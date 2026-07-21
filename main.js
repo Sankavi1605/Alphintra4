@@ -91,6 +91,16 @@ loader.load(
     
     // Create Scroll Animations once loaded
     setupScrollAnimations();
+
+    // Hide loader overlay
+    const loaderOverlay = document.getElementById('loader-overlay');
+    if (loaderOverlay) {
+      loaderOverlay.style.opacity = '0';
+      loaderOverlay.style.visibility = 'hidden';
+      setTimeout(() => {
+        if (loaderOverlay.parentNode) loaderOverlay.parentNode.removeChild(loaderOverlay);
+      }, 800);
+    }
   },
   undefined,
   (error) => {

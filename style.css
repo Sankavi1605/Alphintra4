@@ -24,6 +24,35 @@
   box-sizing: border-box;
 }
 
+/* Loader Styles */
+#loader-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-top);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+.loader-text {
+  font-family: 'Moonwalk', 'Inter', sans-serif;
+  color: var(--text-primary);
+  font-size: 3rem;
+  font-weight: normal;
+  letter-spacing: 0.1em;
+  animation: loader-pulse 1.5s infinite;
+}
+
+@keyframes loader-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background: linear-gradient(to bottom, var(--bg-top), var(--bg-bottom));
