@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OBERMANN WEB DESIGN</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <!-- Three.js Canvas -->
+    <canvas id="webgl-container"></canvas>
+
+    <!-- Navigation -->
+    <nav>
+      <div class="logo">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 12l10 10 10-10L12 2zM12 18l-6-6 6-6 6 6-6 6z" fill="currentColor"/>
+        </svg>
+        OBERMANN WEB DESIGN
+      </div>
+      <div class="nav-links">
+        <a href="#hero">Home</a>
+        <a href="#projects">Projects</a>
+        <a href="#">Pricing</a>
+        <a href="#">About</a>
+        <a href="#">Contact</a>
+      </div>
+      <div class="nav-actions">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+          <polyline points="22,6 12,13 2,6"></polyline>
+        </svg>
+        <svg class="icon" viewBox="0 0 24 24">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+        </svg>
+        <div class="lang-toggle">
+          <span class="active">EN</span>
+          <span>DE</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero">
+      <div class="hero-content">
+        <div class="hero-subtitle">ENOUGH WITH AVERAGE</div>
+        <h1 class="hero-title">Your Website Can Do More</h1>
+        <p class="hero-text">For brands that want to appear online just as high-end as they truly are.</p>
+        <button class="btn">START PROJECT</button>
+      </div>
+      
+      <!-- Moved inside Hero to be perfectly centered during the pinned zoom -->
+      <div class="hole-text">
+        <h2>See For Yourself</h2>
+        <p>Real experiences say more than any promise. Discover what my clients think about working with me and how their projects came to life.</p>
+      </div>
+
+      <div class="scroll-indicator">
+        scroll to explore
+      </div>
+
+      <div class="cards-container">
+        <!-- Card 1 -->
+        <div class="testimonial-card">
+          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+          </svg>
+          <p class="testimonial-text">"The level of detail and quality in the design process was exceptional. Our conversion rates have doubled since the redesign."</p>
+          <div class="testimonial-author">
+            <span class="author-name">Sarah Jenkins</span>
+            <span class="author-company">CEO, Nexus Tech</span>
+          </div>
+        </div>
+        <!-- Card 2 -->
+        <div class="testimonial-card">
+          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+          </svg>
+          <p class="testimonial-text">"Working with Obermann was a game-changer. They understood our brand immediately and elevated it into a digital experience."</p>
+          <div class="testimonial-author">
+            <span class="author-name">David Thorne</span>
+            <span class="author-company">Marketing Dir., Elevate</span>
+          </div>
+        </div>
+        <!-- Card 3 -->
+        <div class="testimonial-card">
+          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+          </svg>
+          <p class="testimonial-text">"A truly high-end service. From the first consultation to the final launch, everything was flawless and exceeded expectations."</p>
+          <div class="testimonial-author">
+            <span class="author-name">Elena Rostova</span>
+            <span class="author-company">Founder, Lusso Design</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects">
+      <div class="section-header">
+        <h2>Projects</h2>
+      </div>
+      
+      <!-- Project 1 -->
+      <div class="project-row">
+        <div class="project-content">
+          <h3>Ronny Herold Consulting</h3>
+          <p>A dark-themed, immersive web presence designed to establish authority and trust in the consulting space. Built with performance and conversion in mind.</p>
+          <a href="#" class="project-link">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+        </div>
+        <div class="project-image">
+          <div style="width: 100%; height: 400px; background: linear-gradient(45deg, #1a1a24, #2a2a35); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 1.5rem;">Dark Theme Screenshot</div>
+        </div>
+      </div>
+
+      <!-- Project 2 -->
+      <div class="project-row">
+        <div class="project-content">
+          <h3>Kreativ-Bauten</h3>
+          <p>A light, airy, and structured digital portfolio for an architecture firm, focusing on large-scale imagery and smooth typography to showcase their physical work.</p>
+          <a href="#" class="project-link">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+        </div>
+        <div class="project-image">
+          <div style="width: 100%; height: 400px; background: linear-gradient(45deg, #e0e0e0, #f5f5f5); display: flex; align-items: center; justify-content: center; color: #333; font-weight: bold; font-size: 1.5rem;">Light Theme Screenshot</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Concepts Section -->
+    <section id="concepts">
+      <div class="section-header">
+        <h2>Concepts</h2>
+      </div>
+      <div class="concepts-grid">
+        <div class="concept-card">
+          <div class="concept-image" style="background: linear-gradient(45deg, #2a2a35, #1a1a24);"></div>
+          <h4>Modern Architecture. Timeless Impact.</h4>
+        </div>
+        <div class="concept-card">
+          <div class="concept-image" style="background: linear-gradient(45deg, #5c3a21, #3a1c0d);"></div>
+          <h4>Where Luxury Meets Horizon</h4>
+        </div>
+        <div class="concept-card">
+          <div class="concept-image" style="background: linear-gradient(45deg, #e0e0e0, #f5f5f5);"></div>
+          <h4 style="color: #333;">Your Ideas. Shaped with Architecture.</h4>
+        </div>
+      </div>
+      <div class="concepts-action">
+        <button class="btn-outline">Show more</button>
+      </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about">
+      <div class="about-header">
+        <h2 class="about-title-top">Meet the person</h2>
+        <h2 class="about-title-bottom">behind the design</h2>
+      </div>
+      <div class="about-grid">
+        <div class="about-image">
+          <div class="portrait-placeholder" style="background: linear-gradient(180deg, rgba(138,43,226,0.1) 0%, rgba(0,0,0,0.5) 100%);"></div>
+        </div>
+        <div class="about-content">
+          <h3>Hey,</h3>
+          <p>my name is Leon Obermann, web designer and developer from Cologne, Germany. I specialize in crafting high-end digital experiences for brands that want to stand out.</p>
+          <p>With a deep understanding of aesthetics and performance, I turn visions into converting realities.</p>
+          <a href="#" class="project-link">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Calculator Section -->
+    <section id="pricing">
+      <div class="section-header">
+        <h2>What your website costs</h2>
+        <p class="section-subtext">Every project is different. The calculator gives you a first estimate.</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-features">
+          <ul class="feature-list">
+            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Custom Design</li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Optimized for Every Device</li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Animations & Interactions</li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Home Page</li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Legal Pages</li>
+          </ul>
+        </div>
+        <div class="pricing-configurator">
+          <div class="config-item">
+            <div class="config-label">
+              <span>Number of Pages</span>
+              <span id="page-count-display">1</span>
+            </div>
+            <input type="range" id="page-slider" min="1" max="20" value="1" class="slider">
+          </div>
+          <div class="config-item toggle-item" data-price="150">
+            <span>Contact Form</span>
+            <div class="toggle-icon">+</div>
+          </div>
+          <div class="config-item toggle-item" data-price="500">
+            <span>Content Management</span>
+            <div class="toggle-icon">+</div>
+          </div>
+          <div class="config-item toggle-item" data-price="300">
+            <span>Multiple Languages</span>
+            <div class="toggle-icon">+</div>
+          </div>
+          <div class="config-item toggle-item" data-price="800">
+            <span>Logo & Branding</span>
+            <div class="toggle-icon">+</div>
+          </div>
+        </div>
+      </div>
+      <div class="pricing-footer">
+        <div class="price-total">from <span id="total-price">€1,290</span></div>
+        <button class="btn btn-wide">GET IN TOUCH</button>
+        <p class="disclaimer">All figures are non-binding estimates.</p>
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact">
+      <div class="contact-grid">
+        <div class="contact-info">
+          <h2>Ready for the next step?</h2>
+          <p class="contact-subtext">Tell me about your brand and project goals.</p>
+          <div class="contact-details">
+            <a href="mailto:hello@obermann.com" class="contact-detail-link">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              hello@obermann.com
+            </a>
+            <a href="tel:+49123456789" class="contact-detail-link">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              +49 123 456 789
+            </a>
+            <a href="#" class="contact-detail-link">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+              LinkedIn
+            </a>
+          </div>
+        </div>
+        <div class="contact-form-container">
+          <form class="contact-form" onsubmit="event.preventDefault();">
+            <div class="input-group">
+              <input type="text" placeholder="Name" required>
+            </div>
+            <div class="input-group">
+              <input type="email" placeholder="Email *" required>
+            </div>
+            <div class="input-group">
+              <input type="tel" placeholder="Phone">
+            </div>
+            <div class="input-group">
+              <textarea placeholder="Message" rows="4" required></textarea>
+            </div>
+            <div class="turnstile-placeholder">
+              <div class="turnstile-circle"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#00c853" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <span>Success</span>
+            </div>
+            <button type="submit" class="btn btn-wide">SEND MESSAGE</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq">
+      <div class="section-header">
+        <h2>FAQ</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>How Much Does a Website Cost?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">Every project is uniquely tailored to your needs. A basic, high-end landing page starts at €1,290. More complex sites with CMS and multi-language support range from €2,000 to €5,000+.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>What Do I Need to Get Started?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">I just need a rough idea of your goals and brand identity. We will refine everything together during our initial strategy call.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>How Long Does a Project Take?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">Typically, a project takes between 2 to 6 weeks, depending on the complexity and how quickly we can iterate on feedback.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>What If I Don't Like the Design?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">The design process is collaborative. We start with concepts and mood boards to ensure we are aligned before any deep coding begins, ensuring you love the final result.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>Can I Update My Content Later?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">Yes, if you opt for the Content Management (CMS) add-on, you will be able to easily update text, images, and projects on your own without touching any code.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>Why Are There No Monthly Costs?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">I build your site on modern, serverless architecture that often falls entirely into free tiers. You own the code completely. (Domain costs still apply).</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">
+            <span>Do You Offer Maintenance or Support After Launch?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">Yes, I offer optional retainer packages for ongoing support, feature additions, and performance monitoring.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div class="footer-top">
+        <div class="footer-col">
+          <a href="#hero">Home</a>
+          <a href="#projects">Projects</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#about">About</a>
+          <a href="#contact">Contact</a>
+          <a href="#">Sitemap</a>
+        </div>
+        <div class="footer-col">
+          <a href="#">Ronny Herold Consulting</a>
+          <a href="#">Kreativ-Bauten</a>
+        </div>
+        <div class="footer-col">
+          <a href="#contact">Contact Form</a>
+          <a href="mailto:hello@obermann.com">hello@obermann.com</a>
+          <a href="tel:+49123456789">+49 123 456 789</a>
+          <a href="#">LinkedIn</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <div class="footer-bottom-left">
+          <svg viewBox="0 0 24 24" class="small-logo"><path d="M12 2L2 12l10 10 10-10L12 2zM12 18l-6-6 6-6 6 6-6 6z" fill="currentColor"/></svg>
+          <span>Copyright © 2026 Obermann Web Design</span>
+          <span class="separator">|</span>
+          <span>Web design from Cologne, NRW</span>
+        </div>
+        <div class="footer-bottom-right">
+          <a href="#">Legal notice</a>
+          <a href="#">Privacy policy</a>
+        </div>
+      </div>
+      <button class="scroll-to-top" id="scrollTopBtn">
+        <svg viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z" fill="currentColor"/></svg>
+      </button>
+    </footer>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
