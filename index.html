@@ -3,329 +3,541 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OBERMANN WEB DESIGN</title>
+    <title>Alphintra | AI, Web, Mobile, Cloud & 3D Engineering Studio</title>
+    <meta name="description" content="Alphintra is an engineering studio building AI-powered, cloud-ready web and mobile products with premium interactive 3D experiences. From startup MVPs to enterprise platforms.">
+    <link rel="canonical" href="https://alphintra.com/">
+    <meta name="theme-color" content="#120814">
+    <meta name="color-scheme" content="dark">
+
+    <!-- Open Graph / social sharing -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Alphintra">
+    <meta property="og:url" content="https://alphintra.com/">
+    <meta property="og:title" content="Alphintra | AI, Web, Mobile, Cloud & 3D Engineering Studio">
+    <meta property="og:description" content="We design and build AI-powered, cloud-ready digital products with premium interactive 3D experiences.">
+    <meta property="og:image" content="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/AlphintraRealLogo-removebg-preview%20(1).png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@alphintra_ai">
+    <meta name="twitter:title" content="Alphintra | AI, Web, Mobile, Cloud & 3D Engineering Studio">
+    <meta name="twitter:description" content="We design and build AI-powered, cloud-ready digital products with premium interactive 3D experiences.">
+    <meta name="twitter:image" content="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/AlphintraRealLogo-removebg-preview%20(1).png">
+
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap">
     <link rel="stylesheet" href="./style.css">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Alphintra",
+      "url": "https://alphintra.com/",
+      "logo": "https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/AlphintraRealLogo-removebg-preview%20(1).png",
+      "description": "Engineering studio building AI, web, mobile, cloud and interactive 3D digital products.",
+      "email": "contact@alphintra.com",
+      "sameAs": [
+        "https://linkedin.com/company/alphintra",
+        "https://x.com/alphintra_ai",
+        "https://www.youtube.com/@alphintra",
+        "https://instagram.com/alphintra",
+        "https://web.facebook.com/profile.php?id=61589295980353"
+      ]
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What services does Alphintra provide?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Alphintra specializes in AI engineering, full-stack web and mobile application development, enterprise cloud architecture, and immersive 3D WebGL experiences." }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Alphintra approach custom project estimates?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Every project starts with a detailed technical discovery. Projects typically range from agile MVP sprints to full enterprise platform deployments. Schedule a call on Calendly and we will come back with an exact scope proposal." }
+        },
+        {
+          "@type": "Question",
+          "name": "How long does a typical digital product take to launch?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Interactive web and 3D landing experiences launch within 2 to 4 weeks. Full custom AI or cloud software platforms typically take 6 to 12 weeks with continuous iterative delivery." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can Alphintra integrate with our existing team or cloud infrastructure?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes, we operate both as a standalone product delivery studio and as an extended engineering team integrated into your AWS/GCP cloud environments." }
+        },
+        {
+          "@type": "Question",
+          "name": "Who owns the IP and source code after project completion?",
+          "acceptedAnswer": { "@type": "Answer", "text": "You retain 100% full ownership of all source code, design assets, and intellectual property." }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
-    <!-- Loader Overlay -->
-    <div id="loader-overlay">
-      <h1 class="loader-text">Loading...</h1>
+    <!-- Loader Overlay (removed by main.js; hidden outright when JS is off) -->
+    <div id="loader-overlay" role="status" aria-live="polite">
+      <p class="loader-text">Loading…</p>
     </div>
+    <noscript>
+      <style>#loader-overlay { display: none; }</style>
+    </noscript>
+
+    <a href="#main" class="skip-link">Skip to main content</a>
 
     <!-- Three.js Canvas -->
-    <canvas id="webgl-container"></canvas>
+    <canvas id="webgl-container" aria-hidden="true"></canvas>
 
-    <!-- Navigation -->
-    <nav>
+    <!-- Navigation: logo left, frosted pill nav centred, hamburger right -->
+    <nav aria-label="Primary">
       <div class="logo">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2L2 12l10 10 10-10L12 2zM12 18l-6-6 6-6 6 6-6 6z" fill="currentColor"/>
-        </svg>
-        OBERMANN WEB DESIGN
+        <a href="#hero" class="logo-link" aria-label="Alphintra — home">
+          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/AlphintraRealLogo-removebg-preview%20(1).png" alt="" width="34" height="38" class="brand-icon-img">
+          <img src="https://pub-04643188b78b434d8c44735a34b1fe23.r2.dev/alphintrabg-removebg-preview.png" alt="Alphintra" width="107" height="28" class="brand-logo-img">
+        </a>
       </div>
-      <div class="nav-links">
+
+      <div class="nav-links liquid-glass">
         <a href="#hero">Home</a>
         <a href="#projects">Projects</a>
-        <a href="#">Pricing</a>
-        <a href="#">About</a>
-        <a href="#">Contact</a>
+        <a href="#concepts">Services</a>
+        <a href="./careers.html">Careers</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
       </div>
+
       <div class="nav-actions">
-        <svg class="icon" viewBox="0 0 24 24">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-          <polyline points="22,6 12,13 2,6"></polyline>
-        </svg>
-        <svg class="icon" viewBox="0 0 24 24">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-        </svg>
-        <div class="lang-toggle">
-          <span class="active">EN</span>
-          <span>DE</span>
-        </div>
+        <a href="mailto:contact@alphintra.com" class="nav-icon-link" aria-label="Email Alphintra">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+        </a>
+        <button class="nav-toggle liquid-glass" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+          <span class="nav-toggle-line"></span>
+          <span class="nav-toggle-line"></span>
+        </button>
       </div>
     </nav>
 
+    <!-- Fullscreen mobile menu -->
+    <div class="mobile-menu" id="mobile-menu" hidden>
+      <button class="mobile-menu-close liquid-glass" type="button" aria-label="Close menu">
+        <span class="mobile-menu-close-line"></span>
+        <span class="mobile-menu-close-line"></span>
+      </button>
+
+      <nav class="mobile-menu-links" aria-label="Mobile">
+        <a href="#hero" style="--i: 0">Home</a>
+        <a href="#projects" style="--i: 1">Projects</a>
+        <a href="#concepts" style="--i: 2">Services</a>
+        <a href="./careers.html" style="--i: 3">Careers</a>
+        <a href="#about" style="--i: 4">About</a>
+        <a href="#contact" style="--i: 5">Contact</a>
+      </nav>
+
+      <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener"
+         class="mobile-menu-cta liquid-glass" style="--i: 6">
+        <span class="status-dot" aria-hidden="true"></span>Schedule a Call
+      </a>
+    </div>
+
+    <main id="main">
     <!-- Hero Section -->
-    <section id="hero">
+    <section id="hero" class="font-helvetica-neue" aria-label="Introduction">
+      <!--
+        Sits *behind* the WebGL canvas, so wherever the chrome form overlaps
+        the wordmark the letters are occluded by the model.
+      -->
+      <h1 class="hero-title">ALPHINTRA</h1>
+
       <div class="hero-content">
-        <div class="hero-subtitle">ENOUGH WITH AVERAGE</div>
-        <h1 class="hero-title">Your Website Can Do More</h1>
-        <p class="hero-text">For brands that want to appear online just as high-end as they truly are.</p>
-        <button class="btn">START PROJECT</button>
-      </div>
-      
-      <!-- Moved inside Hero to be perfectly centered during the pinned zoom -->
-      <div class="hole-text">
-        <h2>See For Yourself</h2>
-        <p>Real experiences say more than any promise. Discover what my clients think about working with me and how their projects came to life.</p>
+        <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="btn btn-glass liquid-glass">SCHEDULE A CALL</a>
       </div>
 
-      <div class="scroll-indicator">
+      <div class="scroll-indicator" aria-hidden="true">
         scroll to explore
       </div>
 
-      <div class="cards-container">
-        <!-- Card 1 -->
-        <div class="testimonial-card">
-          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
-          </svg>
-          <p class="testimonial-text">"The level of detail and quality in the design process was exceptional. Our conversion rates have doubled since the redesign."</p>
-          <div class="testimonial-author">
-            <span class="author-name">Sarah Jenkins</span>
-            <span class="author-company">CEO, Nexus Tech</span>
-          </div>
+      <!--
+        Revealed during the 3D zoom scroll. The heading and the testimonial are
+        rows of one grid so the browser stacks them; the card row expands from
+        0fr, which keeps the pair centred without measuring anything in JS.
+      -->
+      <div class="hole-stage">
+        <div class="hole-text">
+          <h2>See For Yourself</h2>
+          <p>Real products say more than any promise. Discover what our clients build with Alphintra and how their digital platforms come to life.</p>
         </div>
-        <!-- Card 2 -->
-        <div class="testimonial-card">
-          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor">
+
+        <div class="cards-container">
+          <!-- Single Featured Card: Angajan Ramanathan -->
+          <figure class="testimonial-card">
+          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
             <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
           </svg>
-          <p class="testimonial-text">"Working with Obermann was a game-changer. They understood our brand immediately and elevated it into a digital experience."</p>
-          <div class="testimonial-author">
-            <span class="author-name">David Thorne</span>
-            <span class="author-company">Marketing Dir., Elevate</span>
-          </div>
+          <blockquote class="testimonial-text">Before partnering with ALPHINTRA, our trading system was fragile and unreliable. Critical features were hardcoded, automation was incomplete, and the architecture made it nearly impossible to add new features without breaking existing ones. ALPHINTRA completely rearchitected our system from scratch. They built a production-grade, distributed computing infrastructure that now handles massive real-time data loads with full reliability — a system built right, the way it should have been from the start.</blockquote>
+          <figcaption class="testimonial-author">
+            <span class="author-name">Angajan Ramanathan</span>
+            <span class="author-company">Former Member of Parliament, Sri Lanka</span>
+          </figcaption>
+          </figure>
         </div>
-        <!-- Card 3 -->
-        <div class="testimonial-card">
-          <svg class="quote-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
-          </svg>
-          <p class="testimonial-text">"A truly high-end service. From the first consultation to the final launch, everything was flawless and exceeded expectations."</p>
-          <div class="testimonial-author">
-            <span class="author-name">Elena Rostova</span>
-            <span class="author-company">Founder, Lusso Design</span>
+      </div>
+    </section>
+
+    <!--
+      Projects: a single pinned page. The chrome figure stays locked in the
+      middle while each project is swapped through in front of it.
+    -->
+    <section id="projects" aria-labelledby="projects-heading">
+      <div class="projects-stage">
+        <!-- Particle sphere background; starts rendering as the section arrives. -->
+        <div class="projects-figure" id="projects-sphere" aria-hidden="true"></div>
+
+        <div class="projects-inner">
+          <div class="section-header projects-head">
+            <h2 id="projects-heading">Our Featured Work</h2>
+          </div>
+
+          <div class="projects-deck" aria-live="polite">
+          <article class="project-slide liquid-glass" aria-roledescription="slide" aria-label="Project 1 of 3">
+        <div class="project-content">
+          <div class="project-tags">
+            <span class="tag">AI System</span>
+            <span class="tag">Web3</span>
+            <span class="tag">WebGL 3D</span>
+          </div>
+          <h3>CipherLux Platform</h3>
+          <p>Next-generation AI & Web3 intelligence ecosystem engineered with high-frequency data pipelines, real-time analytics, and an immersive WebGL interface.</p>
+          <a href="https://app.cipherlux.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the CipherLux Platform project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+        </div>
+        <div class="project-image">
+          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/Screenshot%202026-02-28%20at%201.32.06%E2%80%AFPM.png" alt="The CipherLux platform dashboard" width="3024" height="1650" loading="lazy" decoding="async">
+        </div>
+          </article>
+
+          <article class="project-slide liquid-glass" aria-roledescription="slide" aria-label="Project 2 of 3">
+        <div class="project-content">
+          <div class="project-tags">
+            <span class="tag">Enterprise Portal</span>
+            <span class="tag">Cloud Architecture</span>
+            <span class="tag">Security</span>
+          </div>
+          <h3>MCAS Official Portal</h3>
+          <p>Enterprise academic & medical research portal featuring high-concurrency role management, secure document architecture, and real-time data sync.</p>
+          <a href="https://themcas.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the MCAS Official Portal project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+        </div>
+        <div class="project-image">
+          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/Screenshot%202026-06-16%20230057.png" alt="The MCAS academic and medical research portal" width="1897" height="866" loading="lazy" decoding="async">
+        </div>
+          </article>
+
+          <article class="project-slide liquid-glass" aria-roledescription="slide" aria-label="Project 3 of 3">
+        <div class="project-content">
+          <div class="project-tags">
+            <span class="tag">Industrial</span>
+            <span class="tag">Logistics ERP</span>
+            <span class="tag">Digital Web</span>
+          </div>
+          <h3>Thurka Metal Crushers</h3>
+          <p>Industrial & infrastructure platform showcasing heavy machinery logistics, quarry inventory automation, and modern brand digital presence.</p>
+          <a href="https://thurkametalcrushers.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the Thurka Metal Crushers project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+        </div>
+        <div class="project-image">
+          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/Screenshot%202026-06-16%20225306.png" alt="The Thurka Metal Crushers industrial platform" width="1900" height="867" loading="lazy" decoding="async">
+        </div>
+          </article>
+
+          </div>
+
+          <div class="projects-progress" aria-hidden="true">
+            <span class="projects-counter"><span class="projects-current">1</span><span class="projects-total">/ 3</span></span>
+            <span class="projects-bar"><span class="projects-bar-fill"></span></span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Projects Section -->
-    <section id="projects">
-      <div class="section-header">
-        <h2>Projects</h2>
-      </div>
-      
-      <!-- Project 1 -->
-      <div class="project-row">
-        <div class="project-content">
-          <h3>Ronny Herold Consulting</h3>
-          <p>A dark-themed, immersive web presence designed to establish authority and trust in the consulting space. Built with performance and conversion in mind.</p>
-          <a href="#" class="project-link">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+    <!-- Concepts / Engineering Tracks Section -->
+    <section id="concepts" aria-labelledby="concepts-heading" data-spotlight>
+      <!-- Layer 1: still background -->
+      <div class="spotlight-layers" aria-hidden="true">
+        <div class="spotlight-media" aria-hidden="true">
+          <img class="spotlight-bg" src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/ChatGPT%20Image%20Aug%203%2C%202026%2C%2005_29_28%20PM.png"
+               alt="" width="1672" height="941" loading="lazy" decoding="async">
         </div>
-        <div class="project-image">
-          <div style="width: 100%; height: 400px; background: linear-gradient(45deg, #1a1a24, #2a2a35); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 1.5rem;">Dark Theme Screenshot</div>
+        <div class="spotlight-reveal" aria-hidden="true">
+          <video class="spotlight-video" muted loop playsinline preload="none" disablepictureinpicture>
+            <source src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/Create_video_from_images_1080p_202608031736.mp4" type="video/mp4">
+          </video>
         </div>
       </div>
 
-      <!-- Project 2 -->
-      <div class="project-row">
-        <div class="project-content">
-          <h3>Kreativ-Bauten</h3>
-          <p>A light, airy, and structured digital portfolio for an architecture firm, focusing on large-scale imagery and smooth typography to showcase their physical work.</p>
-          <a href="#" class="project-link">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
-        </div>
-        <div class="project-image">
-          <div style="width: 100%; height: 400px; background: linear-gradient(45deg, #e0e0e0, #f5f5f5); display: flex; align-items: center; justify-content: center; color: #333; font-weight: bold; font-size: 1.5rem;">Light Theme Screenshot</div>
-        </div>
-      </div>
-    </section>
+      <!--
+        Layer 2: spotlight reveal. The film sits on top of the still but is
+        masked to a soft 260px circle that follows the cursor, so it only
+        shows where the pointer is. See initConceptsSpotlight().
+      -->
 
-    <!-- Concepts Section -->
-    <section id="concepts">
-      <div class="section-header">
-        <h2>Concepts</h2>
-      </div>
-      <div class="concepts-grid">
-        <div class="concept-card">
-          <div class="concept-image" style="background: linear-gradient(45deg, #2a2a35, #1a1a24);"></div>
-          <h4>Modern Architecture. Timeless Impact.</h4>
+      <div class="concepts-inner">
+        <div class="section-header">
+          <h2 id="concepts-heading">Engineering Capabilities</h2>
+          <p class="section-subtext">Six disciplines we bring to every build, from the first architecture diagram through to production scale.</p>
         </div>
-        <div class="concept-card">
-          <div class="concept-image" style="background: linear-gradient(45deg, #5c3a21, #3a1c0d);"></div>
-          <h4>Where Luxury Meets Horizon</h4>
+
+        <div class="concepts-grid">
+          <article class="concept-card liquid-glass">
+            <span class="concept-index" aria-hidden="true">01</span>
+            <h4>AI &amp; Intelligent Systems</h4>
+            <p class="concept-desc">Autonomous AI agents, LLM integrations, and automated decision pipelines.</p>
+            <ul class="concept-list">
+              <li>LLM &amp; agent orchestration</li>
+              <li>Retrieval and knowledge pipelines</li>
+              <li>Automated decision workflows</li>
+            </ul>
+          </article>
+
+          <article class="concept-card liquid-glass">
+            <span class="concept-index" aria-hidden="true">02</span>
+            <h4>Web &amp; Mobile Engineering</h4>
+            <p class="concept-desc">High-performance full-stack web platforms and cross-platform mobile apps.</p>
+            <ul class="concept-list">
+              <li>Full-stack product builds</li>
+              <li>Cross-platform mobile apps</li>
+              <li>Performance and Core Web Vitals</li>
+            </ul>
+          </article>
+
+          <article class="concept-card liquid-glass">
+            <span class="concept-index" aria-hidden="true">03</span>
+            <h4>Interactive 3D &amp; WebGL</h4>
+            <p class="concept-desc">Immersive 3D web experiences, shader effects, and interactive product reveals.</p>
+            <ul class="concept-list">
+              <li>Real-time WebGL scenes</li>
+              <li>Custom shaders and materials</li>
+              <li>Scroll-driven product reveals</li>
+            </ul>
+          </article>
+
+          <article class="concept-card liquid-glass">
+            <span class="concept-index" aria-hidden="true">04</span>
+            <h4>Cloud &amp; DevOps</h4>
+            <p class="concept-desc">Enterprise cloud architecture on AWS and GCP, provisioned and deployed as code.</p>
+            <ul class="concept-list">
+              <li>AWS &amp; GCP architecture</li>
+              <li>CI/CD and infrastructure as code</li>
+              <li>Observability and cost control</li>
+            </ul>
+          </article>
+
+          <article class="concept-card liquid-glass">
+            <span class="concept-index" aria-hidden="true">05</span>
+            <h4>Data &amp; Distributed Systems</h4>
+            <p class="concept-desc">Distributed infrastructure that carries heavy real-time data loads without falling over.</p>
+            <ul class="concept-list">
+              <li>High-frequency data pipelines</li>
+              <li>Real-time analytics and sync</li>
+              <li>Distributed compute at scale</li>
+            </ul>
+          </article>
+
+          <article class="concept-card liquid-glass">
+            <span class="concept-index" aria-hidden="true">06</span>
+            <h4>Security &amp; Reliability</h4>
+            <p class="concept-desc">Role-based access, secure document architecture, and high-concurrency systems.</p>
+            <ul class="concept-list">
+              <li>Role and permission modelling</li>
+              <li>Secure document architecture</li>
+              <li>High-concurrency hardening</li>
+            </ul>
+          </article>
         </div>
-        <div class="concept-card">
-          <div class="concept-image" style="background: linear-gradient(45deg, #e0e0e0, #f5f5f5);"></div>
-          <h4 style="color: #333;">Your Ideas. Shaped with Architecture.</h4>
+
+        <div class="concepts-action">
+          <p class="concepts-action-text">Not sure which of these your project needs? That is what the first call is for.</p>
+          <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="btn-outline">Book Technical Consultation</a>
         </div>
-      </div>
-      <div class="concepts-action">
-        <button class="btn-outline">Show more</button>
       </div>
     </section>
 
     <!-- About Section -->
-    <section id="about">
+    <section id="about" aria-labelledby="about-heading">
       <div class="about-header">
-        <h2 class="about-title-top">Meet the person</h2>
-        <h2 class="about-title-bottom">behind the design</h2>
+        <h2 class="about-title-top" id="about-heading">Engineering Studio</h2>
+        <p class="about-title-bottom">for Scalable Products</p>
       </div>
       <div class="about-grid">
         <div class="about-image">
-          <div class="portrait-placeholder" style="background: linear-gradient(180deg, rgba(138,43,226,0.1) 0%, rgba(0,0,0,0.5) 100%);"></div>
+          <div class="about-blob" id="about-blob" aria-hidden="true"></div>
         </div>
         <div class="about-content">
-          <h3>Hey,</h3>
-          <p>my name is Leon Obermann, web designer and developer from Cologne, Germany. I specialize in crafting high-end digital experiences for brands that want to stand out.</p>
-          <p>With a deep understanding of aesthetics and performance, I turn visions into converting realities.</p>
-          <a href="#" class="project-link">Learn more <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+          <h3>Alphintra</h3>
+          <p>We are a dedicated engineering studio building high-performance AI, web, mobile, cloud, and interactive 3D digital products.</p>
+          <p>From early-stage startup MVPs to enterprise cloud architectures, we combine premium aesthetics with robust engineering to turn ambitious ideas into market leaders.</p>
+          <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="project-link">Schedule a Call <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
         </div>
-      </div>
-    </section>
-
-    <!-- Pricing Calculator Section -->
-    <section id="pricing">
-      <div class="section-header">
-        <h2>What your website costs</h2>
-        <p class="section-subtext">Every project is different. The calculator gives you a first estimate.</p>
-      </div>
-      <div class="pricing-grid">
-        <div class="pricing-features">
-          <ul class="feature-list">
-            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Custom Design</li>
-            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Optimized for Every Device</li>
-            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Animations & Interactions</li>
-            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Home Page</li>
-            <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Legal Pages</li>
-          </ul>
-        </div>
-        <div class="pricing-configurator">
-          <div class="config-item">
-            <div class="config-label">
-              <span>Number of Pages</span>
-              <span id="page-count-display">1</span>
-            </div>
-            <input type="range" id="page-slider" min="1" max="20" value="1" class="slider">
-          </div>
-          <div class="config-item toggle-item" data-price="150">
-            <span>Contact Form</span>
-            <div class="toggle-icon">+</div>
-          </div>
-          <div class="config-item toggle-item" data-price="500">
-            <span>Content Management</span>
-            <div class="toggle-icon">+</div>
-          </div>
-          <div class="config-item toggle-item" data-price="300">
-            <span>Multiple Languages</span>
-            <div class="toggle-icon">+</div>
-          </div>
-          <div class="config-item toggle-item" data-price="800">
-            <span>Logo & Branding</span>
-            <div class="toggle-icon">+</div>
-          </div>
-        </div>
-      </div>
-      <div class="pricing-footer">
-        <div class="price-total">from <span id="total-price">€1,290</span></div>
-        <button class="btn btn-wide">GET IN TOUCH</button>
-        <p class="disclaimer">All figures are non-binding estimates.</p>
       </div>
     </section>
 
     <!-- Contact Section -->
-    <section id="contact">
+    <section id="contact" aria-labelledby="contact-heading">
+      <div class="contact-media" aria-hidden="true">
+        <img src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/ChatGPT%20Image%20Aug%203%2C%202026%2C%2009_38_37%20PM-Photoroom.png"
+             alt="" width="1024" height="1536" loading="lazy" decoding="async">
+      </div>
+
       <div class="contact-grid">
         <div class="contact-info">
-          <h2>Ready for the next step?</h2>
-          <p class="contact-subtext">Tell me about your brand and project goals.</p>
-          <div class="contact-details">
-            <a href="mailto:hello@obermann.com" class="contact-detail-link">
-              <svg viewBox="0 0 24 24" class="icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              hello@obermann.com
+          <p class="contact-eyebrow">LET&rsquo;S TALK</p>
+          <h2 id="contact-heading">Let&rsquo;s Build Something Meaningful</h2>
+          <p class="contact-subtext">Tell us what you are building: AI platform, SaaS product, enterprise system, or digital experience. We will help you architect it, build it, and scale it.</p>
+
+          <div class="contact-details liquid-glass">
+            <a href="mailto:contact@alphintra.com" class="contact-detail-link">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" focusable="false"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              <span class="contact-detail-body">
+                <span class="contact-detail-label">Email</span>
+                <span class="contact-detail-value">contact@alphintra.com</span>
+              </span>
             </a>
-            <a href="tel:+49123456789" class="contact-detail-link">
-              <svg viewBox="0 0 24 24" class="icon"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-              +49 123 456 789
+            <a href="tel:+94740886002" class="contact-detail-link">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" focusable="false"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              <span class="contact-detail-body">
+                <span class="contact-detail-label">Phone</span>
+                <span class="contact-detail-value">+94 74 088 6002</span>
+              </span>
             </a>
-            <a href="#" class="contact-detail-link">
-              <svg viewBox="0 0 24 24" class="icon"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
-              LinkedIn
+            <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="contact-detail-link">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span class="contact-detail-body">
+                <span class="contact-detail-label">Book a slot</span>
+                <span class="contact-detail-value">Schedule a Call</span>
+              </span>
             </a>
           </div>
         </div>
-        <div class="contact-form-container">
-          <form class="contact-form" onsubmit="event.preventDefault();">
-            <div class="input-group">
-              <input type="text" placeholder="Name" required>
-            </div>
-            <div class="input-group">
-              <input type="email" placeholder="Email *" required>
-            </div>
-            <div class="input-group">
-              <input type="tel" placeholder="Phone">
-            </div>
-            <div class="input-group">
-              <textarea placeholder="Message" rows="4" required></textarea>
-            </div>
-            <div class="turnstile-placeholder">
-              <div class="turnstile-circle"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#00c853" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-              <span>Success</span>
-            </div>
-            <button type="submit" class="btn btn-wide">SEND MESSAGE</button>
-          </form>
-        </div>
+
+        <!--
+          Static site: with no `data-endpoint` the form validates in the browser
+          and hands the message to the visitor's mail client. To post to a real
+          backend instead, add data-endpoint="https://…" to the <form> below.
+        -->
+        <form class="contact-form liquid-glass" id="contact-form" novalidate>
+          <div class="input-group">
+            <label for="contact-name">Your name</label>
+            <input type="text" id="contact-name" name="name" autocomplete="name" required
+                   data-error-message="Please tell us your name."
+                   aria-describedby="contact-name-error">
+            <p class="field-error" id="contact-name-error" aria-live="polite"></p>
+          </div>
+          <div class="input-group">
+            <label for="contact-email">Your email</label>
+            <input type="email" id="contact-email" name="email" autocomplete="email" required
+                   data-error-message="Please enter a valid email address so we can reply."
+                   aria-describedby="contact-email-error">
+            <p class="field-error" id="contact-email-error" aria-live="polite"></p>
+          </div>
+          <div class="input-group">
+            <label for="contact-message">Project details &amp; timeline</label>
+            <textarea id="contact-message" name="message" rows="4" required
+                      data-error-message="A sentence or two about the project helps us reply usefully."
+                      aria-describedby="contact-message-error"></textarea>
+            <p class="field-error" id="contact-message-error" aria-live="polite"></p>
+          </div>
+
+          <!-- Honeypot: hidden from people, tempting to bots. -->
+          <div class="honeypot" aria-hidden="true">
+            <label for="company-website">Leave this field empty</label>
+            <input type="text" id="company-website" name="company_website" tabindex="-1" autocomplete="off">
+          </div>
+
+          <!-- Mount Cloudflare Turnstile here when a backend is wired up:
+               <div class="cf-turnstile" data-sitekey="YOUR_SITE_KEY"></div> -->
+
+          <button type="submit" class="btn btn-wide">SEND MESSAGE</button>
+          <p class="form-status" role="status" aria-live="polite"></p>
+        </form>
       </div>
     </section>
 
     <!-- FAQ Section -->
-    <section id="faq">
+    <section id="faq" aria-labelledby="faq-heading" data-spotlight>
+      <div class="spotlight-layers" aria-hidden="true">
+        <div class="spotlight-media faq-scrim" aria-hidden="true">
+          <img class="spotlight-bg" src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/ChatGPT%20Image%20Aug%203%2C%202026%2C%2007_26_19%20PM.png"
+               alt="" width="1672" height="941" loading="lazy" decoding="async">
+        </div>
+        <div class="spotlight-reveal" aria-hidden="true">
+          <video class="spotlight-video" muted loop playsinline preload="none" disablepictureinpicture>
+            <source src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/Create_video_blue_purple_colors_202608031931.mp4" type="video/mp4">
+          </video>
+        </div>
+      </div>
+
+
+      <div class="faq-inner">
       <div class="section-header">
-        <h2>FAQ</h2>
+        <h2 id="faq-heading">Frequently Asked Questions</h2>
       </div>
       <div class="faq-list">
         <div class="faq-item">
-          <div class="faq-question">
-            <span>How Much Does a Website Cost?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">Every project is uniquely tailored to your needs. A basic, high-end landing page starts at €1,290. More complex sites with CMS and multi-language support range from €2,000 to €5,000+.</div>
+          <h3 class="faq-heading">
+            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a1" id="faq-q1">
+              <span>What services does Alphintra provide?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </button>
+          </h3>
+          <div class="faq-answer" id="faq-a1" role="region" aria-labelledby="faq-q1">Alphintra specializes in AI engineering, full-stack web and mobile application development, enterprise cloud architecture, and immersive 3D WebGL experiences.</div>
         </div>
         <div class="faq-item">
-          <div class="faq-question">
-            <span>What Do I Need to Get Started?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">I just need a rough idea of your goals and brand identity. We will refine everything together during our initial strategy call.</div>
+          <h3 class="faq-heading">
+            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a2" id="faq-q2">
+              <span>How does Alphintra approach custom project estimates?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </button>
+          </h3>
+          <div class="faq-answer" id="faq-a2" role="region" aria-labelledby="faq-q2">Every project starts with a detailed technical discovery. Projects typically range from agile MVP sprints to full enterprise platform deployments. Schedule a call on Calendly and we will come back with an exact scope proposal.</div>
         </div>
         <div class="faq-item">
-          <div class="faq-question">
-            <span>How Long Does a Project Take?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">Typically, a project takes between 2 to 6 weeks, depending on the complexity and how quickly we can iterate on feedback.</div>
+          <h3 class="faq-heading">
+            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a3" id="faq-q3">
+              <span>How long does a typical digital product take to launch?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </button>
+          </h3>
+          <div class="faq-answer" id="faq-a3" role="region" aria-labelledby="faq-q3">Interactive web and 3D landing experiences launch within 2 to 4 weeks. Full custom AI or cloud software platforms typically take 6 to 12 weeks with continuous iterative delivery.</div>
         </div>
         <div class="faq-item">
-          <div class="faq-question">
-            <span>What If I Don't Like the Design?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">The design process is collaborative. We start with concepts and mood boards to ensure we are aligned before any deep coding begins, ensuring you love the final result.</div>
+          <h3 class="faq-heading">
+            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a4" id="faq-q4">
+              <span>Can Alphintra integrate with our existing team or cloud infrastructure?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </button>
+          </h3>
+          <div class="faq-answer" id="faq-a4" role="region" aria-labelledby="faq-q4">Yes, we operate both as a standalone product delivery studio and as an extended engineering team integrated into your AWS/GCP cloud environments.</div>
         </div>
         <div class="faq-item">
-          <div class="faq-question">
-            <span>Can I Update My Content Later?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">Yes, if you opt for the Content Management (CMS) add-on, you will be able to easily update text, images, and projects on your own without touching any code.</div>
-        </div>
-        <div class="faq-item">
-          <div class="faq-question">
-            <span>Why Are There No Monthly Costs?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">I build your site on modern, serverless architecture that often falls entirely into free tiers. You own the code completely. (Domain costs still apply).</div>
-        </div>
-        <div class="faq-item">
-          <div class="faq-question">
-            <span>Do You Offer Maintenance or Support After Launch?</span>
-            <span class="faq-icon">+</span>
-          </div>
-          <div class="faq-answer">Yes, I offer optional retainer packages for ongoing support, feature additions, and performance monitoring.</div>
+          <h3 class="faq-heading">
+            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a5" id="faq-q5">
+              <span>Who owns the IP and source code after project completion?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </button>
+          </h3>
+          <div class="faq-answer" id="faq-a5" role="region" aria-labelledby="faq-q5">You retain 100% full ownership of all source code, design assets, and intellectual property.</div>
         </div>
       </div>
+      </div>
     </section>
+    </main>
 
     <!-- Footer -->
     <footer>
@@ -333,36 +545,50 @@
         <div class="footer-col">
           <a href="#hero">Home</a>
           <a href="#projects">Projects</a>
-          <a href="#pricing">Pricing</a>
+          <a href="#concepts">Services</a>
+          <a href="./careers.html">Careers</a>
           <a href="#about">About</a>
           <a href="#contact">Contact</a>
-          <a href="#">Sitemap</a>
         </div>
         <div class="footer-col">
-          <a href="#">Ronny Herold Consulting</a>
-          <a href="#">Kreativ-Bauten</a>
+          <a href="https://app.cipherlux.com/" target="_blank" rel="noopener">CipherLux</a>
+          <a href="https://themcas.com/" target="_blank" rel="noopener">MCAS Portal</a>
+          <a href="https://thurkametalcrushers.com/" target="_blank" rel="noopener">Thurka Metal Crushers</a>
+          <div class="footer-social-links">
+            <a href="https://web.facebook.com/profile.php?id=61589295980353" target="_blank" rel="noopener" aria-label="Facebook" class="social-circle-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            </a>
+            <a href="https://linkedin.com/company/alphintra" target="_blank" rel="noopener" aria-label="LinkedIn" class="social-circle-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            </a>
+            <a href="https://x.com/alphintra_ai" target="_blank" rel="noopener" aria-label="X (Twitter)" class="social-circle-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a href="https://www.youtube.com/@alphintra" target="_blank" rel="noopener" aria-label="YouTube" class="social-circle-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            </a>
+            <a href="https://instagram.com/alphintra" target="_blank" rel="noopener" aria-label="Instagram" class="social-circle-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            </a>
+          </div>
         </div>
         <div class="footer-col">
-          <a href="#contact">Contact Form</a>
-          <a href="mailto:hello@obermann.com">hello@obermann.com</a>
-          <a href="tel:+49123456789">+49 123 456 789</a>
-          <a href="#">LinkedIn</a>
+          <a href="#contact">Contact Us</a>
+          <a href="mailto:contact@alphintra.com">contact@alphintra.com</a>
+          <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener">Schedule Calendly Call</a>
+          <a href="https://alphintra.com/" target="_blank" rel="noopener">alphintra.com</a>
         </div>
       </div>
       <div class="footer-bottom">
         <div class="footer-bottom-left">
-          <svg viewBox="0 0 24 24" class="small-logo"><path d="M12 2L2 12l10 10 10-10L12 2zM12 18l-6-6 6-6 6 6-6 6z" fill="currentColor"/></svg>
-          <span>Copyright © 2026 Obermann Web Design</span>
+          <img src="https://pub-04643188b78b434d8c44735a34b1fe23.r2.dev/alphintrabg-removebg-preview.png" alt="" width="107" height="28" class="footer-logo-img">
+          <span>Copyright © <span data-current-year>2026</span> Alphintra. All rights reserved.</span>
           <span class="separator">|</span>
-          <span>Web design from Cologne, NRW</span>
-        </div>
-        <div class="footer-bottom-right">
-          <a href="#">Legal notice</a>
-          <a href="#">Privacy policy</a>
+          <span>AI, Web, Mobile, Cloud & 3D Engineering</span>
         </div>
       </div>
-      <button class="scroll-to-top" id="scrollTopBtn">
-        <svg viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z" fill="currentColor"/></svg>
+      <button class="scroll-to-top" id="scrollTopBtn" aria-label="Scroll to top">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4l-8 8h6v8h4v-8h6z" fill="currentColor"/></svg>
       </button>
     </footer>
 

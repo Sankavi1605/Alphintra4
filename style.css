@@ -1,10 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @font-face {
   font-family: 'Moonwalk';
+  /* Filename is lowercase on disk — case-sensitive hosts 404 on any other spelling. */
   src: url('./moonwalk.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Self-hosted Helvetica Neue Roman.
+ * NOTE: the binaries are not in the repo — drop HelveticaNeue-Roman.woff2 and
+ * .woff into public/fonts/ and this picks them up. Until then font-display
+ * swap falls through to the stack below, so nothing breaks.
+ */
+@font-face {
+  font-family: 'Helvetica Neue Roman';
+  src: url('/fonts/HelveticaNeue-Roman.woff2') format('woff2'),
+       url('/fonts/HelveticaNeue-Roman.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-helvetica-neue {
+  font-family: 'Helvetica Neue Roman', 'Helvetica Neue', Helvetica, 'Inter', Arial, sans-serif;
 }
 
 :root {
@@ -14,14 +35,51 @@
   --text-secondary: #a0a0a0;
   --accent: #ffffff;
   --accent-text: #000000;
+  --brand: #8a2be2;
+  --brand-soft: #d8b4fe;
+  --danger: #ff8b8b;
+  --success: #7ee0b8;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.05);
+  --nav-height: 64px;
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Visible keyboard focus everywhere, without showing rings on mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--brand-soft);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -120%);
+  z-index: 10000;
+  padding: 0.75rem 1.5rem;
+  background: #ffffff;
+  color: #080510;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: 0 0 8px 8px;
+  transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+/* Set while the fullscreen mobile menu is open. */
+body.no-scroll {
+  overflow: hidden;
 }
 
 /* Loader Styles */
@@ -51,6 +109,11 @@
 @keyframes loader-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-height) + 26px);
 }
 
 body {
@@ -85,75 +148,311 @@ a:hover {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: -1;
+  /*
+   * Above .hero-title (z 1) so the model occludes the wordmark, but below the
+   * hero copy (3), the scroll reveal (10) and the nav (20). Every section
+   * after the hero is lifted to z 3 so the canvas never covers them.
+   */
+  z-index: 2;
   pointer-events: none;
-  opacity: 0.15; /* Start faint so it doesn't distract from hero text */
+  /*
+   * Full strength from the start. At 0.15 the model was too faint to hide
+   * anything, so the wordmark behind it read as being in front.
+   */
+  opacity: 1;
 }
 
-/* Navbar */
+/* Keep the rest of the page in front of the fixed canvas. */
+#projects,
+#concepts,
+#about,
+#contact,
+#faq,
+footer {
+  position: relative;
+  z-index: 3;
+}
+
+/* =========================================================================
+ * Navbar — frosted pill system
+ * Logo left, .liquid-glass pill nav centred, hamburger right. The bar itself
+ * stays transparent; only the pills are glass.
+ * ====================================================================== */
 nav {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  padding: 1.5rem 4rem;
+  z-index: 50;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  z-index: 100;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background: rgba(18, 8, 20, 0.5);
-  border-bottom: 1px solid var(--glass-border);
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem; /* py-4 px-5 */
+  background: transparent;
+  animation: nav-fade-down 0.5s ease-out both;
+}
+
+@media (min-width: 640px) {
+  nav { padding: 1.25rem 2rem; } /* sm:py-5 sm:px-8 */
+}
+
+@media (min-width: 1024px) {
+  nav { padding: 1.25rem 2.5rem; } /* lg:px-10 */
+}
+
+@keyframes nav-fade-down {
+  from { opacity: 0; transform: translateY(-0.75rem); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .logo {
-  font-weight: 800;
-  font-size: 1.2rem;
-  letter-spacing: 0.15em;
-  color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
 }
 
-.logo svg {
-  width: 24px;
-  height: 24px;
-}
-
-.nav-links {
+.logo-link {
   display: flex;
-  gap: 2rem;
+  align-items: center;
+  gap: 0.6rem;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.brand-logo-img {
+  height: 1.05rem;
+  width: auto;
+  object-fit: contain;
+}
+
+@media (min-width: 640px) {
+  .brand-logo-img { height: 1.25rem; }
+}
+
+/*
+ * Centre pill — hidden below md, where the fullscreen menu takes over.
+ * Scoped to `nav` so it outranks .liquid-glass's `position: relative`,
+ * which is declared later in this file.
+ */
+nav .nav-links {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 9999px;
 }
 
 .nav-links a {
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9999px;
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7); /* text-white/70 */
+  white-space: nowrap;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible,
+.nav-links a.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 1;
+}
+
+@media (max-width: 767.98px) {
+  .nav-links { display: none; }
 }
 
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 0.6rem;
 }
 
-.lang-toggle {
-  display: flex;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+.nav-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.2s ease;
 }
 
-.lang-toggle span {
-  opacity: 0.5;
-  cursor: pointer;
-  transition: opacity 0.3s ease;
-}
-
-.lang-toggle span.active, .lang-toggle span:hover {
+.nav-icon-link:hover {
+  color: #ffffff;
   opacity: 1;
 }
+
+.nav-icon-link .icon {
+  stroke: currentColor;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Hamburger pill — two lines of different widths, md:hidden */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.nav-toggle-line {
+  display: block;
+  height: 1.5px;
+  background: #ffffff;
+  border-radius: 2px;
+}
+
+.nav-toggle-line:nth-child(1) { width: 1.25rem; }  /* w-5 */
+.nav-toggle-line:nth-child(2) { width: 0.875rem; } /* w-3.5 */
+
+@media (max-width: 767.98px) {
+  .nav-toggle { display: inline-flex; }
+}
+
+/* =========================================================================
+ * Fullscreen mobile menu
+ * ====================================================================== */
+.mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: #0a0a0a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 5rem 1.5rem 3rem;
+}
+
+.mobile-menu[hidden] {
+  display: none;
+}
+
+/* Scoped for the same reason as nav .nav-links — beats .liquid-glass. */
+.mobile-menu .mobile-menu-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.8);
+  animation: menu-close-in 0.5s cubic-bezier(0.77, 0, 0.18, 1) 60ms forwards;
+}
+
+@media (min-width: 640px) {
+  .mobile-menu .mobile-menu-close { top: 1.25rem; right: 2rem; }
+}
+
+@keyframes menu-close-in {
+  to { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+
+/* X built from two rotated lines, stacked in the same grid cell. */
+.mobile-menu-close-line {
+  grid-area: 1 / 1;
+  width: 1.05rem;
+  height: 1.5px;
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+.mobile-menu-close-line:nth-child(1) { transform: rotate(45deg); }
+.mobile-menu-close-line:nth-child(2) { transform: rotate(-45deg); }
+
+.mobile-menu-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  text-align: center;
+}
+
+.mobile-menu-links a,
+.mobile-menu-cta {
+  opacity: 0;
+  transform: translateY(24px);
+  /* Staggered: 100ms base, +60ms per item. */
+  animation: menu-item-in 0.55s cubic-bezier(0.77, 0, 0.18, 1) forwards;
+  animation-delay: calc(100ms + var(--i, 0) * 60ms);
+}
+
+@keyframes menu-item-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mobile-menu-links a {
+  font-size: 1.875rem; /* text-3xl */
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@media (min-width: 640px) {
+  .mobile-menu-links a { font-size: 2.25rem; } /* sm:text-4xl */
+}
+
+.mobile-menu-links a:hover,
+.mobile-menu-links a.active {
+  color: #ffffff;
+  opacity: 1;
+}
+
+.mobile-menu-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.mobile-menu-cta:hover {
+  opacity: 1;
+}
+
+.status-dot {
+  width: 0.5rem;  /* w-2 */
+  height: 0.5rem; /* h-2 */
+  border-radius: 9999px;
+  background: #4ade80; /* green-400 */
+  flex-shrink: 0;
+}
+
+.footer-logo-img {
+  height: 24px;
+  width: auto;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
 
 .icon {
   width: 20px;
@@ -186,6 +485,28 @@ nav {
   opacity: 1;
 }
 
+/* Frosted variant — surface comes from .liquid-glass. */
+.btn-glass {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  border-radius: 9999px;
+  padding: 0.85rem 1.9rem;
+}
+
+.btn-glass:hover {
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 12px 36px rgba(0, 0, 0, 0.25);
+}
+
+.btn-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Hero Section */
 #hero {
   height: 100vh;
@@ -193,11 +514,75 @@ nav {
   overflow: hidden;
 }
 
+/*
+ * Layer order inside the hero:
+ *   1  .hero-title      giant wordmark
+ *   2  #webgl-container the chrome model, painted over the wordmark
+ *   3  .hero-content    supporting copy, kept in front of the model
+ *  10  .hole-stage      scroll reveal
+ */
+.hero-title {
+  position: absolute;
+  /*
+   * Centres the line box on 46% of the hero so the wordmark lands across the
+   * chrome model's upper mass and gets occluded by it. line-height is 0.9,
+   * so half the line box is 0.45em. Nudge this one number to slide the word
+   * up or down relative to the model.
+   */
+  top: calc(46% - 0.45em);
+  left: 0;
+  right: 0;
+  z-index: 1;
+  margin: 0;
+  font-family: 'Instrument Serif', serif;
+  font-weight: 400;
+  /*
+   * Spec ladder below, each capped at 21vw. "ALPHINTRA" is nine characters —
+   * a full 16rem would run off the side of anything under ~1600px, so the vw
+   * cap keeps it as large as will actually fit.
+   */
+  font-size: min(4.5rem, 21vw);
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  /*
+   * Cast the wordmark back into the scene: a tight contact shadow, a broad
+   * soft drop, and a faint brand-purple bloom so it sits in the same light
+   * as the chrome model in front of it.
+   */
+  text-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.55),
+    0 14px 34px rgba(0, 0, 0, 0.7),
+    0 30px 70px rgba(0, 0, 0, 0.55),
+    0 0 90px rgba(138, 43, 226, 0.28);
+}
+
+@media (min-width: 475px) {
+  .hero-title { font-size: min(5.5rem, 21vw); }
+}
+
+@media (min-width: 640px) {
+  .hero-title { font-size: min(10rem, 21vw); }
+}
+
+@media (min-width: 768px) {
+  .hero-title { font-size: min(13rem, 21vw); }
+}
+
+@media (min-width: 1024px) {
+  .hero-title { font-size: min(16rem, 21vw); }
+}
+
 .hero-content {
   position: absolute;
-  top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 8%;
+  transform: translateX(-50%);
+  z-index: 3;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -205,27 +590,6 @@ nav {
   align-items: center;
   text-align: center;
   padding: 0 2rem;
-}
-
-.hero-subtitle {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-}
-
-.hero-title {
-  font-size: clamp(3rem, 6vw, 5rem);
-  margin-bottom: 1.5rem;
-  max-width: 900px;
-  line-height: 1.1;
-}
-
-.hero-text {
-  font-size: 1.1rem;
-  margin-bottom: 3rem;
-  max-width: 600px;
 }
 
 .scroll-indicator {
@@ -238,81 +602,110 @@ nav {
   gap: 1rem;
 }
 
-/* Testimonials Section */
-#testimonials {
-  padding: 0 4rem 5rem 4rem; /* Removed top padding so cards fit on the same screen as the text */
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.hole-text {
+/*
+ * The heading and the testimonial used to be two independently centred
+ * absolute layers, which meant they sat on top of each other once both were
+ * visible. They are now rows of one centred grid: the card row grows from
+ * 0fr to 1fr during the reveal, so the browser keeps the pair stacked and
+ * centred at any viewport size — no height measurement in JS.
+ */
+.hole-stage {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 100%;
+  max-width: 900px;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-rows: auto 0fr;
+  justify-items: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hole-text {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 0 2rem;
-  pointer-events: none; /* so it doesn't block clicks when hidden */
   opacity: 0; /* hidden before JS loads */
+}
+
+/*
+ * This copy sits directly over the chrome model, whose bright metal washes
+ * white text out completely. A soft dark halo behind the glyphs keeps it
+ * legible against both the light and dark parts of the model.
+ */
+.hole-text h2,
+.hole-text p {
+  text-shadow:
+    0 2px 10px rgba(3, 1, 6, 0.95),
+    0 0 32px rgba(3, 1, 6, 0.85),
+    0 0 70px rgba(3, 1, 6, 0.7);
 }
 
 .hole-text h2 {
   font-size: 3rem;
   margin-bottom: 1rem;
+  color: #ffffff;
 }
 
 .hole-text p {
   font-size: 1.1rem;
   max-width: 600px;
+  /* Was --text-secondary (#a0a0a0) — far too weak over bright metal. */
+  color: rgba(255, 255, 255, 0.94);
 }
 
 .cards-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 2rem;
-  position: absolute;
-  top: 55%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%;
-  max-width: 1400px;
+  display: flex;
+  justify-content: center;
+  align-items: start;
+  width: 100%;
+  /* Spacing lives inside the collapsing row so it closes up with it. */
+  padding-top: 2.5rem;
+  /* min-height:0 + overflow:hidden are what let the 0fr row collapse. */
+  min-height: 0;
+  overflow: hidden;
   opacity: 0; /* hidden before JS loads */
   pointer-events: none; /* prevents hover effects while hidden */
 }
 
 .testimonial-card {
-  background: var(--glass-bg);
-  border: 1px solid #333333; /* subtle dark gray */
-  border-radius: 16px;
-  padding: 2.5rem;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(14, 7, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  padding: 2.2rem 3rem;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  align-items: center;
+  text-align: center;
+  gap: 1.2rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+  width: 100%;
   transition: all 0.3s ease;
 }
 
 .testimonial-card:hover {
-  transform: translateY(-8px);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 10px 30px rgba(138, 43, 226, 0.15), 0 0 15px rgba(255, 255, 255, 0.05);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 25px 60px rgba(138, 43, 226, 0.3);
 }
 
 .quote-icon {
-  width: 40px;
-  height: 40px;
-  opacity: 0.2;
+  width: 36px;
+  height: 36px;
+  opacity: 0.4;
+  color: #d8b4fe;
 }
 
 .testimonial-text {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  flex-grow: 1;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--text-primary);
 }
 
 .testimonial-author {
@@ -329,26 +722,172 @@ nav {
   font-size: 0.9rem;
 }
 
-/* Projects Section */
+/* =========================================================================
+ * Projects — one pinned page, projects swapped through one at a time
+ * ====================================================================== */
 #projects {
-  padding: 5rem 4rem;
+  position: relative;
+}
+
+.projects-stage {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: calc(var(--nav-height) + 2.5rem) 4rem 3rem;
+}
+
+/* Locked dead centre of the stage; the slides move, this does not. */
+/* Full-bleed particle-sphere canvas behind the project cards. */
+.projects-figure {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.projects-figure canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.projects-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-}
-
-.project-row {
   display: flex;
-  align-items: center;
-  gap: 4rem;
-  margin-bottom: 8rem;
+  flex-direction: column;
+  gap: 2rem;
 }
 
-.project-row:nth-child(even) {
-  flex-direction: row-reverse;
+.projects-head {
+  margin-bottom: 0;
+}
+
+.projects-head h2 {
+  margin-bottom: 0;
+}
+
+/* Every slide occupies the same grid cell so they cross-fade in place. */
+.projects-deck {
+  display: grid;
+  align-items: center;
+}
+
+/*
+ * One glass card per project holding both the copy and the screenshot.
+ * Surface comes from .liquid-glass; only geometry and type colour
+ * are set here so that effect stays untouched.
+ */
+.project-slide {
+  grid-area: 1 / 1;
+  justify-self: center;
+  width: 100%;
+  max-width: 1120px;
+  border-radius: 24px;
+  padding: 2.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 2.5rem;
+  align-items: center;
+  opacity: 0;
+}
+
+/* Without JS the deck can't cycle, so at least the first project shows. */
+.project-slide:first-child {
+  opacity: 1;
+}
+
+/* Sit above the glass edge highlight. */
+.project-slide > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 5% white glass reads as dark over the section, so copy stays light. */
+.project-slide h3 {
+  color: var(--text-primary);
+  font-size: 2.1rem;
+  margin-bottom: 0.85rem;
+}
+
+.project-slide p {
+  color: var(--text-secondary);
+  font-size: 1.02rem;
+  margin-bottom: 1.5rem;
+}
+
+.project-slide .project-image {
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
 }
 
 .project-content {
-  flex: 1;
+  min-width: 0;
+}
+
+/* Slide counter + progress bar */
+.projects-progress {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  justify-content: center;
+}
+
+.projects-counter {
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 0.35rem;
+}
+
+.projects-current {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.projects-bar {
+  position: relative;
+  width: min(220px, 30vw);
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.projects-bar-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), var(--brand-soft));
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.project-tags {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.tag {
+  background: rgba(138, 43, 226, 0.15);
+  border: 1px solid rgba(138, 43, 226, 0.4);
+  color: #d8b4fe;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .project-content h3 {
@@ -392,11 +931,12 @@ nav {
 }
 
 .project-image {
-  flex: 1;
+  min-width: 0;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-  border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 4, 12, 0.6);
 }
 
 .project-image img {
@@ -411,12 +951,13 @@ nav {
 }
 
 /* General Section Utilities */
-.section-header, .concept-card, .concepts-action, 
-.about-title-top, .about-title-bottom, .about-image, .about-content h3, .about-content p, .about-content .project-link,
-#pricing h2, #pricing .section-subtext, .feature-list li, .config-item, .toggle-item, .price-total, .pricing-footer .btn, .disclaimer,
-#contact h2, #contact .contact-subtext, .contact-detail-link, .input-group, .turnstile-placeholder, .contact-form .btn,
-#faq h2, .faq-item,
-.footer-col, .footer-col a, .footer-bottom, .scroll-to-top {
+/*
+ * `will-change` was previously pinned onto ~25 selectors permanently, which
+ * keeps a compositor layer alive for every one of them for the life of the
+ * page. GSAP already promotes elements while a tween is running, so the hint
+ * is only worth keeping on the hero pieces that animate on every scroll.
+ */
+.hero-content, .hole-stage {
   will-change: transform, opacity;
 }
 
@@ -459,44 +1000,234 @@ nav {
 }
 
 /* Concepts Section */
+#concepts .section-subtext {
+  max-width: 62ch;
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.82);
+}
+
 #concepts {
-  padding: 5rem 4rem;
-  max-width: 1400px;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 9rem 1.75rem 8rem 1.75rem;
+}
+
+/*
+ * Holds both background layers so a single vertical fade can soften the
+ * top and bottom edges. Without it the artwork stopped dead against the
+ * next section's black.
+ */
+.spotlight-layers {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+}
+
+/* Still background, sitting behind everything */
+.spotlight-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.spotlight-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+/*
+ * Spotlight reveal. The mask image, size and position are written inline by
+ * initConceptsSpotlight(); without JS this stays at opacity 0 and the still
+ * background is all you see.
+ */
+.spotlight-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.spotlight-reveal.is-live {
+  opacity: 1;
+}
+
+.spotlight-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* Unclipped — the spotlight reveals anywhere in the section. */
+}
+
+.concepts-inner {
+  position: relative;
+  z-index: 2;
+  /* Near full-bleed — the cards get the width of the viewport, not a column. */
+  max-width: 2100px;
   margin: 0 auto;
 }
 
 .concepts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.75rem;
   margin-bottom: 4rem;
 }
 
+@media (min-width: 1100px) {
+  .concepts-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/*
+ * Card surface comes entirely from .liquid-glass — only geometry and
+ * type colour are set here so that effect stays untouched.
+ */
 .concept-card {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.9rem;
+  border-radius: 20px;
+  padding: 2.25rem 1.9rem;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
 }
 
-.concept-image {
-  width: 100%;
-  height: 400px;
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  transition: transform 0.4s ease;
+.concept-card:hover {
+  transform: translateY(-8px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 14px 40px rgba(0, 0, 0, 0.28);
 }
 
-.concept-card:hover .concept-image {
-  transform: translateY(-10px);
-}
-
+/* 5% white glass reads as dark over the wave background, so type stays light. */
 .concept-card h4 {
+  position: relative;
+  z-index: 1;
   font-size: 1.2rem;
   font-weight: 600;
+  color: var(--text-primary);
+}
+
+.concept-card .concept-desc {
+  position: relative;
+  z-index: 1;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.concept-index {
+  position: relative;
+  z-index: 1;
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.concept-list {
+  position: relative;
+  z-index: 1;
+  list-style: none;
+  margin-top: 0.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.concept-list li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.concept-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+}
+
+/*
+ * The artwork behind these cards has hard bright streaks and the glass is
+ * only 5% white, so light text alone disappears over them. A tight black
+ * halo keeps every line readable wherever it lands.
+ */
+#concepts h2,
+#concepts .section-subtext,
+.concept-index,
+.concept-card h4,
+.concept-card .concept-desc,
+.concept-list li,
+.concepts-action-text {
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.95),
+    0 2px 12px rgba(0, 0, 0, 0.9),
+    0 0 32px rgba(0, 0, 0, 0.75);
 }
 
 .concepts-action {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.concepts-action-text {
+  max-width: 46ch;
+  font-size: 1.02rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* --- Liquid glass (supplied spec — do not restyle) --- */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.05);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 32px rgba(0, 0, 0, 0.03);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.25) 20%,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0) 60%,
+    rgba(255, 255, 255, 0.25) 80%,
+    rgba(255, 255, 255, 0.6) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* About Section */
@@ -515,8 +1246,12 @@ nav {
   color: var(--text-primary);
 }
 
+/* A visual continuation of the heading above, so it is a <p>, not a second <h2>. */
 .about-title-bottom {
+  font-family: 'Moonwalk', 'Inter', sans-serif;
+  letter-spacing: 0.05em;
   font-size: clamp(3rem, 5vw, 4.5rem);
+  line-height: 1.1;
   color: var(--text-secondary);
   padding-left: 10%;
 }
@@ -529,15 +1264,32 @@ nav {
 }
 
 .about-image {
-  border-radius: 20px;
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
+  width: 100%;
+  height: 540px;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  position: relative;
+  overflow: visible;
 }
 
-.portrait-placeholder {
+.about-image:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.about-blob {
   width: 100%;
-  height: 600px;
-  backdrop-filter: blur(10px);
+  height: 100%;
+  position: relative;
+}
+
+.about-blob canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .about-content h3 {
@@ -552,217 +1304,350 @@ nav {
   color: var(--text-secondary);
 }
 
-/* Pricing Section */
-#pricing {
-  padding: 8rem 4rem;
-  max-width: 1200px;
-  margin: 0 auto;
+/* Careers Page Styling */
+.nav-links a.active {
+  font-weight: 600;
 }
 
-.pricing-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
+.careers-page-container {
+  padding-top: 10rem;
+  padding-bottom: 8rem;
+  min-height: 85vh;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.careers-standalone-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  padding: 4rem;
   backdrop-filter: blur(20px);
-  margin-bottom: 3rem;
-}
-
-.feature-list {
-  list-style: none;
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 4rem 3.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  max-width: 780px;
+  margin: 2rem auto 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-}
-
-.feature-list li {
-  display: flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 1.1rem;
-}
-
-.feature-list svg {
-  width: 24px;
-  height: 24px;
-  color: var(--accent);
-}
-
-.pricing-configurator {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.config-item {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.config-label {
-  display: flex;
-  justify-content: space-between;
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-.slider {
-  width: 100%;
-  appearance: none;
-  height: 4px;
-  background: var(--glass-border);
-  border-radius: 2px;
-  outline: none;
-}
-
-.slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-}
-
-.toggle-item {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.toggle-item:hover, .toggle-item.active {
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.2);
-}
-
-.toggle-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--glass-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  transition: transform 0.3s ease, background 0.3s ease;
-}
-
-.toggle-item.active .toggle-icon {
-  background: var(--accent);
-  color: var(--accent-text);
-  transform: rotate(45deg);
-}
-
-.pricing-footer {
   text-align: center;
-  max-width: 600px;
-  margin: 0 auto;
 }
 
-.price-total {
-  font-size: 2rem;
+.status-badge {
+  display: inline-block;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-bottom: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1.2rem;
 }
 
-.price-total span {
-  font-size: 4rem;
-  font-weight: 800;
+.careers-standalone-card h3 {
+  font-size: 2.4rem;
   color: var(--text-primary);
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
 }
 
-.disclaimer {
-  margin-top: 1rem;
+.careers-main-text {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+  max-width: 600px;
+}
+
+.careers-divider {
+  width: 60px;
+  height: 1px;
+  background: var(--glass-border);
+  margin: 2rem 0;
+}
+
+.careers-detail-text {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 640px;
+}
+
+.careers-contact-box {
+  margin-top: 2.5rem;
+  padding: 1.2rem 2rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.contact-label {
   font-size: 0.85rem;
-  opacity: 0.5;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.contact-email-link {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  transition: opacity 0.3s ease;
+}
+
+.contact-email-link:hover {
+  opacity: 0.8;
 }
 
 /* Contact Section */
 #contact {
-  padding: 8rem 4rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  padding: 8rem 1.75rem;
+}
+
+/* Chrome knot behind the glass panels. */
+.contact-media {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(70vh, 620px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.contact-media img {
+  width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0.55;
+  filter: drop-shadow(0 30px 90px rgba(138, 43, 226, 0.35));
 }
 
 .contact-grid {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 1.5fr;
-  gap: 6rem;
+  gap: 4rem;
+  align-items: start;
+}
+
+.contact-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brand-soft);
+  margin-bottom: 0.9rem;
 }
 
 .contact-subtext {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  line-height: 1.65;
   color: var(--text-secondary);
-  margin-bottom: 4rem;
+  margin-bottom: 2.5rem;
+  max-width: 46ch;
 }
 
+/* Details panel — surface from .liquid-glass, geometry only here. */
 .contact-details {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0.35rem;
+  border-radius: 20px;
+  padding: 0.6rem;
 }
 
 .contact-detail-link {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 1rem;
-  font-size: 1.1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  font-size: 1.05rem;
+  transition: background-color 0.25s ease;
+}
+
+.contact-detail-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  opacity: 1;
+}
+
+.contact-detail-link .icon {
+  flex-shrink: 0;
+  stroke: var(--brand-soft);
+}
+
+.contact-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.contact-detail-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+}
+
+.contact-detail-value {
+  font-size: 1.02rem;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .contact-form {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.75rem;
+  border-radius: 24px;
+  padding: 2.25rem;
+}
+
+.contact-form > * {
+  position: relative;
+  z-index: 1;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
 }
 
 .input-group input, .input-group textarea {
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--glass-border);
-  padding: 1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.85rem 0;
   color: var(--text-primary);
   font-family: inherit;
   font-size: 1.1rem;
-  outline: none;
   transition: border-color 0.3s ease;
   resize: vertical;
 }
 
 .input-group input:focus, .input-group textarea:focus {
+  outline: none;
   border-color: var(--accent);
 }
 
-.turnstile-placeholder {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(0,0,0,0.2);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  margin-bottom: 1rem;
+.input-group input:focus-visible, .input-group textarea:focus-visible {
+  outline: 2px solid var(--brand-soft);
+  outline-offset: 4px;
 }
 
-.turnstile-circle svg {
-  width: 32px;
-  height: 32px;
+.input-group input[aria-invalid='true'],
+.input-group textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error:empty {
+  display: none;
+}
+
+.field-error {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+/* Honeypot: off-screen rather than display:none, which some bots skip. */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.form-status:empty {
+  display: none;
+}
+
+.form-status {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  padding: 0.9rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.form-status[data-state='error'] {
+  border-color: rgba(255, 139, 139, 0.4);
+  color: var(--danger);
+}
+
+.form-status[data-state='success'] {
+  border-color: rgba(126, 224, 184, 0.4);
+  color: var(--success);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* FAQ Section */
 #faq {
-  padding: 8rem 4rem;
+  position: relative;
+  overflow: hidden;
+  padding: 9rem 1.75rem;
+}
+
+.faq-inner {
+  position: relative;
+  z-index: 2;
   max-width: 900px;
   margin: 0 auto;
+}
+
+/*
+ * The FAQ copy is plain text rather than glass cards, so the still
+ * background gets a scrim to keep questions readable. The scrim sits inside
+ * the media layer, which means the cursor-revealed film still comes through
+ * at full strength.
+ */
+.faq-scrim::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 2, 8, 0.82) 0%, rgba(5, 2, 8, 0.7) 50%, rgba(5, 2, 8, 0.85) 100%);
+  pointer-events: none;
+}
+
+#faq .faq-question,
+#faq .faq-answer {
+  text-shadow: 0 1px 10px rgba(3, 1, 6, 0.8);
+}
+
+#faq .faq-item {
+  border-bottom-color: rgba(255, 255, 255, 0.16);
 }
 
 .faq-list {
@@ -774,15 +1659,32 @@ nav {
   border-bottom: 1px solid var(--glass-border);
 }
 
+.faq-heading {
+  margin: 0;
+  font: inherit;
+  letter-spacing: normal;
+}
+
 .faq-question {
+  width: 100%;
   padding: 2rem 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1.5rem;
+  text-align: left;
+  font-family: 'Inter', sans-serif;
   font-size: 1.3rem;
   font-weight: 600;
   cursor: pointer;
   color: var(--text-primary);
+  background: none;
+  border: none;
+  transition: color 0.3s ease;
+}
+
+.faq-question:hover {
+  color: var(--brand-soft);
 }
 
 .faq-icon {
@@ -843,6 +1745,35 @@ footer {
   color: var(--text-primary);
 }
 
+.footer-social-links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.4rem 0;
+}
+
+.social-circle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-primary) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s ease !important;
+  text-decoration: none !important;
+}
+
+.social-circle-btn:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+}
+
 .footer-bottom {
   max-width: 1400px;
   margin: 0 auto;
@@ -861,10 +1792,6 @@ footer {
   gap: 1rem;
 }
 
-.small-logo {
-  width: 16px;
-  height: 16px;
-}
 
 .separator {
   opacity: 0.3;
@@ -902,26 +1829,196 @@ footer {
   height: 24px;
 }
 
+/* =========================================================================
+ * Responsive
+ * ====================================================================== */
+
+/* Tablet / small laptop */
+@media (max-width: 1100px) {
+  .nav-links a { padding-left: 0.7rem; padding-right: 0.7rem; }
+
+  #projects, #contact, #faq { padding-left: 2.5rem; padding-right: 2.5rem; }
+  #concepts { padding-left: 1.5rem; padding-right: 1.5rem; }
+  #about { padding: 7rem 2.5rem; }
+  footer { padding-left: 2.5rem; padding-right: 2.5rem; }
+
+  .projects-stage { padding-left: 2.5rem; padding-right: 2.5rem; }
+  .project-slide { gap: 1.75rem; padding: 1.75rem; }
+  .project-slide h3 { font-size: 1.8rem; }
+  .about-grid, .contact-grid { gap: 3rem; }
+}
+
+/* Phones */
 @media (max-width: 768px) {
-  nav { padding: 1.5rem 2rem; }
-  .nav-links { display: none; }
-  .hero-title { font-size: 2.5rem; }
-  .project-row, .project-row:nth-child(even) {
-    flex-direction: column;
+  #projects, #concepts, #contact, #faq {
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
-  .about-grid, .pricing-grid, .contact-grid {
+  #about { padding: 5rem 1.25rem; }
+  #concepts { padding-top: 4.5rem; }
+  footer { padding: 4rem 1.25rem 2rem; }
+
+  .section-header { margin-bottom: 2.5rem; }
+  .section-header h2 { font-size: 2rem; }
+
+  .hero-content { padding: 0 1.25rem; }
+  .btn { padding: 0.9rem 1.75rem; }
+
+  .hole-text h2 { font-size: 2rem; }
+  .hole-text p { font-size: 1rem; }
+
+  .scroll-indicator { left: 50%; transform: translateX(-50%); bottom: 1.25rem; }
+
+  .hole-stage {
+    padding: 0 1rem;
+    /* The quote wraps a lot on a narrow screen; never let the stack grow
+       past the pinned viewport, and let the card scroll if it still would. */
+    max-height: calc(100dvh - 5.5rem);
+  }
+  .cards-container { overflow-y: auto; overscroll-behavior: contain; }
+  .testimonial-card { padding: 1.5rem 1.25rem; border-radius: 16px; gap: 0.9rem; }
+  .testimonial-text { font-size: 0.9rem; line-height: 1.55; }
+  .quote-icon { width: 26px; height: 26px; }
+
+  .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2rem; }
+  .projects-inner { gap: 1.25rem; }
+
+  .project-slide {
     grid-template-columns: 1fr;
+    gap: 1.1rem;
+    padding: 1.35rem;
+    border-radius: 20px;
+    align-content: center;
+    /* Copy first, screenshot under it, and never taller than the stage. */
+    max-height: calc(100dvh - var(--nav-height) - 9rem);
+    overflow-y: auto;
   }
-  .pricing-grid {
-    padding: 2rem;
-  }
+  .project-slide h3 { font-size: 1.5rem; margin-bottom: 0.6rem; }
+  .project-slide p { font-size: 0.95rem; margin-bottom: 1.1rem; }
+  .project-tags { margin-bottom: 0.75rem; }
+  .tag { font-size: 0.68rem; padding: 0.2rem 0.6rem; }
+
+  /* minmax(300px, …) still forces overflow on a 360px screen. */
+  .concepts-grid { grid-template-columns: 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
+  .concept-card { padding: 1.6rem 1.4rem; gap: 0.7rem; }
+  .concept-index { font-size: 1.3rem; }
+  .concept-list { padding-top: 0.85rem; gap: 0.45rem; }
+  .concept-list li { font-size: 0.88rem; }
+  #concepts { min-height: 0; display: block; }
+
+  .about-header { margin-bottom: 3rem; }
+  .about-title-bottom { padding-left: 0; }
+  .about-grid, .contact-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .about-image { height: 320px; }
+  .about-content p { font-size: 1.05rem; line-height: 1.7; margin-bottom: 1.25rem; }
+
+  .contact-subtext { margin-bottom: 1.5rem; }
+  .contact-details { gap: 0.25rem; padding: 0.5rem; }
+  .contact-detail-link { padding: 0.85rem 0.9rem; }
+  .contact-form { padding: 1.4rem; border-radius: 20px; gap: 1.4rem; }
+  .contact-media { width: min(56vh, 340px); }
+  .contact-media img { opacity: 0.35; }
+
+  .faq-question { font-size: 1.05rem; padding: 1.4rem 0; gap: 1rem; }
+  .faq-answer { font-size: 1rem; }
+
+  .footer-top { gap: 2.5rem; margin-bottom: 3rem; }
+
   .footer-bottom {
     flex-direction: column;
     gap: 1rem;
     text-align: center;
   }
+  .footer-bottom-left { flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+  .footer-bottom-left .separator { display: none; }
+
   .scroll-to-top {
     position: static;
     margin: 2rem auto 0;
   }
+}
+
+/* =========================================================================
+ * Reduced motion
+ *
+ * The pinned 3D zoom is the entire hero interaction, so instead of trying to
+ * animate it more gently we drop the WebGL layer (main.js skips it too) and
+ * lay the hero out as three ordinary stacked blocks.
+ * ====================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html { scroll-behavior: auto; }
+
+  #webgl-container,
+  .scroll-indicator,
+  #loader-overlay {
+    display: none;
+  }
+
+  #hero {
+    height: auto;
+    overflow: visible;
+    padding: calc(var(--nav-height) + 4rem) 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4rem;
+  }
+
+  .hero-title,
+  .hero-content,
+  .hole-stage,
+  .hole-text,
+  .cards-container {
+    position: static;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    will-change: auto;
+    overflow: visible;
+  }
+
+  /* No model to hide behind, so the wordmark just reads as a heading. */
+  .hero-title {
+    font-size: clamp(3.5rem, 14vw, 9rem);
+  }
+
+  /* Both rows are open; nothing collapses without the scroll animation. */
+  .hole-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
+    padding: 0;
+  }
+
+  .cards-container { padding-top: 0; max-width: 860px; }
+
+  /* Projects: no pin, no cycling — the three simply stack down the page. */
+  .projects-stage {
+    min-height: 0;
+    display: block;
+    overflow: visible;
+    padding: 5rem 1.5rem;
+  }
+
+  .projects-figure { display: none; }
+
+  .projects-deck { display: block; }
+
+  .project-slide {
+    grid-area: auto;
+    opacity: 1;
+    margin-bottom: 5rem;
+  }
+
+  .projects-progress { display: none; }
 }
