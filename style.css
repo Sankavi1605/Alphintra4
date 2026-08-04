@@ -1482,8 +1482,28 @@ nav .nav-links {
   overflow: hidden;
   /* The scene reads the pointer, so it must receive the events. */
   cursor: grab;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  /*
+   * Held off the top third so "Engineering Studio / for Scalable Products"
+   * reads on plain black, then fully on by 39% — where "We think in systems"
+   * starts, which is the block the liquid is meant to sit behind. Measured:
+   * the header spans 19-32% of this element, the copy grid 39-81%.
+   */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 32%,
+    #000 39%,
+    #000 88%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 32%,
+    #000 39%,
+    #000 88%,
+    transparent 100%
+  );
 }
 
 .about-field:active { cursor: grabbing; }
@@ -1505,15 +1525,15 @@ nav .nav-links {
   pointer-events: none;
   background:
     /* vignette: sinks the corners into the section's black */
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.5) 100%),
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
     /* the scrim proper, heaviest through the band the copy occupies */
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.34) 0%,
-      rgba(0, 0, 0, 0.64) 26%,
-      rgba(0, 0, 0, 0.68) 55%,
-      rgba(0, 0, 0, 0.63) 80%,
-      rgba(0, 0, 0, 0.34) 100%
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0.8) 26%,
+      rgba(0, 0, 0, 0.83) 55%,
+      rgba(0, 0, 0, 0.8) 80%,
+      rgba(0, 0, 0, 0.45) 100%
     );
 }
 
@@ -1724,6 +1744,53 @@ nav .nav-links {
   position: relative;
   overflow: hidden;
   padding: 8rem 1.75rem;
+  /* Black behind the liquid, transparent at the edges so the page gradient
+     carries through instead of butting against a flat band. */
+  background: linear-gradient(180deg, transparent 0%, #000000 12%, #000000 88%, transparent 100%);
+}
+
+/*
+ * The same raymarched liquid as the About section, minus the letter column.
+ * .contact-grid already carries z-index 1, so this sits behind it.
+ */
+.contact-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  /* The scene reads the pointer, so it must receive the events. */
+  cursor: grab;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+}
+
+.contact-field:active { cursor: grabbing; }
+
+.contact-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Matching scrim, so the form and the copy stay the subject. */
+.contact-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0.8) 26%,
+      rgba(0, 0, 0, 0.83) 55%,
+      rgba(0, 0, 0, 0.8) 80%,
+      rgba(0, 0, 0, 0.45) 100%
+    );
 }
 
 .contact-grid {
@@ -2312,7 +2379,8 @@ footer {
     padding: 5rem 1.5rem;
   }
 
-  .about-field { display: none; }
+  .about-field,
+  .contact-field { display: none; }
 
   /* Slides stack down the page here, so one frame around the lot is wrong. */
   .projects-deck { display: block; padding: 0; }

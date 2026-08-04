@@ -87,6 +87,7 @@ if (prefersReducedMotion) {
   /* Still paint one static frame so those sections are not empty. */
   queueMicrotask(initAboutField);
   queueMicrotask(initCapabilityField);
+  queueMicrotask(initContactField);
 } else {
   initHeroScene();
 
@@ -99,6 +100,7 @@ if (prefersReducedMotion) {
   queueMicrotask(initHorizonField);
   queueMicrotask(initAboutField);
   queueMicrotask(initCapabilityField);
+  queueMicrotask(initContactField);
 }
 
 function initHeroScene() {
@@ -1763,6 +1765,142 @@ function initHorizonField() {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+  }
+
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      sync();
+    },
+    { rootMargin: '200px' }
+  ).observe(host);
+
+  document.addEventListener('visibilitychange', sync);
+}
+
+/* =========================================================================
+ * Contact field
+ *
+ * The About section's raymarched liquid, reused behind "Let's Build Something
+ * Meaningful" — pass 1 only. The ALPHINTRA letter column is that section's
+ * motif, so this is the fluid on its own, which also keeps it to a single
+ * draw call per frame.
+ *
+ * Deliberately a small separate initialiser rather than a parameterised
+ * version of initAboutField(): that function is 300 lines with the letter
+ * choreography woven through its resize, frame and entrance paths, and
+ * threading a flag through all of it to save ~40 lines here would put the
+ * About section at risk for no visual gain.
+ * ====================================================================== */
+function initContactField() {
+  const host = document.querySelector('#contact-field');
+  if (!host) return;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  } catch (error) {
+    console.error('Contact field: no WebGL context', error);
+    return;
+  }
+
+  /* Same r128 grade as the About field — the shader applies its own pow(). */
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.setPixelRatio(pixelRatioFor(1.5, 1));
+  host.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  const uni = {
+    uTime: { value: 0 },
+    uRes: { value: new THREE.Vector2(1, 1) },
+    uPtr: { value: new THREE.Vector2(0, 0) },
+    uSpread: { value: 1 },
+    uReveal: { value: 0 },
+  };
+
+  scene.add(
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: uni,
+        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
+        fragmentShader: FIELD_FRAGMENT_SHADER,
+      })
+    )
+  );
+
+  function resize() {
+    const w = host.clientWidth;
+    const h = host.clientHeight;
+    if (!w || !h) return;
+
+    renderer.setSize(w, h, false);
+    uni.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    /* Same framing rule as the About field: spread the pods on wide boxes. */
+    uni.uSpread.value = Math.min(Math.max(w / h / 0.56, 1), 2.1);
+  }
+  /* Observed, not measured once — this section is still pre-layout here. */
+  resize();
+  new ResizeObserver(resize).observe(host);
+
+  const target = { x: 0, y: 0 };
+  function fromEvent(e) {
+    const r = host.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    target.x = ((p.clientX - r.left) / r.width - 0.5) * 2;
+    target.y = -((p.clientY - r.top) / r.height - 0.5) * 2;
+  }
+  host.addEventListener('pointermove', fromEvent);
+  host.addEventListener('touchmove', fromEvent, { passive: true });
+  host.addEventListener('pointerleave', () => {
+    target.x = 0;
+    target.y = 0;
+  });
+
+  const clock = new THREE.Clock();
+  let frameId = null;
+  let onScreen = false;
+
+  function draw() {
+    renderer.render(scene, cam);
+  }
+
+  function frame() {
+    frameId = requestAnimationFrame(frame);
+    uni.uTime.value = clock.getElapsedTime();
+
+    const p = uni.uPtr.value;
+    p.x += (target.x - p.x) * 0.05;
+    p.y += (target.y - p.y) * 0.05;
+
+    draw();
+  }
+
+  let entrancePlayed = false;
+
+  function playEntrance() {
+    if (entrancePlayed) return;
+    entrancePlayed = true;
+    gsap.to(uni.uReveal, { value: 1, duration: 1.8, ease: 'power2.inOut' });
+  }
+
+  function sync() {
+    const shouldRun = onScreen && !document.hidden;
+    if (shouldRun) {
+      playEntrance();
+      if (frameId === null) frame();
+    } else if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+  }
+
+  if (prefersReducedMotion) {
+    uni.uReveal.value = 1;
+    draw();
+    return;
   }
 
   new IntersectionObserver(
