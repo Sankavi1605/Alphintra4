@@ -10,20 +10,57 @@ import './ui.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
+/*
+ * Mobile browsers fire resize every time the URL bar slides in or out, which
+ * happens *during* a scroll. Left alone, ScrollTrigger re-measures every pin
+ * mid-gesture and the whole page stutters. This tells it to ignore height-only
+ * changes on touch devices, which is exactly that case.
+ */
+ScrollTrigger.config({ ignoreMobileResize: true });
+
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* -------------------------------------------------------------------------
+ * Render resolution
+ *
+ * This page runs four WebGL contexts — the hero model, the horizon, the about
+ * field and the capability field — and every one of them is fragment-bound.
+ * Cost scales with the *square* of the device pixel ratio, so a phone at 3x
+ * is doing 4x the shading of the same phone at 1.5x for detail nobody can
+ * resolve on a 6" screen. Desktop keeps its crisp 2x; phones trade a little
+ * sharpness for a frame rate that actually holds.
+ * ---------------------------------------------------------------------- */
+const SMALL_SCREEN_QUERY = window.matchMedia('(max-width: 767.98px)');
+
+function pixelRatioFor(desktopCap, mobileCap) {
+  return Math.min(window.devicePixelRatio, SMALL_SCREEN_QUERY.matches ? mobileCap : desktopCap);
+}
 
 /* -------------------------------------------------------------------------
  * Loader
  *
  * The overlay covers the whole page, so anything that can stop it from being
- * dismissed takes the site down with it. Hide it on the first of: models
- * ready, window load, or a hard timeout.
+ * dismissed takes the site down with it. It comes down on the first of: the
+ * models being ready and their scroll animations wired, a load error, or a
+ * hard timeout.
+ *
+ * There is deliberately no `window.load` dismissal. That event fires when the
+ * markup, CSS and images are done, which is well before 8.5MB of .glb — so it
+ * used to reveal a scrollable page whose hero animations did not exist yet.
  * ---------------------------------------------------------------------- */
 let loaderHidden = false;
 
 function hideLoader() {
   if (loaderHidden) return;
   loaderHidden = true;
+
+  // Give the scrollbar back, and re-assert the top in case the browser
+  // restored a position before the inline script could opt out of that.
+  document.body.classList.remove('is-loading');
+  window.scrollTo(0, 0);
+  // The document was unscrollable until a moment ago; let every trigger
+  // re-measure against the real page height before the first scroll.
+  ScrollTrigger.refresh();
 
   const overlay = document.getElementById('loader-overlay');
   if (!overlay) return;
@@ -33,8 +70,12 @@ function hideLoader() {
   setTimeout(() => overlay.remove(), 800);
 }
 
-// Grace period so the models usually win the race, then a hard ceiling.
-window.addEventListener('load', () => setTimeout(hideLoader, 1200));
+/*
+ * Hard ceiling. On a slow connection this can still fire before the models
+ * arrive, which is survivable now only because the page is pinned to the top:
+ * the model's opening pose is the right one for the hero, so there is nothing
+ * to snap away from when the triggers are finally created.
+ */
 setTimeout(hideLoader, 8000);
 
 /* -------------------------------------------------------------------------
@@ -43,18 +84,21 @@ setTimeout(hideLoader, 8000);
  * ---------------------------------------------------------------------- */
 if (prefersReducedMotion) {
   hideLoader();
-  /* Still paint one static frame so the About section is not empty. */
+  /* Still paint one static frame so those sections are not empty. */
   queueMicrotask(initAboutField);
+  queueMicrotask(initCapabilityField);
 } else {
   initHeroScene();
 
   /*
    * A module script is deferred, so readyState is already "interactive" here.
    * Calling straight through would run this while module evaluation is still
-   * on the stack, and the shader const it reads is declared further down the
-   * file — still in its temporal dead zone. A microtask lets evaluation finish.
+   * on the stack, and the shader consts it reads are declared further down the
+   * file — still in their temporal dead zone. A microtask lets evaluation finish.
    */
+  queueMicrotask(initHorizonField);
   queueMicrotask(initAboutField);
+  queueMicrotask(initCapabilityField);
 }
 
 function initHeroScene() {
@@ -77,7 +121,33 @@ function initHeroScene() {
     return;
   }
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  /*
+   * Framing. The camera's 45deg FOV is vertical, so on a portrait phone the
+   * horizontal extent collapses to aspect * that — and the model, posed for a
+   * landscape frame, runs straight off both sides. Easing the camera back
+   * shrinks it to fit without the barrel distortion a wider FOV would add.
+   *
+   * Only ~60% of the way: fully matching the desktop framing needs z≈15 at a
+   * phone's aspect, which leaves the model a speck in a sea of empty hero.
+   * The scroll timeline animates model.scale/position and never the camera, so
+   * owning z here cannot fight it.
+   */
+  const BASE_CAMERA_Z = 5;
+  const PORTRAIT_PULLBACK = 0.6;
+  const MAX_CAMERA_Z = 9;
+
+  function frameCamera() {
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = aspect;
+    camera.position.z =
+      aspect >= 1
+        ? BASE_CAMERA_Z
+        : Math.min(MAX_CAMERA_Z, BASE_CAMERA_Z * (1 + (1 / aspect - 1) * PORTRAIT_PULLBACK));
+    camera.updateProjectionMatrix();
+  }
+  frameCamera();
+
+  renderer.setPixelRatio(pixelRatioFor(2, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -257,11 +327,16 @@ function initHeroScene() {
 
   // 5. Resize
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    frameCamera();
+    renderer.setPixelRatio(pixelRatioFor(2, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
-    ScrollTrigger.refresh();
+    /*
+     * No ScrollTrigger.refresh() here. ScrollTrigger already listens for
+     * resize itself, so this was doing the most expensive work on the page
+     * twice — and on mobile, where the URL bar sliding in and out fires resize
+     * continuously *during* a scroll, it re-measured every trigger mid-gesture.
+     * ignoreMobileResize (set at the top of this file) handles that case.
+     */
   });
 }
 
@@ -494,8 +569,15 @@ function setupProjectsSequence() {
   // Scroll distance per project. Shorter on phones so the pin isn't a slog.
   const perSlide = () => (window.innerWidth < 768 ? 620 : 900);
 
-  gsap.set(slides, { opacity: 0, y: 60 });
-  gsap.set(slides[0], { opacity: 1, y: 0 });
+  /*
+   * autoAlpha, not opacity: it pairs opacity with visibility, so an off-screen
+   * slide is dropped from paint and compositing entirely instead of being
+   * blended in at zero every frame — three full-bleed screenshots' worth of
+   * texture per frame. It also takes the hidden slides' links out of the tab
+   * order, which plain opacity:0 left reachable.
+   */
+  gsap.set(slides, { autoAlpha: 0, y: 60 });
+  gsap.set(slides[0], { autoAlpha: 1, y: 0 });
 
   let active = -1;
   const setActive = (index) => {
@@ -506,6 +588,13 @@ function setupProjectsSequence() {
   };
   setActive(0);
 
+  /*
+   * quickSetter resolves the target and property once, so the scrub writes a
+   * cached transform instead of re-parsing a template string into style.cssText
+   * on every scroll tick.
+   */
+  const setBar = barFill ? gsap.quickSetter(barFill, 'scaleX') : null;
+
   const tl = gsap.timeline({
     scrollTrigger: {
       trigger: '#projects',
@@ -514,9 +603,11 @@ function setupProjectsSequence() {
       scrub: 1,
       pin: stage,
       anticipatePin: 1,
+      // Re-measure on resize instead of keeping the first layout's numbers.
+      invalidateOnRefresh: true,
       onUpdate: (self) => {
         setActive(Math.min(slides.length - 1, Math.floor(self.progress * slides.length)));
-        if (barFill) barFill.style.transform = `scaleX(${self.progress})`;
+        if (setBar) setBar(self.progress);
       },
     },
   });
@@ -524,8 +615,10 @@ function setupProjectsSequence() {
   slides.forEach((slide, i) => {
     if (i === 0) return;
     const at = i * HOLD - FADE / 2;
-    tl.to(slides[i - 1], { opacity: 0, y: -60, duration: FADE, ease: 'power2.in' }, at);
-    tl.to(slide, { opacity: 1, y: 0, duration: FADE, ease: 'power2.out' }, at);
+    // force3D keeps both slides on their own compositor layer for the whole
+    // crossfade, so the browser cannot drop them back to CPU paint mid-tween.
+    tl.to(slides[i - 1], { autoAlpha: 0, y: -60, duration: FADE, ease: 'power2.in', force3D: true }, at);
+    tl.to(slide, { autoAlpha: 1, y: 0, duration: FADE, ease: 'power2.out', force3D: true }, at);
   });
 
   // Hold the last project on screen before unpinning.
@@ -729,7 +822,7 @@ function initAboutField() {
    * Forcing linear output reproduces the original grade exactly.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(pixelRatioFor(1.5, 1));
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
 
@@ -955,6 +1048,721 @@ function initAboutField() {
     });
     renderOnce();
     return;
+  }
+
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      sync();
+    },
+    { rootMargin: '200px' }
+  ).observe(host);
+
+  document.addEventListener('visibilitychange', sync);
+}
+
+/* -------------------------------------------------------------------------
+ * Engineering Capabilities background — glass bubbles
+ *
+ * The supplied sketch, ported from three r128 to r185. Two passes share one
+ * renderer: a navy-to-violet gradient quad, then real spheres wearing a
+ * fresnel-rim shader. Each sphere is dark glass — near invisible face-on with
+ * a razor-thin glowing rim at grazing angles — and additive blending makes the
+ * crossings flare white-hot.
+ * ---------------------------------------------------------------------- */
+const BUBBLE_BG_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform vec2 uRes; uniform float uReveal;
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/min(uRes.x,uRes.y)*2.0;
+    float g = smoothstep(-1.3, 1.5, uv.y*0.7 + uv.x*0.45);
+    vec3 c = mix(vec3(0.012,0.010,0.045), vec3(0.085,0.030,0.16), pow(g,1.8));
+    c = mix(c, vec3(0.005,0.006,0.02), smoothstep(0.2,-1.4, uv.x + uv.y*0.3)); /* darker low-left */
+    c *= 1.0 - 0.35*pow(length(uv*vec2(0.5,0.55)),2.2);                         /* vignette      */
+    c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
+    gl_FragColor = vec4(c*uReveal, 1.0);
+  }
+`;
+
+const BUBBLE_VERTEX_SHADER = `
+  varying vec3 vN, vW;
+  void main(){
+    vN = normalize(mat3(modelMatrix) * normal);
+    vec4 w = modelMatrix * vec4(position, 1.0);
+    vW = w.xyz;
+    gl_Position = projectionMatrix * viewMatrix * w;
+  }
+`;
+
+const BUBBLE_RIM_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform vec3  uColA, uColB, uGlow;
+  uniform vec2  uAxis;
+  uniform float uIntensity, uReveal, uHaze;
+  varying vec3 vN, vW;
+  void main(){
+    vec3 v = normalize(cameraPosition - vW);
+    vec3 n = normalize(vN);
+    float fres = clamp(1.0 - dot(n, v), 0.0, 1.0);
+
+    float line = pow(fres, 10.0) * 2.8;   /* the razor rim          */
+    float halo = pow(fres,  3.5) * 0.45;  /* soft bloom around it   */
+
+    float t = smoothstep(-0.85, 0.85, dot(normalize(n.xy + vec2(1e-4)), normalize(uAxis)));
+    vec3 rimCol = mix(uColA, uColB, t);
+
+    vec3 col = rimCol * (line + halo);
+    col += vec3(1.0, 0.96, 0.90) * pow(fres, 22.0) * 1.1; /* white-hot core  */
+    col += uGlow * pow(fres, 2.1) * uHaze;                /* interior haze   */
+
+    gl_FragColor = vec4(col * uIntensity * uReveal, 1.0);
+  }
+`;
+
+function initCapabilityField() {
+  const host = document.querySelector('#capability-field');
+  if (!host) return;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  } catch (error) {
+    console.error('Capability field: no WebGL context', error);
+    return;
+  }
+
+  /*
+   * Same r128 grade as the About field: the rim shader is tuned for linear
+   * output, and r155+ would push its additive highlights through an sRGB
+   * transfer on top of that and blow the crossings out to flat white.
+   */
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.autoClear = false;
+  host.appendChild(renderer.domElement);
+
+  /* --- pass 1: deep navy to violet gradient + vignette -------------------- */
+  const bgScene = new THREE.Scene();
+  const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const bgUni = { uRes: { value: new THREE.Vector2(1, 1) }, uReveal: { value: 0 } };
+
+  bgScene.add(
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: bgUni,
+        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
+        fragmentShader: BUBBLE_BG_FRAGMENT_SHADER,
+      })
+    )
+  );
+
+  /* --- pass 2: the bubbles ------------------------------------------------ */
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(0, 0, 14);
+
+  const ORANGE = new THREE.Color(1.0, 0.52, 0.13);
+  const AMBER = new THREE.Color(1.0, 0.7, 0.3);
+  const VIOLET = new THREE.Color(0.62, 0.38, 1.0);
+  const PINK = new THREE.Color(1.0, 0.42, 0.75);
+  const BLUE = new THREE.Color(0.22, 0.42, 1.0);
+
+  const bubbles = [];
+  function bubble({ r, pos, colA, colB, axis, glow, haze = 0.28, intensity = 1.0, detail = 96 }) {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColA: { value: new THREE.Color(colA) },
+        uColB: { value: new THREE.Color(colB) },
+        uGlow: { value: new THREE.Color(glow || BLUE) },
+        uAxis: { value: new THREE.Vector2(axis[0], axis[1]) },
+        uIntensity: { value: intensity },
+        uHaze: { value: haze },
+        uReveal: { value: 0 },
+      },
+      vertexShader: BUBBLE_VERTEX_SHADER,
+      fragmentShader: BUBBLE_RIM_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, detail, detail), mat);
+    m.position.set(...pos);
+    scene.add(m);
+    bubbles.push(m);
+    return m;
+  }
+
+  /* Composition traced from the reference (landscape, camera at z=14): */
+
+  /* A — huge left sphere: amber top rim, blue haze filling its body */
+  bubble({ r: 8.0, pos: [-7.5, -2.8, 0.0],
+           colA: VIOLET, colB: AMBER, axis: [0.25, 1],
+           glow: BLUE, haze: 0.42, intensity: 1.05 });
+
+  /* B — giant top sphere: violet upper rim, hot orange lower rim */
+  bubble({ r: 9.0, pos: [3.2, 8.6, -1.0],
+           colA: ORANGE, colB: VIOLET, axis: [0.15, 1],
+           glow: new THREE.Color(0.3, 0.1, 0.45), haze: 0.2, intensity: 1.15 });
+
+  /* C — bottom-right sphere: white-violet top rim, blue glow inside */
+  bubble({ r: 7.0, pos: [7.8, -7.8, 0.5],
+           colA: ORANGE, colB: PINK, axis: [-0.2, 1],
+           glow: BLUE, haze: 0.4, intensity: 1.2 });
+
+  /* D — far right sphere: pure violet rim sweeping the right edge */
+  bubble({ r: 9.5, pos: [14.5, 3.0, -2.0],
+           colA: VIOLET, colB: PINK, axis: [-1, 0.2],
+           glow: new THREE.Color(0.25, 0.08, 0.4), haze: 0.15, intensity: 1.0 });
+
+  /* E — the small inner lens where the big rims cross */
+  bubble({ r: 2.3, pos: [0.3, 2.1, 1.2],
+           colA: PINK, colB: new THREE.Color(0.85, 0.8, 1.0), axis: [0.4, 1],
+           glow: VIOLET, haze: 0.1, intensity: 0.75, detail: 64 });
+
+  /* --- resize / pointer / loop -------------------------------------------- */
+  function resize() {
+    const w = host.clientWidth;
+    const h = host.clientHeight;
+    if (!w || !h) return;
+
+    renderer.setSize(w, h, false);
+    bgUni.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    /* pull the camera back on portrait screens so the arcs still cross on-frame */
+    camera.position.z = w / h < 1 ? 14 * (1.25 + (1 - w / h) * 0.5) : 14;
+  }
+  /* Observed rather than measured once: the section is still pre-layout when
+     this runs, exactly as the About field was. */
+  resize();
+  new ResizeObserver(resize).observe(host);
+
+  const target = { x: 0, y: 0 };
+  const ptr = { x: 0, y: 0 };
+  /*
+   * The field is pointer-events:none so the cards keep their hover, so the
+   * cursor is read off the section and converted against the field's own box.
+   */
+  const section = host.closest('section') || host;
+  function fromEvent(e) {
+    const rct = host.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    target.x = ((p.clientX - rct.left) / rct.width - 0.5) * 2;
+    target.y = -((p.clientY - rct.top) / rct.height - 0.5) * 2;
+  }
+  section.addEventListener('pointermove', fromEvent);
+  section.addEventListener('touchmove', fromEvent, { passive: true });
+  section.addEventListener('pointerleave', () => {
+    target.x = 0;
+    target.y = 0;
+  });
+
+  const clock = new THREE.Clock();
+  const base = bubbles.map((m) => m.position.clone());
+  let frameId = null;
+  let onScreen = false;
+
+  function draw() {
+    renderer.clear();
+    renderer.render(bgScene, bgCam);
+    renderer.clearDepth();
+    renderer.render(scene, camera);
+  }
+
+  function frame() {
+    frameId = requestAnimationFrame(frame);
+    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
+
+    ptr.x += (target.x - ptr.x) * 0.045;
+    ptr.y += (target.y - ptr.y) * 0.045;
+
+    camera.position.x = ptr.x * 0.9;
+    camera.position.y = ptr.y * 0.7;
+    camera.lookAt(0, 0, 0);
+
+    if (!prefersReducedMotion) {
+      /* slow orbital drift so the crossing points glide and re-flare */
+      bubbles.forEach((m, i) => {
+        m.position.x = base[i].x + Math.sin(t * 0.11 + i * 2.1) * 0.45;
+        m.position.y = base[i].y + Math.cos(t * 0.09 + i * 1.7) * 0.40;
+      });
+    }
+
+    draw();
+  }
+
+  let entrancePlayed = false;
+
+  /*
+   * Held until the section is actually on screen. Fired on load the rims would
+   * have finished igniting long before anyone scrolled this far down.
+   */
+  function playEntrance() {
+    if (entrancePlayed) return;
+    entrancePlayed = true;
+
+    const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+    tl.to(bgUni.uReveal, { value: 1, duration: 1.6, ease: 'power2.inOut' }, 0);
+    bubbles.forEach((m, i) => {
+      m.scale.setScalar(0.94);
+      tl.to(m.material.uniforms.uReveal, { value: 1, duration: 1.5 }, 0.5 + i * 0.28);
+      tl.to(m.scale, { x: 1, y: 1, z: 1, duration: 2.0, ease: 'power3.out' }, 0.5 + i * 0.28);
+    });
+  }
+
+  function sync() {
+    const shouldRun = onScreen && !document.hidden;
+    if (shouldRun) {
+      playEntrance();
+      if (frameId === null) frame();
+    } else if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+  }
+
+  if (prefersReducedMotion) {
+    bgUni.uReveal.value = 1;
+    bubbles.forEach((m) => {
+      m.material.uniforms.uReveal.value = 1;
+    });
+    draw();
+    return;
+  }
+
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      sync();
+    },
+    { rootMargin: '200px' }
+  ).observe(host);
+
+  document.addEventListener('visibilitychange', sync);
+}
+
+/* =========================================================================
+ * Purple horizon — the hero background
+ *
+ * Three passes into one canvas: a sky quad carrying the dawn glow, a field of
+ * twinkling stars, and the planet. The planet is analytic — no mesh. Every
+ * pixel intersects a ray against the sphere equation, so the limb is an exact
+ * circle with sub-pixel antialiasing and the atmosphere is a closed-form
+ * falloff, which is why there is no banding anywhere along the terminator.
+ *
+ * The two Earth maps are real (NASA-derived, from the three.js planet set),
+ * decoded out of the sketch into assets/ rather than carried as base64.
+ * ====================================================================== */
+
+/* Near-black violet above; the purple dawn floods up from the limb centre. */
+const HORIZON_SKY_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform vec2 uRes; uniform float uReveal, uGlow;
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/uRes.y*2.0;   /* y: -1..1 */
+
+    /* deep space above, faint violet wash */
+    float up = smoothstep(-0.9, 1.1, uv.y);
+    vec3 c = mix(vec3(0.055,0.015,0.10), vec3(0.012,0.004,0.020), up);
+
+    /* the dawn: broad purple bloom rising from the limb centre,
+       squashed horizontally so the white spreads along the curve */
+    vec2 h = vec2(0.0, -0.98);
+    float d = length((uv - h) * vec2(0.48, 1.0));
+    c += vec3(0.40,0.13,0.70) * exp(-d*1.9)  * 1.05 * uGlow;   /* purple flood  */
+    c += vec3(0.70,0.40,0.98) * exp(-d*4.5)  * 0.85 * uGlow;   /* violet core   */
+    c += vec3(1.00,0.95,1.00) * exp(-d*11.0) * 1.30 * uGlow;   /* white-hot rim */
+
+    c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
+    gl_FragColor = vec4(c*uReveal, 1.0);
+  }
+`;
+
+const HORIZON_STAR_VERTEX_SHADER = `
+  attribute float aPhase, aSize;
+  uniform float uTime;
+  varying float vA;
+  void main(){
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    float tw = 0.65 + 0.35*sin(uTime*(0.6 + fract(aPhase)*1.4) + aPhase*7.0);
+    vA = tw;
+    gl_PointSize = aSize * tw * (140.0 / -mv.z);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const HORIZON_STAR_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform float uReveal;
+  varying float vA;
+  void main(){
+    vec2 q = gl_PointCoord - 0.5;
+    float a = smoothstep(0.5, 0.05, length(q));
+    vec3 col = mix(vec3(0.85,0.78,1.0), vec3(1.0), vA); /* faint violet tint */
+    gl_FragColor = vec4(col, a * vA * uReveal);
+  }
+`;
+
+const HORIZON_PLANET_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform float uTime, uReveal, uAtmo, uFov, uAspect, uRise;
+  uniform vec2  uRes, uCamRot;
+  uniform vec3  uCenter;
+  uniform sampler2D uLights, uWater;
+
+  const float R = 30.0;
+  const float PI = 3.14159265;
+
+  vec3 shade(vec3 n, vec3 v){
+    /* real equirectangular Earth mapping.
+       The longitude offset frames Europe / the Mediterranean at
+       the front of the visible cap, matching the reference; the
+       tiny uTime term keeps the real Earth turning slowly.      */
+    float lon = atan(n.z, n.x) - 1.29 + uTime * 0.006;
+    float lat = asin(clamp(n.y, -1.0, 1.0));
+    vec2 uvT = vec2(fract(lon / (2.0*PI) + 0.5), lat / PI + 0.5);
+
+    float water  = texture2D(uWater,  uvT).r;      /* white = ocean */
+    float mland  = 1.0 - smoothstep(0.18, 0.55, water);
+    float lights = texture2D(uLights, uvT).r;      /* real cities   */
+
+    /* distance to the limb drives the light: 1 at the horizon,
+       falling to 0 toward the viewer */
+    float fres = clamp(1.0 - dot(n, v), 0.0, 1.0);
+    float lit  = smoothstep(0.28, 1.0, fres);
+
+    vec3 oceanLit  = vec3(0.52,0.30,0.80);   /* bright lavender near limb */
+    vec3 oceanDark = vec3(0.050,0.020,0.095);/* near-black at the bottom  */
+    vec3 ocean = mix(oceanDark, oceanLit, lit);
+
+    /* real continents as dark silhouettes, faintly violet where lit */
+    vec3 earth = mix(vec3(0.012,0.006,0.028), vec3(0.105,0.052,0.165), lit*0.65);
+    vec3 col = mix(ocean, earth, mland);
+
+    /* the actual city-light map — Europe's real glow network */
+    float glowL = pow(lights, 1.35);
+    col += vec3(0.98,0.92,1.0) * glowL * (0.55 + 0.85*lit) * 1.5;
+
+    /* the crisp bright band right at the horizon */
+    col += vec3(0.72,0.48,1.00) * pow(fres, 9.0)  * 1.3 * uAtmo;
+    col += vec3(1.00,0.97,1.00) * pow(fres, 28.0) * 2.2 * uAtmo;
+    return col;
+  }
+
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/uRes * 2.0;
+
+    /* build the exact same perspective ray the star camera uses */
+    vec3 rd = normalize(vec3(uv.x*uFov*uAspect, uv.y*uFov, -1.0));
+    float cx = cos(uCamRot.x), sx = sin(uCamRot.x);
+    float cy = cos(uCamRot.y), sy = sin(uCamRot.y);
+    rd.yz = mat2(cx,-sx,sx,cx) * rd.yz;
+    rd.xz = mat2(cy,-sy,sy,cy) * rd.xz;
+
+    vec3 ro = vec3(0.0);
+    vec3 c  = uCenter + vec3(0.0, uRise, 0.0);
+
+    /* analytic ray-sphere */
+    vec3  oc = ro - c;
+    float b  = dot(oc, rd);
+    float h2 = dot(oc,oc) - b*b;          /* squared distance of ray to centre */
+    float bp = sqrt(max(h2, 0.0));        /* impact parameter                  */
+    float edge = R - bp;                  /* >0 inside the disc, <0 outside    */
+
+    /* sub-pixel antialiasing width at the sphere's distance */
+    float dist = max(-b, 1.0);
+    float px = dist * uFov * 2.0 / uRes.y;
+    float aa = smoothstep(-px, px, edge);
+
+    vec3 col = vec3(0.0);
+    float alpha = 0.0;
+
+    if(edge > -px){ /* surface */
+      float t = -b - sqrt(max(R*R - h2, 0.0));
+      vec3 p = ro + rd*max(t, 0.0);
+      vec3 n = normalize(p - c);
+      col = shade(n, -rd);
+      alpha = aa;
+    }
+
+    /* analytic atmosphere halo — pure exponential falloff, no shell mesh */
+    float out_ = max(bp - R, 0.0);
+    vec3 halo = vec3(0.55,0.25,0.95) * exp(-out_*1.1) * 0.85
+              + vec3(0.85,0.60,1.05) * exp(-out_*3.2) * 0.75
+              + vec3(1.00,0.96,1.00) * exp(-out_*9.0) * 0.85;
+    /* brighter halo toward the dawn point at the top of the limb */
+    float toward = clamp(0.5 + 0.5*normalize(c - ro + rd*max(-b,0.0)).y + 0.9, 0.0, 1.35);
+    halo *= (1.0 - aa) * uAtmo * toward;
+
+    col += halo;
+    alpha = max(alpha, clamp(max(max(halo.r,halo.g),halo.b), 0.0, 1.0));
+
+    gl_FragColor = vec4(col * uReveal, alpha * uReveal);
+  }
+`;
+
+function initHorizonField() {
+  const host = document.querySelector('#horizon-field');
+  if (!host) return;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  } catch (error) {
+    console.error('Horizon field: no WebGL context', error);
+    return;
+  }
+
+  /*
+   * Same r128 grade as the other two fields: the sky, the rim and the halo are
+   * all authored for linear output, and r155+ would push their additive
+   * highlights through an sRGB transfer on top and blow the dawn out to white.
+   */
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.autoClear = false;
+  host.appendChild(renderer.domElement);
+
+  /* --- pass 1: the sky and its dawn --------------------------------------- */
+  const bgScene = new THREE.Scene();
+  const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const bgUni = {
+    uRes: { value: new THREE.Vector2(1, 1) },
+    uReveal: { value: 0 },
+    /* dawn intensity, GSAP-driven */
+    uGlow: { value: 0 },
+  };
+
+  bgScene.add(
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: bgUni,
+        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
+        fragmentShader: HORIZON_SKY_FRAGMENT_SHADER,
+      })
+    )
+  );
+
+  /* --- pass 2: stars ------------------------------------------------------ */
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+  camera.position.set(0, 0, 0);
+
+  const starUni = { uTime: { value: 0 }, uReveal: { value: 0 } };
+
+  /* 3200 points, with a denser milky-way band running down the middle */
+  {
+    const N = 3200;
+    const pos = new Float32Array(N * 3);
+    const phase = new Float32Array(N);
+    const size = new Float32Array(N);
+    const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+
+    for (let i = 0; i < N; i++) {
+      const band = i < N * 0.42; /* 42% in the central band */
+      pos[i * 3] = band ? gauss() * 9 : (Math.random() - 0.5) * 110;
+      pos[i * 3 + 1] = band ? Math.random() * 55 - 8 : Math.random() * 70 - 10;
+      pos[i * 3 + 2] = -55 - Math.random() * 35;
+      phase[i] = Math.random() * Math.PI * 2;
+      size[i] = 0.35 + Math.pow(Math.random(), 3.2) * 2.4; /* few big, many tiny */
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+    g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+
+    scene.add(
+      new THREE.Points(
+        g,
+        new THREE.ShaderMaterial({
+          uniforms: starUni,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          vertexShader: HORIZON_STAR_VERTEX_SHADER,
+          fragmentShader: HORIZON_STAR_FRAGMENT_SHADER,
+        })
+      )
+    );
+  }
+
+  /* --- pass 3: the analytic planet ---------------------------------------- */
+  const planetScene = new THREE.Scene();
+  const planetUni = {
+    uTime: { value: 0 },
+    uReveal: { value: 0 },
+    uAtmo: { value: 0 },
+    uRes: { value: new THREE.Vector2(1, 1) },
+    uFov: { value: Math.tan((50 * Math.PI) / 360) },
+    uAspect: { value: 1 },
+    /* x: pitch, y: yaw */
+    uCamRot: { value: new THREE.Vector2(0, 0) },
+    uCenter: { value: new THREE.Vector3(0, -35.5, -20) },
+    uRise: { value: 0 },
+    /* real Earth city lights (equirect) */
+    uLights: { value: null },
+    /* real land/water mask (equirect) */
+    uWater: { value: null },
+  };
+
+  planetScene.add(
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: planetUni,
+        transparent: true,
+        depthWrite: false,
+        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
+        fragmentShader: HORIZON_PLANET_FRAGMENT_SHADER,
+      })
+    )
+  );
+
+  /* --- the real Earth maps ------------------------------------------------ */
+  {
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    const prep = (t) => {
+      t.wrapS = THREE.RepeatWrapping; /* seamless across the date line */
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      if (maxAniso > 1) t.anisotropy = Math.min(8, maxAniso);
+      return t;
+    };
+
+    /*
+     * 1x1 fallbacks so the scene still renders before — or without — the maps:
+     * lights black (no cities yet), water white (all ocean, pure lavender).
+     */
+    const solid = (v) => {
+      const t = new THREE.DataTexture(new Uint8Array([v, v, v, 255]), 1, 1, THREE.RGBAFormat);
+      t.needsUpdate = true;
+      return t;
+    };
+    planetUni.uLights.value = solid(0);
+    planetUni.uWater.value = solid(255);
+
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      './assets/earth-lights.jpg',
+      (t) => {
+        planetUni.uLights.value = prep(t);
+      },
+      undefined,
+      () => console.warn('Horizon field: lights map failed, using fallback')
+    );
+    loader.load(
+      './assets/earth-water.jpg',
+      (t) => {
+        planetUni.uWater.value = prep(t);
+      },
+      undefined,
+      () => console.warn('Horizon field: water map failed, using fallback')
+    );
+  }
+
+  /* --- resize / pointer / loop -------------------------------------------- */
+  function resize() {
+    const w = host.clientWidth;
+    const h = host.clientHeight;
+    if (!w || !h) return;
+
+    renderer.setSize(w, h, false);
+    bgUni.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    planetUni.uRes.value.copy(bgUni.uRes.value);
+    planetUni.uAspect.value = w / h;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  new ResizeObserver(resize).observe(host);
+
+  const target = { x: 0, y: 0 };
+  const ptr = { x: 0, y: 0 };
+  /*
+   * The field is pointer-events:none so the button keeps its hover, so the
+   * cursor is read off the section and converted against the field's own box.
+   */
+  const section = host.closest('section') || host;
+  function fromEvent(e) {
+    const rct = host.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    target.x = ((p.clientX - rct.left) / rct.width - 0.5) * 2;
+    target.y = -((p.clientY - rct.top) / rct.height - 0.5) * 2;
+  }
+  section.addEventListener('pointermove', fromEvent);
+  section.addEventListener('touchmove', fromEvent, { passive: true });
+  section.addEventListener('pointerleave', () => {
+    target.x = 0;
+    target.y = 0;
+  });
+
+  const clock = new THREE.Clock();
+  let frameId = null;
+  let onScreen = false;
+
+  function draw() {
+    renderer.clear();
+    renderer.render(bgScene, bgCam);
+    renderer.clearDepth();
+    renderer.render(scene, camera); /* stars */
+    renderer.clearDepth();
+    /* the planet last, so its disc occludes the stars below the limb */
+    renderer.render(planetScene, bgCam);
+  }
+
+  function frame() {
+    frameId = requestAnimationFrame(frame);
+    const t = clock.getElapsedTime();
+
+    starUni.uTime.value = t;
+    planetUni.uTime.value = t;
+
+    ptr.x += (target.x - ptr.x) * 0.04;
+    ptr.y += (target.y - ptr.y) * 0.04;
+
+    /* the sky parallaxes more than the planet — gentle depth */
+    camera.rotation.y = -ptr.x * 0.035;
+    camera.rotation.x = ptr.y * 0.025;
+    planetUni.uCamRot.value.set(camera.rotation.x, camera.rotation.y);
+
+    draw();
+  }
+
+  let entrancePlayed = false;
+
+  /*
+   * The dawn sequence: stars fade up first, the planet rises into frame, then
+   * the atmosphere ignites and the purple dawn floods the sky.
+   */
+  function playEntrance() {
+    if (entrancePlayed) return;
+    entrancePlayed = true;
+
+    planetUni.uRise.value = -2.4; /* start below frame, rise to 0 */
+
+    const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+    tl.to(bgUni.uReveal, { value: 1, duration: 1.4, ease: 'power2.inOut' }, 0)
+      .to(starUni.uReveal, { value: 1, duration: 2.2 }, 0.3)
+      .to(planetUni.uReveal, { value: 1, duration: 2.0 }, 0.8)
+      .to(planetUni.uRise, { value: 0, duration: 3.2, ease: 'power3.out' }, 0.8)
+      .to(planetUni.uAtmo, { value: 1, duration: 2.0 }, 1.4)
+      .to(bgUni.uGlow, { value: 1, duration: 2.6, ease: 'power2.inOut' }, 1.6);
+
+    /* once the dawn has landed, the glow breathes very slowly */
+    tl.to(bgUni.uGlow, { value: 0.9, duration: 5, repeat: -1, yoyo: true, ease: 'sine.inOut' }, 5);
+  }
+
+  function sync() {
+    const shouldRun = onScreen && !document.hidden;
+    if (shouldRun) {
+      playEntrance();
+      if (frameId === null) frame();
+    } else if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
   }
 
   new IntersectionObserver(

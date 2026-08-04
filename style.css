@@ -82,6 +82,15 @@ body.no-scroll {
   overflow: hidden;
 }
 
+/*
+ * Set in the markup, cleared by hideLoader(). Scrolling behind the overlay
+ * would leave ScrollTrigger initialising mid-page the moment the models land,
+ * which is exactly what made the hero model appear over the footer.
+ */
+body.is-loading {
+  overflow: hidden;
+}
+
 /* Loader Styles */
 #loader-overlay {
   position: fixed;
@@ -191,6 +200,28 @@ nav {
   padding: 1rem 1.25rem; /* py-4 px-5 */
   background: transparent;
   animation: nav-fade-down 0.5s ease-out both;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+/*
+ * The intro keyframes hold transform and opacity through `both` fill-mode,
+ * and a running animation out-ranks the transition above. initNavAutoHide()
+ * retires it once it has played so the bar is free to slide away.
+ */
+nav.nav-ready {
+  animation: none;
+}
+
+/*
+ * Scrolling down takes the bar with it. The nav is transparent and sits over
+ * whatever section is passing, so headings kept colliding with the links;
+ * getting out of the way is cheaper than giving it a background that would
+ * cover the artwork behind it. Scrolling up brings it straight back.
+ */
+nav.nav-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (min-width: 640px) {
@@ -270,7 +301,14 @@ nav .nav-links {
 }
 
 @media (max-width: 767.98px) {
-  .nav-links { display: none; }
+  /*
+   * Must be scoped to `nav` to match the specificity of `nav .nav-links`
+   * above, which sets display:flex. A bare `.nav-links` selector loses on
+   * specificity no matter where it sits in the file, so this rule silently
+   * did nothing and the full desktop pill stayed on phones, overflowing the
+   * viewport on both sides and colliding with the logo.
+   */
+  nav .nav-links { display: none; }
 }
 
 .nav-actions {
@@ -514,13 +552,67 @@ nav .nav-links {
   overflow: hidden;
 }
 
+#hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 260px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(5, 2, 10, 0.7) 60%, rgba(5, 2, 10, 1) 100%);
+  pointer-events: none;
+  z-index: 12;
+}
+
 /*
  * Layer order inside the hero:
+ *   0  .horizon-field   the rising planet, plus its black veil
  *   1  .hero-title      giant wordmark
  *   2  #webgl-container the chrome model, painted over the wordmark
  *   3  .hero-content    supporting copy, kept in front of the model
  *  10  .hole-stage      scroll reveal
  */
+
+/*
+ * Purple horizon. pointer-events stays off so the button and the wordmark
+ * keep their hover — initHorizonField() reads the cursor off #hero instead.
+ */
+.horizon-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.horizon-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * The black veil, painted over the canvas rather than mixed into the shader
+ * so the sketch's own grade is left alone. Nearly opaque at the top where the
+ * wordmark sits, and thinnest at the bottom centre so the dawn still burns
+ * through the middle of the limb.
+ */
+.horizon-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    78% 52% at 50% 100%,
+    rgba(4, 2, 7, 0.18) 0%,
+    rgba(4, 2, 7, 0.56) 45%,
+    rgba(4, 2, 7, 0.8) 100%
+  );
+}
+
 .hero-title {
   position: absolute;
   /*
@@ -729,6 +821,18 @@ nav .nav-links {
   position: relative;
 }
 
+#projects::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(to bottom, rgba(5, 2, 10, 1) 0%, rgba(5, 2, 10, 0.6) 60%, rgba(5, 2, 10, 0) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .projects-stage {
   position: relative;
   /* Exactly one window tall. */
@@ -741,29 +845,6 @@ nav .nav-links {
   padding: calc(var(--nav-height) + 2.5rem) 4rem 3rem;
 }
 
-/* Locked dead centre of the stage; the slides move, this does not. */
-/* Background film — behind everything, no overlay. */
-.projects-video-wrap {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  /* Same vertical fade as the spotlight sections: without it the film ends
-     in a hard horizontal line against the next section. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-}
-
-.projects-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  /* JS drives the fade cycle from 0. */
-  opacity: 0;
-}
-
 .projects-inner {
   position: relative;
   z-index: 2;
@@ -772,10 +853,22 @@ nav .nav-links {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  /*
+   * Room for the frame's glowing top and bottom bars, which sit ~7% and ~11%
+   * of the card's height outside it. At the old 2rem the bottom bar landed on
+   * the progress counter.
+   */
+  gap: 3.5rem;
 }
 
-.projects-head {
+/*
+ * .section-header's 4rem is declared further down the file, so the plain
+ * .projects-head reset below it never actually won — the column was carrying
+ * a redundant 64px on top of the flex gap. The stage is a fixed 100vh with
+ * overflow:hidden, so that 64px was 64px of the card being clipped on short
+ * laptops. Scoped selector so it beats .section-header on specificity.
+ */
+.projects-inner .projects-head {
   margin-bottom: 0;
 }
 
@@ -785,27 +878,92 @@ nav .nav-links {
 
 /* Every slide occupies the same grid cell so they cross-fade in place. */
 .projects-deck {
+  position: relative;
   display: grid;
   align-items: center;
+  /*
+   * Breathing room between the card and the frame's inner stroke. It has to
+   * clear the corners, not just the straight runs: the opening's arc is about
+   * 98x113px, so at 45 degrees it cuts ~29px/33px in from the corner point.
+   * Less padding than this and the card's own 24px corner pokes through.
+   */
+  padding: 1.4rem 1.7rem;
+  /*
+   * The frame is hung off this box, so it has to be the card's box and not
+   * the full 1400px column — otherwise the stroke floats ~90px clear of the
+   * card on both sides. 1120px is .project-slide's max-width.
+   */
+  width: 100%;
+  max-width: calc(1040px + 3.4rem);
+  margin-inline: auto;
 }
 
 /*
- * One glass card per project holding both the copy and the screenshot.
- * Surface comes from .liquid-glass; only geometry and type colour
- * are set here so that effect stays untouched.
+ * Chrome frame behind the deck.
+ *
+ * The artwork is a rounded box floating inside a mostly transparent 1383x1137
+ * canvas, so it cannot simply be stretched over the card — the stroke would
+ * land nowhere near the edges. Measured off the PNG's alpha channel, the
+ * opening runs x 138..1259 and y 225..856, i.e. 81.06% x 55.50% of the file.
+ * Scaling the layer up by the inverse of that (and offsetting by the same
+ * ratios) puts the frame's opening exactly on the deck's box, whatever size
+ * the card ends up being.
+ */
+.projects-deck::before {
+  content: '';
+  position: absolute;
+  left: -12.31%;
+  right: -11.06%;
+  top: -35.66%;
+  bottom: -44.53%;
+  z-index: 0;
+  pointer-events: none;
+  background: url('https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/box2-Photoroom.png') center / 100% 100% no-repeat;
+}
+
+/*
+ * Copy and screenshot per project. The padding doubles as the inner margin
+ * between the details and the frame's stroke, and it fixes the box the frame
+ * is sized from; drop it and the frame collapses onto the content and
+ * stretches further out of proportion.
  */
 .project-slide {
   grid-area: 1 / 1;
   justify-self: center;
+  /* Above the frame layer. */
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 1120px;
-  border-radius: 24px;
-  padding: 2.25rem;
+  max-width: 1040px;
+  /* Only seen where the glass panel survives — see the override below. */
+  border-radius: 96px;
+  padding: 1.85rem 2.25rem;
   display: grid;
   grid-template-columns: 1fr 1.15fr;
-  gap: 2.5rem;
+  gap: 2.25rem;
   align-items: center;
   opacity: 0;
+}
+
+/*
+ * The chrome frame is the surface wherever it is drawn, so the glass panel
+ * comes off there and the details sit straight in the box. The class stays on
+ * the element rather than being stripped from the markup because the frame is
+ * hidden on phones and under reduced motion — and there the card still has to
+ * be a card, not loose text on the page gradient. Conditions must mirror the
+ * two places .projects-deck::before is switched off.
+ */
+@media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
+  .project-slide.liquid-glass {
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .project-slide.liquid-glass::before {
+    display: none;
+  }
 }
 
 /* Without JS the deck can't cycle, so at least the first project shows. */
@@ -813,13 +971,12 @@ nav .nav-links {
   opacity: 1;
 }
 
-/* Sit above the glass edge highlight. */
 .project-slide > * {
   position: relative;
   z-index: 1;
 }
 
-/* 5% white glass reads as dark over the section, so copy stays light. */
+/* Sitting straight on the dark section now, so the copy stays light. */
 .project-slide h3 {
   color: var(--text-primary);
   font-size: 2.1rem;
@@ -940,17 +1097,20 @@ nav .nav-links {
 
 .project-image {
   min-width: 0;
-  border-radius: 16px;
+  border-radius: 48px;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(8, 4, 12, 0.6);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .project-image img {
   width: 100%;
   height: auto;
   display: block;
+  border-radius: inherit;
   transition: transform 0.5s ease;
 }
 
@@ -1021,6 +1181,60 @@ nav .nav-links {
   display: flex;
   align-items: center;
   padding: 9rem 1.75rem 8rem 1.75rem;
+}
+
+/*
+ * Full-bleed bubble field behind the cards. Same vertical fade as the other
+ * scene sections, or the deep navy backdrop ends in a hard line against the
+ * page gradient above and below. Pointer-events stay off so the cards keep
+ * their hover and the button stays clickable — initCapabilityField() reads
+ * the cursor from the section instead.
+ */
+.capability-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
+.capability-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Black scrim over the bubbles, the same treatment as .about-field. The rims
+ * peak white-hot and the cards are only 5% white, so a rim drifting behind a
+ * card washes its copy out. Darkening the field is the lever here because the
+ * .liquid-glass recipe itself has to stay exactly as it is.
+ *
+ * Inside .capability-field, so it inherits the same top/bottom mask and can
+ * never show as a hard-edged rectangle against the neighbouring sections.
+ */
+.capability-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    /* vignette: sinks the corners into the section's black */
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.45) 100%),
+    /* the scrim proper, heaviest through the band the cards occupy */
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.38) 0%,
+      rgba(0, 0, 0, 0.66) 22%,
+      rgba(0, 0, 0, 0.7) 55%,
+      rgba(0, 0, 0, 0.66) 82%,
+      rgba(0, 0, 0, 0.38) 100%
+    );
 }
 
 /*
@@ -1245,9 +1459,14 @@ nav .nav-links {
   /* Black behind the film, but transparent at the very edges so the page
      gradient carries through instead of butting against a flat #000 band. */
   background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
-  padding: 10rem 1.75rem;
-  /* The letter column is framed for a tall viewport; give it the room. */
-  min-height: 100vh;
+  padding: 16rem 1.75rem;
+  /*
+   * The letter column is framed for a tall viewport, and the liquid needs
+   * room either side of the copy or the blobs crowd it. Taller than the
+   * viewport on purpose: the content stays centred and the field gets the
+   * extra height, which also spreads its top/bottom fade over more pixels.
+   */
+  min-height: 145vh;
   display: flex;
   align-items: center;
 }
@@ -1268,6 +1487,35 @@ nav .nav-links {
 }
 
 .about-field:active { cursor: grabbing; }
+
+/*
+ * Black scrim over the liquid. The blobs peak near-white, and the copy sits
+ * straight on top of them, so without this the paragraphs wash out wherever a
+ * bright lobe drifts underneath. Painted over the canvas rather than mixed
+ * into the shader, so the sketch's own grade is left alone.
+ *
+ * Inside .about-field, so it inherits the same top/bottom mask and never
+ * shows as a hard-edged rectangle against the neighbouring sections.
+ */
+.about-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    /* vignette: sinks the corners into the section's black */
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.5) 100%),
+    /* the scrim proper, heaviest through the band the copy occupies */
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.34) 0%,
+      rgba(0, 0, 0, 0.64) 26%,
+      rgba(0, 0, 0, 0.68) 55%,
+      rgba(0, 0, 0, 0.63) 80%,
+      rgba(0, 0, 0, 0.34) 100%
+    );
+}
 
 .about-field canvas {
   position: absolute;
@@ -1883,7 +2131,7 @@ footer {
 
   #projects, #contact, #faq { padding-left: 2.5rem; padding-right: 2.5rem; }
   #concepts { padding-left: 1.5rem; padding-right: 1.5rem; }
-  #about { padding: 7rem 2rem; }
+  #about { padding: 9rem 2rem; }
   footer { padding-left: 2.5rem; padding-right: 2.5rem; }
 
   .projects-stage { padding-left: 2.5rem; padding-right: 2.5rem; }
@@ -1929,11 +2177,18 @@ footer {
   .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2rem; }
   .projects-inner { gap: 1.25rem; }
 
+  /*
+   * The card goes portrait on a phone, and stretching a 1.22:1 frame to
+   * roughly 0.4:1 mangles its corners. Drop it rather than distort it.
+   */
+  .projects-deck { padding: 0; }
+  .projects-deck::before { display: none; }
+
   .project-slide {
     grid-template-columns: 1fr;
     gap: 1.1rem;
     padding: 1.35rem;
-    border-radius: 20px;
+    border-radius: 28px;
     align-content: center;
     /* Copy first, screenshot under it, and never taller than the stage. */
     max-height: calc(100dvh - var(--nav-height) - 9rem);
@@ -1997,7 +2252,12 @@ footer {
 
   html { scroll-behavior: auto; }
 
+  /*
+   * The hero becomes a tall stacked block here, and the planet is framed for
+   * a viewport-shaped box, so it is dropped with the rest of the WebGL layer.
+   */
   #webgl-container,
+  .horizon-field,
   .scroll-indicator,
   #loader-overlay {
     display: none;
@@ -2052,10 +2312,11 @@ footer {
     padding: 5rem 1.5rem;
   }
 
-  .projects-video-wrap,
   .about-field { display: none; }
 
-  .projects-deck { display: block; }
+  /* Slides stack down the page here, so one frame around the lot is wrong. */
+  .projects-deck { display: block; padding: 0; }
+  .projects-deck::before { display: none; }
 
   .project-slide {
     grid-area: auto;

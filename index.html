@@ -81,14 +81,41 @@
       ]
     }
     </script>
+    <script>
+      /*
+       * Runs before first paint, and before the deferred module. The hero's
+       * scroll animations are only wired once the .glb models arrive, so if the
+       * browser restores the scroll position from a previous visit the fixed
+       * hero canvas ends up drawing the model in its opening pose over whatever
+       * section it landed on — then snapping away when ScrollTrigger starts.
+       * Always opening at the top means the opening pose is the correct one.
+       */
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+      /*
+       * Failsafe for the scroll lock below. hideLoader() normally clears it,
+       * but if main.js never runs at all — blocked, failed to parse, offline —
+       * nothing else would, and the page could not be scrolled. Deliberately
+       * longer than main.js's own 8s ceiling so it only ever fires as a
+       * last resort. document.body does not exist yet inside <head>.
+       */
+      setTimeout(function () {
+        if (document.body) document.body.classList.remove('is-loading');
+      }, 10000);
+    </script>
   </head>
-  <body>
+  <!-- is-loading locks scrolling until the models are ready; main.js clears it. -->
+  <body class="is-loading">
     <!-- Loader Overlay (removed by main.js; hidden outright when JS is off) -->
     <div id="loader-overlay" role="status" aria-live="polite">
       <p class="loader-text">Loading…</p>
     </div>
     <noscript>
-      <style>#loader-overlay { display: none; }</style>
+      <style>
+        #loader-overlay { display: none; }
+        /* Nothing will ever clear is-loading, so give the scrollbar back. */
+        body.is-loading { overflow: visible; }
+      </style>
     </noscript>
 
     <a href="#main" class="skip-link">Skip to main content</a>
@@ -154,6 +181,14 @@
     <!-- Hero Section -->
     <section id="hero" class="font-helvetica-neue" aria-label="Introduction">
       <!--
+        Purple horizon: an analytic Earth rising into a field of stars, with
+        the dawn flooding up from the limb. Carries its own black veil (see
+        .horizon-field::after) so the wordmark and the chrome model stay the
+        subject and the planet reads as sky behind them.
+      -->
+      <div class="horizon-field" id="horizon-field" aria-hidden="true"></div>
+
+      <!--
         Sits *behind* the WebGL canvas, so wherever the chrome form overlaps
         the wordmark the letters are occluded by the model.
       -->
@@ -200,17 +235,6 @@
     -->
     <section id="projects" aria-labelledby="projects-heading">
       <div class="projects-stage">
-        <!--
-          Background film, behind everything. Not `loop` — a JS fade cycle
-          handles the 0.5s in/out and the replay; see initProjectsVideo().
-        -->
-        <div class="projects-video-wrap" aria-hidden="true">
-          <video class="projects-video" muted playsinline preload="none" disablepictureinpicture>
-            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4" type="video/mp4">
-          </video>
-        </div>
-
-
         <div class="projects-inner">
           <div class="section-header projects-head">
             <h2 id="projects-heading">Our Featured Work</h2>
@@ -276,25 +300,9 @@
     </section>
 
     <!-- Concepts / Engineering Tracks Section -->
-    <section id="concepts" aria-labelledby="concepts-heading" data-spotlight>
-      <!-- Layer 1: still background -->
-      <div class="spotlight-layers" aria-hidden="true">
-        <div class="spotlight-media" aria-hidden="true">
-          <img class="spotlight-bg" src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/ChatGPT%20Image%20Aug%203%2C%202026%2C%2005_29_28%20PM.png"
-               alt="" width="1672" height="941" loading="lazy" decoding="async">
-        </div>
-        <div class="spotlight-reveal" aria-hidden="true">
-          <video class="spotlight-video" muted loop playsinline preload="none" disablepictureinpicture>
-            <source src="https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/Create_video_from_images_1080p_202608031736.mp4" type="video/mp4">
-          </video>
-        </div>
-      </div>
-
-      <!--
-        Layer 2: spotlight reveal. The film sits on top of the still but is
-        masked to a soft 260px circle that follows the cursor, so it only
-        shows where the pointer is. See initConceptsSpotlight().
-      -->
+    <section id="concepts" aria-labelledby="concepts-heading">
+      <!-- Glass-bubble field: dark spheres lit only by their fresnel rims. -->
+      <div class="capability-field" id="capability-field" aria-hidden="true"></div>
 
       <div class="concepts-inner">
         <div class="section-header">

@@ -51,6 +51,54 @@ function initNav() {
 }
 
 /* -------------------------------------------------------------------------
+ * Auto-hiding navigation
+ *
+ * The bar is fixed and transparent, so over a busy section its links collide
+ * with the heading underneath. Scrolling down slides it away; scrolling up —
+ * at any point on the page — brings it back.
+ * ---------------------------------------------------------------------- */
+const NAV_ALWAYS_SHOWN_ABOVE = 120; // px from the top where the bar always stays
+const NAV_SCROLL_THRESHOLD = 6; // ignore sub-pixel jitter and rubber-banding
+
+function initNavAutoHide() {
+  const nav = document.querySelector('nav');
+  if (!nav) return;
+
+  // Retire the intro animation, or its `both` fill-mode keeps overriding the
+  // transform the hide relies on. The timeout covers the animation never
+  // firing at all (reduced motion, or the tab starting in the background).
+  const release = () => nav.classList.add('nav-ready');
+  nav.addEventListener('animationend', release, { once: true });
+  setTimeout(release, 1200);
+
+  let last = window.scrollY;
+  let queued = false;
+
+  const update = () => {
+    queued = false;
+    const y = window.scrollY;
+    const delta = y - last;
+    if (Math.abs(delta) < NAV_SCROLL_THRESHOLD) return;
+
+    // Never hide near the top. The mobile-menu guard is belt-and-braces: the
+    // body is locked while it is open, so this should not fire anyway.
+    const menuOpen = document.body.classList.contains('no-scroll');
+    nav.classList.toggle('nav-hidden', delta > 0 && y > NAV_ALWAYS_SHOWN_ABOVE && !menuOpen);
+    last = y;
+  };
+
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(update);
+    },
+    { passive: true }
+  );
+}
+
+/* -------------------------------------------------------------------------
  * FAQ accordion — real buttons, so keyboard and screen readers work
  * ---------------------------------------------------------------------- */
 function initFaq() {
@@ -331,90 +379,6 @@ function initSpotlight(section) {
 }
 
 /* -------------------------------------------------------------------------
- * Projects background film
- *
- * Not a native `loop`. Opacity starts at 0 and a rAF loop fades in over the
- * first 0.5s and out over the last 0.5s; on `ended` it snaps to 0, waits
- * 100ms, then replays from the beginning. No gradient overlay.
- * ---------------------------------------------------------------------- */
-const PROJECTS_VIDEO_FADE = 0.5; // seconds
-const PROJECTS_VIDEO_GAP = 100; // ms between cycles
-
-function initProjectsVideo() {
-  const video = document.querySelector('.projects-video');
-  if (!video) return;
-
-  // A looping film is the opposite of what reduced motion asks for.
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    video.closest('.projects-video-wrap')?.remove();
-    return;
-  }
-
-  video.muted = true;
-  video.playsInline = true;
-
-  let onScreen = false;
-  let frameId = null;
-  let replayTimer = null;
-
-  const setOpacity = (value) => {
-    video.style.opacity = String(Math.min(1, Math.max(0, value)));
-  };
-
-  const frame = () => {
-    frameId = requestAnimationFrame(frame);
-
-    const duration = video.duration;
-    if (!duration || !isFinite(duration)) return;
-
-    const t = video.currentTime;
-    if (t < PROJECTS_VIDEO_FADE) setOpacity(t / PROJECTS_VIDEO_FADE);
-    else if (t > duration - PROJECTS_VIDEO_FADE) setOpacity((duration - t) / PROJECTS_VIDEO_FADE);
-    else setOpacity(1);
-  };
-
-  video.addEventListener('ended', () => {
-    setOpacity(0);
-    clearTimeout(replayTimer);
-    replayTimer = setTimeout(() => {
-      video.currentTime = 0;
-      if (onScreen && !document.hidden) video.play().catch(() => {});
-    }, PROJECTS_VIDEO_GAP);
-  });
-
-  const sync = () => {
-    const shouldRun = onScreen && !document.hidden;
-    if (shouldRun) {
-      if (frameId === null) frame();
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId);
-        frameId = null;
-      }
-    }
-  };
-
-  // 13MB of film: only fetch it once the section is close.
-  let fetched = false;
-  new IntersectionObserver(
-    ([entry]) => {
-      onScreen = entry.isIntersecting;
-      if (onScreen && !fetched) {
-        fetched = true;
-        video.preload = 'auto';
-        video.load();
-      }
-      sync();
-    },
-    { rootMargin: '400px' }
-  ).observe(video);
-
-  document.addEventListener('visibilitychange', sync);
-}
-
-/* -------------------------------------------------------------------------
  * Footer year
  * ---------------------------------------------------------------------- */
 function initYear() {
@@ -425,11 +389,11 @@ function initYear() {
 
 export function initUI() {
   initNav();
+  initNavAutoHide();
   initFaq();
   initScrollTop();
   initContactForm();
   initSpotlights();
-  initProjectsVideo();
   initYear();
 }
 
