@@ -1478,25 +1478,6 @@ nav .nav-links {
   padding: 8rem 1.75rem;
 }
 
-/* Chrome knot behind the glass panels. */
-.contact-media {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(70vh, 620px);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.contact-media img {
-  width: 100%;
-  height: auto;
-  display: block;
-  opacity: 0.55;
-  filter: drop-shadow(0 30px 90px rgba(138, 43, 226, 0.35));
-}
-
 .contact-grid {
   position: relative;
   z-index: 1;
@@ -1980,8 +1961,6 @@ footer {
   .contact-details { gap: 0.25rem; padding: 0.5rem; }
   .contact-detail-link { padding: 0.85rem 0.9rem; }
   .contact-form { padding: 1.4rem; border-radius: 20px; gap: 1.4rem; }
-  .contact-media { width: min(56vh, 340px); }
-  .contact-media img { opacity: 0.35; }
 
   .faq-question { font-size: 1.05rem; padding: 1.4rem 0; gap: 1rem; }
   .faq-answer { font-size: 1rem; }
