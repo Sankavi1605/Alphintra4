@@ -1477,30 +1477,34 @@ nav .nav-links {
  */
 .about-field {
   position: absolute;
-  inset: 0;
+  /*
+   * Starts below the header rather than spanning the section, so
+   * "Engineering Studio / for Scalable Products" reads on plain black.
+   * Measured: the header ends at 32% of the section.
+   *
+   * This is deliberately a shorter BOX rather than a full-height box with its
+   * top masked away. Masking hid the top of the ALPHINTRA column too — the
+   * word spans 3.4 world units and the masked-in band was only 2.0, so "ALP"
+   * was cut off with no shift that could fit all nine letters. Shrinking the
+   * element instead lets the scene reframe itself: the ResizeObserver rescales
+   * the column to the new box, and the whole word shows.
+   */
+  inset: 32% 0 0;
   z-index: 0;
   overflow: hidden;
   /* The scene reads the pointer, so it must receive the events. */
   cursor: grab;
-  /*
-   * Held off the top third so "Engineering Studio / for Scalable Products"
-   * reads on plain black, then fully on by 39% — where "We think in systems"
-   * starts, which is the block the liquid is meant to sit behind. Measured:
-   * the header spans 19-32% of this element, the copy grid 39-81%.
-   */
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
-    transparent 32%,
-    #000 39%,
+    #000 10%,
     #000 88%,
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0%,
-    transparent 32%,
-    #000 39%,
+    #000 10%,
     #000 88%,
     transparent 100%
   );
@@ -1638,6 +1642,52 @@ nav .nav-links {
 /* Careers Page Styling */
 .nav-links a.active {
   font-weight: 600;
+}
+
+/*
+ * Careers page: the same purple horizon as the hero, but as a full-viewport
+ * backdrop rather than a section background — this page is one short card, so
+ * an absolute host would leave the dawn stranded at the top.
+ *
+ * Fixed at z-index 0 rather than -1: negative would drop it behind the body's
+ * own gradient and disappear. Positioned children paint above a static
+ * ancestor's inline content, so the page content is lifted to 1 below.
+ */
+#careers-horizon {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  /* The scene reads the pointer off the document, so it needs no events. */
+  pointer-events: none;
+}
+
+#careers-horizon canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Veil, so the card and the copy stay the subject and the dawn reads as sky. */
+#careers-horizon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    78% 52% at 50% 100%,
+    rgba(4, 2, 7, 0.2) 0%,
+    rgba(4, 2, 7, 0.58) 45%,
+    rgba(4, 2, 7, 0.82) 100%
+  );
+}
+
+.careers-page-container,
+body > footer {
+  position: relative;
+  z-index: 1;
 }
 
 .careers-page-container {
@@ -2325,6 +2375,7 @@ footer {
    */
   #webgl-container,
   .horizon-field,
+  #careers-horizon,
   .scroll-indicator,
   #loader-overlay {
     display: none;
