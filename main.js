@@ -130,7 +130,7 @@ function initHeroScene() {
       // Ultra-polished liquid chrome
       model.traverse((child) => {
         if (!child.isMesh) return;
-        child.geometry?.computeVertexNormals();
+        ensureNormals(child.geometry);
         child.material = new THREE.MeshPhysicalMaterial({
           color: 0xffffff,
           metalness: 1.0,
@@ -161,7 +161,7 @@ function initHeroScene() {
 
           model3.traverse((child) => {
             if (!child.isMesh || !child.material) return;
-            child.geometry?.computeVertexNormals();
+            ensureNormals(child.geometry);
             child.material.color.setHex(0xffffff);
             child.material.metalness = 1.0;
             child.material.roughness = 0.12;
@@ -273,6 +273,20 @@ function initHeroScene() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     ScrollTrigger.refresh();
   });
+}
+
+/**
+ * The GLBs are meshopt-quantized, so their normal attribute arrives as a
+ * normalized Int8Array. computeVertexNormals() zeroes that attribute and then
+ * accumulates float face-normal sums back through setXYZ — which truncates to
+ * int8 steps, so every partial sum rounds to zero. The result is (0,0,0)
+ * normals and a pure-metal material shading solid black.
+ *
+ * The exported normals are already correct, so only compute when missing.
+ */
+function ensureNormals(geometry) {
+  if (!geometry) return;
+  if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
 }
 
 function centerObject(object) {
