@@ -43,8 +43,18 @@ setTimeout(hideLoader, 8000);
  * ---------------------------------------------------------------------- */
 if (prefersReducedMotion) {
   hideLoader();
+  /* Still paint one static frame so the About section is not empty. */
+  queueMicrotask(initAboutField);
 } else {
   initHeroScene();
+
+  /*
+   * A module script is deferred, so readyState is already "interactive" here.
+   * Calling straight through would run this while module evaluation is still
+   * on the stack, and the shader const it reads is declared further down the
+   * file — still in its temporal dead zone. A microtask lets evaluation finish.
+   */
+  queueMicrotask(initAboutField);
 }
 
 function initHeroScene() {
@@ -543,4 +553,417 @@ function reveal(target, scrollTrigger, from = {}, to = {}) {
   }
 
   gsap.fromTo(target, fromVars, toVars);
+}
+
+/* -------------------------------------------------------------------------
+ * About background — raymarched liquid field with the ALPHINTRA column
+ *
+ * The supplied sketch, ported from three r128 to the r185 the site runs on.
+ * Two passes share one renderer: an SDF blob field on a fullscreen quad, then
+ * a perspective scene of canvas-textured letter planes at staggered depths so
+ * the word genuinely sits inside the liquid rather than on top of it.
+ * ---------------------------------------------------------------------- */
+const FIELD_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform float uTime, uReveal, uSpread;
+  uniform vec2  uRes, uPtr;
+
+  float smin(float a, float b, float k){
+    float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
+    return mix(b, a, h) - k*h*(1.0-h);
+  }
+
+  vec3 drift(float seed, float amp){
+    return amp * vec3(
+      sin(uTime*0.22 + seed),
+      cos(uTime*0.17 + seed*1.9),
+      sin(uTime*0.13 + seed*2.7)
+    );
+  }
+
+  float sph(vec3 p, vec3 c, float r){
+    c.x *= uSpread;
+    return length(p - c) - r;
+  }
+
+  /* Round shapes in graded sizes — huge / big / medium / small / tiny.
+     Single spheres where the image shows a ball; two spheres with a
+     large blend radius where it shows a smooth pear or droplet, so
+     every silhouette stays rounded with no lumps.                     */
+  float map(vec3 p){
+    /* 1 — HUGE pear, top-left: two spheres, very soft blend */
+    vec3 o1 = drift(1.0, 0.09);
+    float d = sph(p, vec3(-1.50, 2.25, -0.4)+o1, 1.60);
+    d = smin(d, sph(p, vec3(-1.10, 0.75, -0.3)+o1, 0.95), 1.10);
+
+    /* 2 — TINY ball, top-right */
+    float b2 = sph(p, vec3(0.88, 2.05, -0.2)+drift(2.0,0.06), 0.21);
+    d = min(d, b2);
+
+    /* 3 — SMALL ball, upper-centre */
+    d = min(d, sph(p, vec3(0.28, 1.45, -0.25)+drift(3.0,0.07), 0.37));
+
+    /* 4 — BIG rounded pod, right: two spheres, soft blend */
+    vec3 o4 = drift(4.0, 0.08);
+    float b4 = sph(p, vec3(0.75, 0.95, -0.5)+o4, 0.82);
+    b4 = smin(b4, sph(p, vec3(1.65, 0.60, -0.6)+o4, 0.72), 0.90);
+    d = min(d, b4);
+
+    /* 5 — MEDIUM droplet, centre: round body + soft tip */
+    vec3 o5 = drift(5.0, 0.09);
+    float b5 = sph(p, vec3(-0.18, 0.12, 0.30)+o5, 0.34);
+    b5 = smin(b5, sph(p, vec3(-0.42, 0.42, 0.30)+o5, 0.17), 0.42);
+    d = min(d, b5);
+
+    /* 6 — MEDIUM rounded bean, lower-left: two spheres, soft blend */
+    vec3 o6 = drift(6.0, 0.08);
+    float b6 = sph(p, vec3(-1.00, -0.68, 0.05)+o6, 0.36);
+    b6 = smin(b6, sph(p, vec3(-0.74, -1.10, 0.05)+o6, 0.32), 0.52);
+    d = min(d, b6);
+
+    /* 7 — SMALL droplet, lower-centre */
+    vec3 o7 = drift(7.0, 0.07);
+    float b7 = sph(p, vec3(0.34, -0.95, 0.10)+o7, 0.29);
+    b7 = smin(b7, sph(p, vec3(0.20, -0.70, 0.10)+o7, 0.13), 0.34);
+    d = min(d, b7);
+
+    /* 8 — HUGE ball, right edge: one clean sphere */
+    d = min(d, sph(p, vec3(1.90, -0.50, -0.7)+drift(8.0,0.07), 1.10));
+
+    /* 9 — HUGE dome, bottom: two spheres, very soft blend */
+    vec3 o9 = drift(9.0, 0.08);
+    float b9 = sph(p, vec3(0.35, -2.40, -0.2)+o9, 1.50);
+    b9 = smin(b9, sph(p, vec3(-0.60, -2.25, -0.2)+o9, 1.00), 1.00);
+    d = min(d, b9);
+
+    return d;
+  }
+
+  vec3 normalAt(vec3 p){
+    vec2 e = vec2(0.003, 0.0);
+    return normalize(vec3(
+      map(p+e.xyy)-map(p-e.xyy),
+      map(p+e.yxy)-map(p-e.yxy),
+      map(p+e.yyx)-map(p-e.yyx)));
+  }
+
+  vec3 background(vec2 uv){
+    /* near-black plum, faintly warmer up-right, faint indigo low-left */
+    float g = smoothstep(-1.2, 1.6, uv.y*0.8 + uv.x*0.35);
+    vec3 c = mix(vec3(0.012,0.006,0.022), vec3(0.10,0.012,0.09), pow(g,2.2));
+    c += vec3(0.015,0.02,0.07) * smoothstep(0.8,-1.4, uv.y + uv.x*0.5);
+    return c;
+  }
+
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / min(uRes.x, uRes.y) * 2.0;
+    /* frame roughly like the portrait reference */
+    uv *= 1.55;
+
+    vec3 ro = vec3(uPtr.x*0.45, uPtr.y*0.35, 5.2);
+    vec3 rd = normalize(vec3(uv.x, uv.y, -3.4));
+    /* tiny camera yaw with the pointer */
+    float yaw = uPtr.x*0.06;
+    rd.xz = mat2(cos(yaw),-sin(yaw),sin(yaw),cos(yaw)) * rd.xz;
+
+    vec3 col = background(uv);
+
+    float t = 0.0; float hit = 0.0;
+    for(int i=0;i<72;i++){
+      vec3 p = ro + rd*t;
+      float d = map(p);
+      if(d<0.0015){ hit=1.0; break; }
+      t += d*0.9;
+      if(t>14.0) break;
+    }
+
+    if(hit>0.5){
+      vec3 p = ro + rd*t;
+      vec3 n = normalAt(p);
+
+      vec3 lMag = normalize(vec3( 0.35, 0.95, 0.30)); /* magenta key from above   */
+      vec3 lInd = normalize(vec3(-0.45,-0.80, 0.55)); /* indigo fill from below   */
+
+      float dM = pow(max(dot(n,lMag),0.0), 2.2);
+      float dI = pow(max(dot(n,lInd),0.0), 2.6);
+      float fr = pow(1.0-max(dot(n,-rd),0.0), 3.5);
+
+      /* body is almost black — colour lives on the rims, like the image */
+      vec3 s = vec3(0.006,0.003,0.014);
+      s += vec3(0.80,0.06,0.52)*dM*0.95;
+      s += vec3(0.20,0.24,0.95)*dI*0.85;
+      s += mix(vec3(0.55,0.10,0.55), vec3(0.25,0.28,0.9), step(0.0,-n.y)) * fr*0.55;
+
+      vec3 h = normalize(lMag-rd);
+      s += vec3(1.0,0.75,0.95)*pow(max(dot(n,h),0.0),60.0)*0.35;
+
+      s = mix(s, background(uv), smoothstep(5.0, 12.0, t));
+      col = s;
+    }
+
+    /* vignette */
+    col *= 1.0 - 0.45*pow(length(uv*vec2(0.55,0.42)), 2.4);
+    col *= uReveal;
+    col = pow(col, vec3(0.92));
+    col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function initAboutField() {
+  const host = document.querySelector('#about-field');
+  if (!host) return;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  } catch (error) {
+    console.error('About field: no WebGL context', error);
+    return;
+  }
+
+  /*
+   * The sketch was written against r128, where both texture and output
+   * encoding defaulted to linear. r155+ defaults output to sRGB, which would
+   * double-brighten a shader that already applies its own pow(col, 0.92).
+   * Forcing linear output reproduces the original grade exactly.
+   */
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.autoClear = false;
+  host.appendChild(renderer.domElement);
+
+  /* --- pass 1: the liquid ------------------------------------------------ */
+  const bgScene = new THREE.Scene();
+  const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  const uni = {
+    uTime: { value: 0 },
+    uRes: { value: new THREE.Vector2(1, 1) },
+    uPtr: { value: new THREE.Vector2(0, 0) },
+    uSpread: { value: 1 },
+    uReveal: { value: 0 },
+  };
+
+  bgScene.add(
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: uni,
+        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
+        fragmentShader: FIELD_FRAGMENT_SHADER,
+      })
+    )
+  );
+
+  /* --- pass 2: the word as 3D objects ------------------------------------ */
+  const txScene = new THREE.Scene();
+  const txCam = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+  txCam.position.z = 6;
+
+  const word = new THREE.Group();
+  txScene.add(word);
+
+  function letterTexture(ch, color, weight) {
+    const S = 256;
+    const c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, S, S);
+    g.fillStyle = color;
+    g.font = `${weight} 168px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(ch, S / 2, S / 2 + 8);
+    const t = new THREE.CanvasTexture(c);
+    t.minFilter = THREE.LinearFilter;
+    return t;
+  }
+
+  function makeLetter(ch, color, size, x, y, z, additive) {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(size, size),
+      new THREE.MeshBasicMaterial({
+        map: letterTexture(ch, color, additive ? 300 : 200),
+        transparent: true,
+        depthWrite: false,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+        opacity: 0,
+      })
+    );
+    m.position.set(x, y, z);
+    word.add(m);
+    return m;
+  }
+
+  /* Main column — thin, near-white, evenly spaced down the centre.
+     ALPHINTRA is 9 letters where the sketch had 8, so the step is derived
+     from the original 3.08 span rather than hard-coded, keeping the column
+     the same height and leaving the tail placement below it valid. */
+  const MAIN = 'ALPHINTRA';
+  const top = 1.62;
+  const step = 3.08 / (MAIN.length - 1);
+  const mainLetters = [...MAIN].map((ch, i) =>
+    makeLetter(ch, 'rgba(240,238,248,0.95)', 0.34, 0, top - i * step, 0.9 + Math.sin(i * 1.7) * 0.25, false)
+  );
+
+  /* echo ghosts — the coloured strays around the column */
+  const IND = '#4653f0';
+  const MAG = '#c9308f';
+  const echoes = [
+    makeLetter('A', IND, 0.44, 0.62, 1.18, 0.4, true),
+    makeLetter('R', IND, 0.46, -0.5, 0.12, -0.6, true),
+    makeLetter('A', MAG, 0.5, 1.42, -0.02, 0.2, true),
+  ];
+
+  /* tail — the bigger indigo letters descending onto the bottom pod */
+  const tails = [
+    ['N', -0.1, -1.42, 0.42, 1.1],
+    ['T', -0.26, -1.66, 0.56, 1.2],
+    ['R', -0.34, -1.94, 0.6, 1.3],
+    ['A', -0.1, -2.18, 0.66, 1.4],
+  ].map(function (def) {
+    return makeLetter(def[0], IND, def[3], def[1], def[2], def[4], true);
+  });
+
+  /* --- resize / pointer / loop ------------------------------------------- */
+  function resize() {
+    const w = host.clientWidth;
+    const h = host.clientHeight;
+    if (!w || !h) return;
+
+    renderer.setSize(w, h, false);
+    uni.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    uni.uSpread.value = Math.min(Math.max(w / h / 0.56, 1), 2.1);
+
+    txCam.aspect = w / h;
+    txCam.updateProjectionMatrix();
+    word.scale.setScalar(Math.min(1, h / w + 0.38));
+
+    /*
+     * The copy occupies the right half of this section, so on desktop the
+     * column shifts into the left half instead of running underneath it.
+     */
+    const visibleWidth = 2 * txCam.position.z * Math.tan((txCam.fov * Math.PI) / 360) * txCam.aspect;
+    word.position.x = w / h > 1.1 ? -visibleWidth * 0.25 : 0;
+  }
+  /*
+   * A one-shot resize() measured the host before layout had settled and left
+   * the drawing buffer at 40x2099. Observing the element instead re-syncs on
+   * every reflow — font swap, ScrollTrigger pinning, window resize alike.
+   */
+  resize();
+  new ResizeObserver(resize).observe(host);
+
+  const target = { x: 0, y: 0 };
+  function fromEvent(e) {
+    const r = host.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    target.x = ((p.clientX - r.left) / r.width - 0.5) * 2;
+    target.y = -((p.clientY - r.top) / r.height - 0.5) * 2;
+  }
+  host.addEventListener('pointermove', fromEvent);
+  host.addEventListener('touchmove', fromEvent, { passive: true });
+  host.addEventListener('pointerleave', () => {
+    target.x = 0;
+    target.y = 0;
+  });
+
+  const clock = new THREE.Clock();
+  let frameId = null;
+  let onScreen = false;
+
+  function frame() {
+    frameId = requestAnimationFrame(frame);
+
+    const t = clock.getElapsedTime();
+    uni.uTime.value = t;
+
+    const p = uni.uPtr.value;
+    p.x += (target.x - p.x) * 0.05;
+    p.y += (target.y - p.y) * 0.05;
+
+    /* letters parallax with the same pointer as the raymarch camera */
+    txCam.position.x = p.x * 0.35;
+    txCam.position.y = p.y * 0.28;
+    txCam.lookAt(word.position.x, 0, 0);
+
+    /* gentle per-letter float so the word feels suspended in the fluid */
+    mainLetters.forEach((m, i) => {
+      m.position.x = Math.sin(t * 0.5 + i * 0.9) * 0.015;
+    });
+    word.rotation.z = Math.sin(t * 0.18) * 0.01;
+
+    renderer.clear();
+    renderer.render(bgScene, bgCam);
+    renderer.clearDepth();
+    renderer.render(txScene, txCam);
+  }
+
+  /* One static frame so the section is never blank while paused. */
+  function renderOnce() {
+    renderer.clear();
+    renderer.render(bgScene, bgCam);
+    renderer.clearDepth();
+    renderer.render(txScene, txCam);
+  }
+
+  const all = [...mainLetters, ...echoes, ...tails];
+  let entrancePlayed = false;
+
+  function playEntrance() {
+    if (entrancePlayed) return;
+    entrancePlayed = true;
+
+    gsap.to(uni.uReveal, { value: 1, duration: 1.8, ease: 'power2.inOut' });
+
+    mainLetters.forEach((m, i) => {
+      gsap.from(m.position, { y: m.position.y - 0.25, duration: 1.0, delay: 0.4 + i * 0.08, ease: 'power3.out' });
+      gsap.to(m.material, { opacity: 0.95, duration: 0.9, delay: 0.4 + i * 0.08 });
+    });
+
+    [...echoes, ...tails].forEach((m, i) => {
+      gsap.from(m.scale, { x: 0.6, y: 0.6, duration: 1.1, delay: 1.0 + i * 0.1, ease: 'back.out(1.6)' });
+      gsap.to(m.material, { opacity: 0.85, duration: 1.0, delay: 1.0 + i * 0.1 });
+      gsap.to(m.position, {
+        y: m.position.y + (i % 2 ? 0.06 : -0.06),
+        x: m.position.x + (i % 3 ? -0.03 : 0.03),
+        duration: 5.5 + i * 0.6,
+        delay: 2.2,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    });
+  }
+
+  function sync() {
+    const shouldRun = onScreen && !document.hidden;
+    if (shouldRun) {
+      playEntrance();
+      if (frameId === null) frame();
+    } else if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+  }
+
+  if (prefersReducedMotion) {
+    uni.uReveal.value = 1;
+    all.forEach((m) => {
+      m.material.opacity = m.material.blending === THREE.AdditiveBlending ? 0.8 : 0.95;
+    });
+    renderOnce();
+    return;
+  }
+
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      sync();
+    },
+    { rootMargin: '200px' }
+  ).observe(host);
+
+  document.addEventListener('visibilitychange', sync);
 }

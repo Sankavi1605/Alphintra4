@@ -415,51 +415,6 @@ function initProjectsVideo() {
 }
 
 /* -------------------------------------------------------------------------
- * About background film
- *
- * Autoplays, loops, muted, inline — but the `autoplay` attribute is set from
- * JS rather than markup. In markup it overrides preload="none" and the
- * browser pulls all 7MB on page load, before the section is anywhere near
- * the viewport. Behaviour is identical; the download just waits its turn.
- * ---------------------------------------------------------------------- */
-function initAboutVideo() {
-  const video = document.querySelector('.about-video');
-  if (!video) return;
-
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    video.closest('.about-media')?.remove();
-    return;
-  }
-
-  video.muted = true;
-  video.playsInline = true;
-  video.autoplay = true;
-
-  let onScreen = false;
-  let fetched = false;
-
-  const sync = () => {
-    if (onScreen && !document.hidden) video.play().catch(() => {});
-    else video.pause();
-  };
-
-  new IntersectionObserver(
-    ([entry]) => {
-      onScreen = entry.isIntersecting;
-      if (onScreen && !fetched) {
-        fetched = true;
-        video.preload = 'auto';
-        video.load();
-      }
-      sync();
-    },
-    { rootMargin: '400px' }
-  ).observe(video);
-
-  document.addEventListener('visibilitychange', sync);
-}
-
-/* -------------------------------------------------------------------------
  * Footer year
  * ---------------------------------------------------------------------- */
 function initYear() {
@@ -475,7 +430,6 @@ export function initUI() {
   initContactForm();
   initSpotlights();
   initProjectsVideo();
-  initAboutVideo();
   initYear();
 }
 

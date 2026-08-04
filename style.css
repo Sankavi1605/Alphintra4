@@ -1246,31 +1246,44 @@ nav .nav-links {
      gradient carries through instead of butting against a flat #000 band. */
   background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
   padding: 10rem 1.75rem;
+  /* The letter column is framed for a tall viewport; give it the room. */
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
 }
 
-/* Full-bleed looping film, behind the content. */
-.about-media {
+/*
+ * Full-bleed raymarched field, behind the content. Same vertical fade as the
+ * spotlight sections, or the scene ends in a hard line against the next one.
+ */
+.about-field {
   position: absolute;
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  pointer-events: none;
-  /* Same vertical fade as the spotlight sections: without it the film ends
-     in a hard horizontal line against the next section. */
+  /* The scene reads the pointer, so it must receive the events. */
+  cursor: grab;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
 }
 
-.about-video {
+.about-field:active { cursor: grabbing; }
+
+.about-field canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
 }
 
 .about-inner {
   position: relative;
   z-index: 1;
+  width: 100%;
+  /* Sits over the canvas, but only the copy itself should swallow the
+     pointer — everywhere else the field keeps its parallax. */
+  pointer-events: none;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -1305,6 +1318,37 @@ nav .nav-links {
    half and the film shows through where the blob used to be. */
 .about-content {
   grid-column: 2;
+  pointer-events: auto;
+}
+
+/* Process steps from the live site's Discovery / Sprint phases. */
+.about-process {
+  list-style: none;
+  margin: 2rem 0 2.5rem;
+  padding: 0;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.about-process li {
+  display: grid;
+  gap: 0.3rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--glass-border);
+}
+
+.about-process strong {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-soft);
+}
+
+.about-process span {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 768px) {
@@ -1876,7 +1920,6 @@ footer {
     padding-right: 1.25rem;
   }
   #about { padding: 5rem 1.25rem; }
-  .about-video { opacity: 0.5; }
   #concepts { padding-top: 4.5rem; }
   footer { padding: 4rem 1.25rem 2rem; }
 
@@ -2031,7 +2074,7 @@ footer {
   }
 
   .projects-video-wrap,
-  .about-media { display: none; }
+  .about-field { display: none; }
 
   .projects-deck { display: block; }
 
