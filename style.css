@@ -749,6 +749,10 @@ nav .nav-links {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  /* Same vertical fade as the spotlight sections: without it the film ends
+     in a hard horizontal line against the next section. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
 }
 
 .projects-video {
@@ -758,21 +762,6 @@ nav .nav-links {
   display: block;
   /* JS drives the fade cycle from 0. */
   opacity: 0;
-}
-
-/* Particle-sphere canvas, composited over the film. */
-.projects-figure {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.projects-figure canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 
 .projects-inner {
@@ -1253,7 +1242,9 @@ nav .nav-links {
 #about {
   position: relative;
   overflow: hidden;
-  background: #000000;
+  /* Black behind the film, but transparent at the very edges so the page
+     gradient carries through instead of butting against a flat #000 band. */
+  background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
   padding: 10rem 1.75rem;
 }
 
@@ -1264,6 +1255,10 @@ nav .nav-links {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  /* Same vertical fade as the spotlight sections: without it the film ends
+     in a hard horizontal line against the next section. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
 }
 
 .about-video {
@@ -1306,33 +1301,14 @@ nav .nav-links {
   align-items: center;
 }
 
-.about-image {
-  width: 100%;
-  height: 540px;
-  border: none;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
-  position: relative;
-  overflow: visible;
+/* The left column held the WebGL blob; with that gone the copy keeps its
+   half and the film shows through where the blob used to be. */
+.about-content {
+  grid-column: 2;
 }
 
-.about-image:hover {
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.about-blob {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.about-blob canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
+@media (max-width: 768px) {
+  .about-content { grid-column: 1; }
 }
 
 .about-content h3 {
@@ -1888,7 +1864,7 @@ footer {
   .projects-stage { padding-left: 2.5rem; padding-right: 2.5rem; }
   .project-slide { gap: 1.75rem; padding: 1.75rem; }
   .project-slide h3 { font-size: 1.8rem; }
-  .about-grid, .contact-grid { gap: 3rem; }
+  .contact-grid { gap: 3rem; }
 }
 
 /* Phones */
@@ -1955,7 +1931,6 @@ footer {
   .about-header { margin-bottom: 3rem; }
   .about-title-bottom { padding-left: 0; }
   .about-grid, .contact-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-  .about-image { height: 320px; }
   .about-content p { font-size: 1.05rem; line-height: 1.7; margin-bottom: 1.25rem; }
 
   .contact-subtext { margin-bottom: 1.5rem; }
@@ -2055,7 +2030,6 @@ footer {
     padding: 5rem 1.5rem;
   }
 
-  .projects-figure,
   .projects-video-wrap,
   .about-media { display: none; }
 
