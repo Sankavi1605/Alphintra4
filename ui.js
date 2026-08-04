@@ -331,6 +331,135 @@ function initSpotlight(section) {
 }
 
 /* -------------------------------------------------------------------------
+ * Projects background film
+ *
+ * Not a native `loop`. Opacity starts at 0 and a rAF loop fades in over the
+ * first 0.5s and out over the last 0.5s; on `ended` it snaps to 0, waits
+ * 100ms, then replays from the beginning. No gradient overlay.
+ * ---------------------------------------------------------------------- */
+const PROJECTS_VIDEO_FADE = 0.5; // seconds
+const PROJECTS_VIDEO_GAP = 100; // ms between cycles
+
+function initProjectsVideo() {
+  const video = document.querySelector('.projects-video');
+  if (!video) return;
+
+  // A looping film is the opposite of what reduced motion asks for.
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    video.closest('.projects-video-wrap')?.remove();
+    return;
+  }
+
+  video.muted = true;
+  video.playsInline = true;
+
+  let onScreen = false;
+  let frameId = null;
+  let replayTimer = null;
+
+  const setOpacity = (value) => {
+    video.style.opacity = String(Math.min(1, Math.max(0, value)));
+  };
+
+  const frame = () => {
+    frameId = requestAnimationFrame(frame);
+
+    const duration = video.duration;
+    if (!duration || !isFinite(duration)) return;
+
+    const t = video.currentTime;
+    if (t < PROJECTS_VIDEO_FADE) setOpacity(t / PROJECTS_VIDEO_FADE);
+    else if (t > duration - PROJECTS_VIDEO_FADE) setOpacity((duration - t) / PROJECTS_VIDEO_FADE);
+    else setOpacity(1);
+  };
+
+  video.addEventListener('ended', () => {
+    setOpacity(0);
+    clearTimeout(replayTimer);
+    replayTimer = setTimeout(() => {
+      video.currentTime = 0;
+      if (onScreen && !document.hidden) video.play().catch(() => {});
+    }, PROJECTS_VIDEO_GAP);
+  });
+
+  const sync = () => {
+    const shouldRun = onScreen && !document.hidden;
+    if (shouldRun) {
+      if (frameId === null) frame();
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+    }
+  };
+
+  // 13MB of film: only fetch it once the section is close.
+  let fetched = false;
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      if (onScreen && !fetched) {
+        fetched = true;
+        video.preload = 'auto';
+        video.load();
+      }
+      sync();
+    },
+    { rootMargin: '400px' }
+  ).observe(video);
+
+  document.addEventListener('visibilitychange', sync);
+}
+
+/* -------------------------------------------------------------------------
+ * About background film
+ *
+ * Autoplays, loops, muted, inline — but the `autoplay` attribute is set from
+ * JS rather than markup. In markup it overrides preload="none" and the
+ * browser pulls all 7MB on page load, before the section is anywhere near
+ * the viewport. Behaviour is identical; the download just waits its turn.
+ * ---------------------------------------------------------------------- */
+function initAboutVideo() {
+  const video = document.querySelector('.about-video');
+  if (!video) return;
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    video.closest('.about-media')?.remove();
+    return;
+  }
+
+  video.muted = true;
+  video.playsInline = true;
+  video.autoplay = true;
+
+  let onScreen = false;
+  let fetched = false;
+
+  const sync = () => {
+    if (onScreen && !document.hidden) video.play().catch(() => {});
+    else video.pause();
+  };
+
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      if (onScreen && !fetched) {
+        fetched = true;
+        video.preload = 'auto';
+        video.load();
+      }
+      sync();
+    },
+    { rootMargin: '400px' }
+  ).observe(video);
+
+  document.addEventListener('visibilitychange', sync);
+}
+
+/* -------------------------------------------------------------------------
  * Footer year
  * ---------------------------------------------------------------------- */
 function initYear() {
@@ -345,6 +474,8 @@ export function initUI() {
   initScrollTop();
   initContactForm();
   initSpotlights();
+  initProjectsVideo();
+  initAboutVideo();
   initYear();
 }
 

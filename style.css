@@ -731,8 +731,9 @@ nav .nav-links {
 
 .projects-stage {
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* Exactly one window tall. */
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -741,11 +742,29 @@ nav .nav-links {
 }
 
 /* Locked dead centre of the stage; the slides move, this does not. */
-/* Full-bleed particle-sphere canvas behind the project cards. */
-.projects-figure {
+/* Background film — behind everything, no overlay. */
+.projects-video-wrap {
   position: absolute;
   inset: 0;
   z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.projects-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* JS drives the fade cycle from 0. */
+  opacity: 0;
+}
+
+/* Particle-sphere canvas, composited over the film. */
+.projects-figure {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -758,7 +777,7 @@ nav .nav-links {
 
 .projects-inner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
@@ -1232,7 +1251,31 @@ nav .nav-links {
 
 /* About Section */
 #about {
-  padding: 10rem 4rem;
+  position: relative;
+  overflow: hidden;
+  background: #000000;
+  padding: 10rem 1.75rem;
+}
+
+/* Full-bleed looping film, behind the content. */
+.about-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.about-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.about-inner {
+  position: relative;
+  z-index: 1;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -1839,7 +1882,7 @@ footer {
 
   #projects, #contact, #faq { padding-left: 2.5rem; padding-right: 2.5rem; }
   #concepts { padding-left: 1.5rem; padding-right: 1.5rem; }
-  #about { padding: 7rem 2.5rem; }
+  #about { padding: 7rem 2rem; }
   footer { padding-left: 2.5rem; padding-right: 2.5rem; }
 
   .projects-stage { padding-left: 2.5rem; padding-right: 2.5rem; }
@@ -1857,6 +1900,7 @@ footer {
     padding-right: 1.25rem;
   }
   #about { padding: 5rem 1.25rem; }
+  .about-video { opacity: 0.5; }
   #concepts { padding-top: 4.5rem; }
   footer { padding: 4rem 1.25rem 2rem; }
 
@@ -2004,13 +2048,16 @@ footer {
 
   /* Projects: no pin, no cycling — the three simply stack down the page. */
   .projects-stage {
+    height: auto;
     min-height: 0;
     display: block;
     overflow: visible;
     padding: 5rem 1.5rem;
   }
 
-  .projects-figure { display: none; }
+  .projects-figure,
+  .projects-video-wrap,
+  .about-media { display: none; }
 
   .projects-deck { display: block; }
 

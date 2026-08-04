@@ -200,7 +200,17 @@
     -->
     <section id="projects" aria-labelledby="projects-heading">
       <div class="projects-stage">
-        <!-- Particle sphere background; starts rendering as the section arrives. -->
+        <!--
+          Background film, behind everything. Not `loop` — a JS fade cycle
+          handles the 0.5s in/out and the replay; see initProjectsVideo().
+        -->
+        <div class="projects-video-wrap" aria-hidden="true">
+          <video class="projects-video" muted playsinline preload="none" disablepictureinpicture>
+            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4" type="video/mp4">
+          </video>
+        </div>
+
+        <!-- Particle sphere, composited over the film. -->
         <div class="projects-figure" id="projects-sphere" aria-hidden="true"></div>
 
         <div class="projects-inner">
@@ -371,6 +381,14 @@
 
     <!-- About Section -->
     <section id="about" aria-labelledby="about-heading">
+      <!-- Full-bleed looping film behind the section, on black. -->
+      <div class="about-media" aria-hidden="true">
+        <video class="about-video" loop muted playsinline preload="none" disablepictureinpicture>
+          <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4" type="video/mp4">
+        </video>
+      </div>
+
+      <div class="about-inner">
       <div class="about-header">
         <h2 class="about-title-top" id="about-heading">Engineering Studio</h2>
         <p class="about-title-bottom">for Scalable Products</p>
@@ -385,6 +403,7 @@
           <p>From early-stage startup MVPs to enterprise cloud architectures, we combine premium aesthetics with robust engineering to turn ambitious ideas into market leaders.</p>
           <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="project-link">Schedule a Call <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
         </div>
+      </div>
       </div>
     </section>
 
