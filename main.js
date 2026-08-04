@@ -586,11 +586,12 @@ const SPHERE_PARAMS = {
    * The sketch used 80. IcosahedronGeometry detail d emits 20 * (d+1)^2
    * triangles, so 80 is ~394,000 points, and this loop recomputes every one
    * of them — a noise4D call each — on the main thread every frame.
-   * Benchmarked here: 80 costs ~74ms/frame (~14fps), 50 costs ~19ms (~53fps),
-   * 40 costs ~15ms (~66fps). 50 is the densest that still feels smooth.
-   * Raise it if you would rather have density than frames.
+   * Benchmarked warm: 50 costs ~46ms/frame (~22fps), 30 costs ~13ms (~75fps).
+   * The colour ramp also moved to the GPU (see onBeforeCompile below), which
+   * removes a Color lerp per point and halves the per-frame buffer upload.
+   * Raise this if you would rather have density than frames.
    */
-  segments: 50,
+  segments: 30,
   noiseScale: 2.0,
   noiseSpeed: 0.4,
   colorTop: 0xe0e0e0,    // Silver
@@ -644,7 +645,9 @@ function initProjectsSphere() {
     return;
   }
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // 1.5 rather than 2: ~44% fewer fragments on a retina display, and this is
+  // a soft additive point cloud where the extra density is invisible.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(width, height);
   container.appendChild(renderer.domElement);
 
@@ -653,16 +656,47 @@ function initProjectsSphere() {
 
   const originalPositions = geometry.attributes.position.array.slice();
   const velocities = new Float32Array(count).fill(0);
-  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
 
   const material = new THREE.PointsMaterial({
     size: 0.12,
-    vertexColors: true,
     transparent: true,
     opacity: 0.9,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
+
+  /*
+   * The three-stop height gradient is a pure function of the deformed y, so
+   * it belongs on the GPU. Doing it per point in JS cost a Color copy+lerp
+   * each frame and a second 1.8MB buffer upload; this is the same maths in
+   * the vertex shader with neither.
+   */
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uColorTop = { value: new THREE.Color(params.colorTop) };
+    shader.uniforms.uColorMiddle = { value: new THREE.Color(params.colorMiddle) };
+    shader.uniforms.uColorBottom = { value: new THREE.Color(params.colorBottom) };
+    shader.uniforms.uMaxHeight = { value: params.radius + params.noiseScale };
+
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        uniform vec3 uColorTop;
+        uniform vec3 uColorMiddle;
+        uniform vec3 uColorBottom;
+        uniform float uMaxHeight;
+        varying vec3 vGradColor;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float gradH = clamp((position.y + uMaxHeight) / (uMaxHeight * 2.0), 0.0, 1.0);
+        vGradColor = gradH > 0.5
+          ? mix(uColorMiddle, uColorTop, (gradH - 0.5) * 2.0)
+          : mix(uColorBottom, uColorMiddle, gradH * 2.0);`);
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\n varying vec3 vGradColor;')
+      .replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        'vec4 diffuseColor = vec4( vGradColor, opacity );'
+      );
+  };
 
   const particles = new THREE.Points(geometry, material);
 
@@ -686,10 +720,6 @@ function initProjectsSphere() {
   const originalVector = new THREE.Vector3();
   const direction = new THREE.Vector3();
   const vertexWorldPos = new THREE.Vector3();
-  const vertexColor = new THREE.Color();
-  const colorTop = new THREE.Color(params.colorTop);
-  const colorMiddle = new THREE.Color(params.colorMiddle);
-  const colorBottom = new THREE.Color(params.colorBottom);
 
   window.addEventListener(
     'mousemove',
@@ -710,13 +740,10 @@ function initProjectsSphere() {
     const time = clock.getElapsedTime() * params.noiseSpeed;
 
     const positions = geometry.attributes.position.array;
-    const colors = geometry.attributes.color.array;
 
     raycaster.setFromCamera(mouse, camera);
     raycaster.ray.intersectPlane(targetPlane, intersectPoint);
     if (mouse.x === -9999) intersectPoint.set(0, 0, 9999);
-
-    const maxHeight = params.radius + params.noiseScale;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
@@ -757,24 +784,9 @@ function initProjectsSphere() {
       positions[i3] = nx;
       positions[i3 + 1] = ny;
       positions[i3 + 2] = nz;
-
-      // 4. Three-stop gradient by height
-      let heightPercent = (ny + maxHeight) / (maxHeight * 2);
-      heightPercent = Math.max(0, Math.min(1, heightPercent));
-
-      if (heightPercent > 0.5) {
-        vertexColor.copy(colorMiddle).lerp(colorTop, (heightPercent - 0.5) * 2);
-      } else {
-        vertexColor.copy(colorBottom).lerp(colorMiddle, heightPercent * 2);
-      }
-
-      colors[i3] = vertexColor.r;
-      colors[i3 + 1] = vertexColor.g;
-      colors[i3 + 2] = vertexColor.b;
     }
 
     geometry.attributes.position.needsUpdate = true;
-    geometry.attributes.color.needsUpdate = true;
 
     particles.rotation.y += 0.002;
     particles.rotation.x += 0.001;
@@ -906,11 +918,16 @@ function initAboutBlob() {
   }
 
   renderer.setSize(width, height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   container.appendChild(renderer.domElement);
 
   // High segment count so the smooth shader has enough vertex data.
-  const geometry = new THREE.SphereGeometry(2, 128, 128);
+  /*
+   * 128x128 was 16,641 vertices deformed and re-normalled every frame (~9ms).
+   * 72x72 is 5,329 — a third of the cost, and indistinguishable on a shape
+   * this smooth at this size.
+   */
+  const geometry = new THREE.SphereGeometry(2, 72, 72);
 
   const positionAttribute = geometry.attributes.position;
   const count = positionAttribute.count;
