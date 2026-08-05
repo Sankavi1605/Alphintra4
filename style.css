@@ -123,6 +123,32 @@ body.is-loading {
 html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--nav-height) + 26px);
+  /*
+   * Scrollytelling: everything below the hero is a one-screen scene, and the
+   * scroller rests on one at a time. See the snap-scene rule further down.
+   *
+   * mandatory, so a scroll always lands on a scene. proximity was tried first
+   * and is what made this feel stuck rather than smooth: a single wheel notch
+   * never crosses the proximity threshold, so it left the scroller parked
+   * between two scenes with a band of each showing, and only a hard fling
+   * actually moved a whole screen.
+   *
+   * Mandatory needs every stretch of the page to be *some* snap area or the
+   * scroller cannot rest there at all. Two get one explicitly:
+   *
+   *   .pin-spacer  the hero's 2200px of scrubbed zoom. It has no single
+   *                resting place — the point is to scroll *through* it — but
+   *                the spec lets the scroller rest anywhere inside a snap area
+   *                that is taller than the viewport, and at 2200px against
+   *                900px it is. Without this, scrolling into the zoom was
+   *                thrown straight out to #projects: scrollTo(1200) landed at
+   *                5700, which is what killed mandatory the first time.
+   *
+   *   footer       shorter than a screen and last on the page, so with no snap
+   *                point of its own the scroller would spring back to the
+   *                final scene and the footer could never be read.
+   */
+  scroll-snap-type: y mandatory;
 }
 
 body {
@@ -174,12 +200,62 @@ a:hover {
 /* Keep the rest of the page in front of the fixed canvas. */
 #projects,
 #concepts,
+#about-us,
+#services,
+#makers,
 #about,
 #contact,
 #faq,
 footer {
   position: relative;
   z-index: 3;
+}
+
+/* =========================================================================
+ * Scrollytelling — one scene per screen
+ *
+ * From #projects down, each section is a full screen with its own WebGL scene,
+ * and the scroller stops on every one of them: scroll-snap-stop keeps a fling
+ * from skipping a scene, so they arrive in order however hard you throw the
+ * wheel. Each scene also replays its entrance from black on arrival — that
+ * half lives in main.js, in the field initialisers' resetEntrance().
+ *
+ * svh, not vh: on a phone vh is the *largest* viewport, so 100vh scenes are
+ * taller than the screen until the address bar retracts, and every snap would
+ * leave a strip of the next scene showing.
+ * ====================================================================== */
+#projects,
+#concepts,
+#about-us,
+#services,
+#makers,
+#about,
+#contact,
+#faq {
+  min-height: 100svh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  /*
+   * html sets scroll-padding-top so anchor links clear the fixed nav. These
+   * scenes are full-bleed with the nav floating over them, so they want to
+   * land flush against the top of the screen instead — otherwise every snap
+   * sits a nav-height low and shows a band of the scene above.
+   */
+  scroll-margin-top: calc(-1 * (var(--nav-height) + 26px));
+}
+
+/*
+ * The two non-scene snap areas mandatory needs — see the note on html.
+ *
+ * .pin-spacer is ScrollTrigger's wrapper around the pinned hero, created at
+ * runtime; it is taller than the viewport, so `start` here does not force the
+ * scroller to the top of the zoom, it simply makes the whole zoom a legal
+ * place to rest.
+ */
+.pin-spacer,
+footer {
+  scroll-snap-align: start;
+  scroll-margin-top: calc(-1 * (var(--nav-height) + 26px));
 }
 
 /* =========================================================================
@@ -547,7 +623,13 @@ nav .nav-links {
 
 /* Hero Section */
 #hero {
-  height: 100vh;
+  /*
+   * svh, not vh, for the same reason the snap scenes use it: on a phone vh is
+   * the *largest* viewport, so a 100vh hero is taller than the screen until the
+   * address bar retracts, and the model's feet and the button sit below the
+   * fold on arrival. svh is exactly one screenful.
+   */
+  height: 100svh;
   position: relative;
   overflow: hidden;
 }
@@ -616,12 +698,28 @@ nav .nav-links {
 .hero-title {
   position: absolute;
   /*
-   * Centres the line box on 46% of the hero so the wordmark lands across the
-   * chrome model's upper mass and gets occluded by it. line-height is 0.9,
-   * so half the line box is 0.45em. Nudge this one number to slide the word
-   * up or down relative to the model.
+   * Centres the line box on 24% of the hero. line-height is 0.9, so half the
+   * line box is 0.45em. Nudge this one number to slide the word up or down
+   * relative to the model.
+   *
+   * It began at 46%, which put the row across the model's upper mass and
+   * swallowed the middle letters — "ALPHI(N)TRA" read as two halves either
+   * side of the chrome. 38% still left the apex spiking the full height of the
+   * row.
+   *
+   * Measured, not guessed — the painted glyph box from TextMetrics, not the
+   * line box, which carries ~25px of dead leading below the caps at this size.
+   * At 1265x800 the caps run y 90..266 and the model's apex starts at 287: 21px
+   * of daylight under the word, 30px over it to the nav pill.
+   *
+   * This pair is the furthest the two can separate without cropping the model's
+   * feet — at 26%/-2.95 the word had 33px of air but the frame cut 39px off the
+   * bottom of the legs.
+   *
+   * Paired with model.position.y in initHeroScene — moving one without the
+   * other closes the gap again.
    */
-  top: calc(46% - 0.45em);
+  top: calc(24% - 0.45em);
   left: 0;
   right: 0;
   z-index: 1;
@@ -815,225 +913,224 @@ nav .nav-links {
 }
 
 /* =========================================================================
- * Projects — one pinned page, projects swapped through one at a time
+ * Projects — lit blades behind a carousel of glass cards
+ *
+ * The chrome-torus PNG that used to sit behind this section is gone; the
+ * backdrop is now the blades field (see initProjectsField), and the heading is
+ * drawn into the same canvas rather than set in HTML. The section no longer
+ * pins: the cards run themselves on a loop, so the scroll-scrubbed deck, its
+ * counter and its progress bar have all been removed with it.
  * ====================================================================== */
 #projects {
   position: relative;
+  overflow: hidden;
+  /* Same backdrop as the other scene sections: the hero canvas is fixed for
+     the whole scroll, so a transparent section lets it through wherever the
+     field's mask has faded out. */
+  background: linear-gradient(180deg, transparent 0%, #000000 8%, #000000 92%, transparent 100%);
 }
 
-#projects::before {
+/*
+ * The blades, plus the OUR FEATURED WORK lettering drawn over them. Full-bleed
+ * because the blades are 2.1-unit chevrons fanning off the right edge — crop
+ * them to the card box and they read as stray diagonals.
+ */
+.projects-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+}
+
+.projects-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Scrim, banded by height for the same reason as .makers-field::after: it sits
+ * over the canvas, so a flat wash heavy enough for the cards would also crush
+ * the lettering. The word occupies roughly the top third and the cards the
+ * bottom half, so the band is light through the heading and heavy under the
+ * deck. 0.62 there puts a clipped-white blade at rgb(97) before .work-glass
+ * adds its own 4.5% white, which keeps white copy past 8:1.
+ */
+.projects-field::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 200px;
-  background: linear-gradient(to bottom, rgba(5, 2, 10, 1) 0%, rgba(5, 2, 10, 0.6) 60%, rgba(5, 2, 10, 0) 100%);
-  pointer-events: none;
+  inset: 0;
   z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 95% at 50% 45%, rgba(0, 0, 0, 0) 42%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.34) 0%,
+      rgba(0, 0, 0, 0.24) 30%,
+      rgba(0, 0, 0, 0.3) 44%,
+      rgba(0, 0, 0, 0.62) 54%,
+      rgba(0, 0, 0, 0.62) 94%,
+      rgba(0, 0, 0, 0.4) 100%
+    );
 }
 
+/*
+ * One window tall, cards parked on the bottom padding so the WebGL heading
+ * keeps the upper third to itself.
+ */
 .projects-stage {
   position: relative;
-  /* Exactly one window tall. */
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  overflow: hidden;
-  padding: calc(var(--nav-height) + 2.5rem) 4rem 3rem;
-}
-
-.projects-inner {
-  position: relative;
   z-index: 2;
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
-  /*
-   * Room for the frame's glowing top and bottom bars, which sit ~7% and ~11%
-   * of the card's height outside it. At the old 2rem the bottom bar landed on
-   * the progress counter.
-   */
-  gap: 3.5rem;
+  justify-content: flex-end;
+  padding: calc(var(--nav-height) + 2.5rem) clamp(1.5rem, 5vw, 4rem) clamp(3rem, 7vh, 5.5rem);
 }
 
 /*
- * .section-header's 4rem is declared further down the file, so the plain
- * .projects-head reset below it never actually won — the column was carrying
- * a redundant 64px on top of the flex gap. The stage is a fixed 100vh with
- * overflow:hidden, so that 64px was 64px of the card being clipped on short
- * laptops. Scoped selector so it beats .section-header on specificity.
+ * The carousel track. Every card is absolutely stacked in the same box and
+ * moved on x, so the entering and leaving cards pass each other without any
+ * layout work per frame. The height is fixed because the cards are absolute
+ * and would otherwise collapse the track to nothing.
  */
-.projects-inner .projects-head {
-  margin-bottom: 0;
-}
-
-.projects-head h2 {
-  margin-bottom: 0;
-}
-
-/* Every slide occupies the same grid cell so they cross-fade in place. */
 .projects-deck {
   position: relative;
-  display: grid;
-  align-items: center;
-  /*
-   * Breathing room between the card and the frame's inner stroke. It has to
-   * clear the corners, not just the straight runs: the opening's arc is about
-   * 98x113px, so at 45 degrees it cuts ~29px/33px in from the corner point.
-   * Less padding than this and the card's own 24px corner pokes through.
-   */
-  padding: 1.4rem 1.7rem;
-  /*
-   * The frame is hung off this box, so it has to be the card's box and not
-   * the full 1400px column — otherwise the stroke floats ~90px clear of the
-   * card on both sides. 1120px is .project-slide's max-width.
-   */
   width: 100%;
-  max-width: calc(1040px + 3.4rem);
+  max-width: 1180px;
   margin-inline: auto;
+  height: clamp(300px, 42vh, 420px);
+  perspective: 1100px;
 }
 
-/*
- * Chrome frame behind the deck.
- *
- * The artwork is a rounded box floating inside a mostly transparent 1383x1137
- * canvas, so it cannot simply be stretched over the card — the stroke would
- * land nowhere near the edges. Measured off the PNG's alpha channel, the
- * opening runs x 138..1259 and y 225..856, i.e. 81.06% x 55.50% of the file.
- * Scaling the layer up by the inverse of that (and offsetting by the same
- * ratios) puts the frame's opening exactly on the deck's box, whatever size
- * the card ends up being.
- */
-.projects-deck::before {
-  content: '';
-  position: absolute;
-  left: -12.31%;
-  right: -11.06%;
-  top: -35.66%;
-  bottom: -44.53%;
-  z-index: 0;
-  pointer-events: none;
-  background: url('https://pub-9b680ac5d04e439fb9dc60caf6196848.r2.dev/box2-Photoroom.png') center / 100% 100% no-repeat;
-}
-
-/*
- * Copy and screenshot per project. The padding doubles as the inner margin
- * between the details and the frame's stroke, and it fixes the box the frame
- * is sized from; drop it and the frame collapses onto the content and
- * stretches further out of proportion.
- */
 .project-slide {
-  grid-area: 1 / 1;
-  justify-self: center;
-  /* Above the frame layer. */
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 1040px;
-  /* Only seen where the glass panel survives — see the override below. */
-  border-radius: 96px;
-  padding: 1.85rem 2.25rem;
-  display: grid;
-  grid-template-columns: 1fr 1.15fr;
-  gap: 2.25rem;
-  align-items: center;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.75rem, 3.2vw, 3rem) clamp(1.75rem, 3.5vw, 3.5rem);
+  /* The conveyor reveals these one at a time; without JS the first is shown. */
   opacity: 0;
+  cursor: pointer;
 }
 
-/*
- * The chrome frame is the surface wherever it is drawn, so the glass panel
- * comes off there and the details sit straight in the box. The class stays on
- * the element rather than being stripped from the markup because the frame is
- * hidden on phones and under reduced motion — and there the card still has to
- * be a card, not loose text on the page gradient. Conditions must mirror the
- * two places .projects-deck::before is switched off.
- */
-@media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
-  .project-slide.liquid-glass {
-    background: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  .project-slide.liquid-glass::before {
-    display: none;
-  }
-}
-
-/* Without JS the deck can't cycle, so at least the first project shows. */
 .project-slide:first-child {
   opacity: 1;
 }
 
+/*
+ * The liquid glass, ported from the sketch. Deliberately NOT .liquid-glass:
+ * that recipe is untouched and still used by every other card on the site,
+ * while this one carries the specular pool that follows the pointer (--mx/--my,
+ * driven in initProjectsField) which is the whole point of the treatment.
+ */
+.work-glass {
+  --mx: 50%;
+  --my: 38%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45) brightness(1.08);
+  backdrop-filter: blur(22px) saturate(1.45) brightness(1.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 24px 60px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.35s;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .work-glass {
+    background: rgba(24, 26, 42, 0.72);
+  }
+}
+
+/* The liquid: a specular pool that follows the pointer and drifts on idle. */
+.work-glass::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    340px 240px at var(--mx) var(--my),
+    rgba(205, 165, 255, 0.26),
+    rgba(150, 105, 255, 0.09) 42%,
+    transparent 68%
+  );
+  transition: opacity 0.3s;
+}
+
+/* Glossy top sheen, like curved glass catching the blade light. */
+.work-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    172deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.03) 26%,
+    transparent 46%
+  );
+}
+
+.work-glass:hover,
+.work-glass:focus-within {
+  box-shadow:
+    inset 0 0 0 1px rgba(205, 175, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 30px 70px rgba(0, 0, 0, 0.55),
+    0 0 48px rgba(155, 105, 255, 0.14);
+}
+
+/* Above the two glass overlays. */
 .project-slide > * {
   position: relative;
   z-index: 1;
 }
 
-/* Sitting straight on the dark section now, so the copy stays light. */
-.project-slide h3 {
-  color: var(--text-primary);
-  font-size: 2.1rem;
-  margin-bottom: 0.85rem;
+.project-num {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: #ab93d8;
 }
 
-.project-slide p {
-  color: var(--text-secondary);
-  font-size: 1.02rem;
-  margin-bottom: 1.5rem;
-}
-
-.project-slide .project-image {
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
-}
-
+/* Pushed to the bottom of the card, under the number. */
 .project-content {
   min-width: 0;
+  margin-top: auto;
 }
 
-/* Slide counter + progress bar */
-.projects-progress {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  justify-content: center;
+.project-slide h3 {
+  color: #f0f2fb;
+  font-weight: 300;
+  font-size: clamp(1.4rem, 2.4vw, 2.1rem);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.8rem;
 }
 
-.projects-counter {
-  font-size: 0.85rem;
-  letter-spacing: 0.14em;
-  color: var(--text-secondary);
-  display: flex;
-  gap: 0.35rem;
-}
-
-.projects-current {
+/*
+ * Capped in ch rather than left to fill the card: a single paragraph running
+ * the full ~1100px is a ~150 character line, roughly twice what the eye
+ * tracks comfortably.
+ */
+.project-slide p {
   color: var(--text-primary);
-  font-weight: 600;
-}
-
-.projects-bar {
-  position: relative;
-  width: min(220px, 30vw);
-  height: 2px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.14);
-  overflow: hidden;
-}
-
-.projects-bar-fill {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand), var(--brand-soft));
-  transform: scaleX(0);
-  transform-origin: left center;
+  font-weight: 300;
+  font-size: clamp(0.95rem, 1.05vw, 1.05rem);
+  line-height: 1.65;
+  max-width: 62ch;
+  margin-bottom: 1.5rem;
 }
 
 .project-tags {
@@ -1053,17 +1150,6 @@ nav .nav-links {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.project-content h3 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.project-content p {
-  font-size: 1.1rem;
-  margin-bottom: 2rem;
-  line-height: 1.6;
 }
 
 .project-link {
@@ -1095,27 +1181,41 @@ nav .nav-links {
   transform-origin: left;
 }
 
-.project-image {
-  min-width: 0;
-  border-radius: 48px;
+/*
+ * Off-screen but still in the accessibility tree and the document outline.
+ * Used where a heading is drawn in WebGL rather than set in HTML — the canvas
+ * text is invisible to screen readers, search and text selection, so the real
+ * heading has to exist somewhere. clip-path over display:none because hidden
+ * elements are dropped from the tree entirely.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(8, 4, 12, 0.6);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-.project-image img {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: inherit;
-  transition: transform 0.5s ease;
-}
-
-.project-image:hover img {
-  transform: scale(1.03);
+/*
+ * Headings a WebGL layer draws instead. Same effect as .visually-hidden, but a
+ * separate class so the reduced-motion block can put them back: that block
+ * drops .about-field entirely, and a permanently hidden h2 would leave the
+ * section with no visible heading at all.
+ */
+.drawn-in-webgl {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* General Section Utilities */
@@ -1168,27 +1268,32 @@ nav .nav-links {
 }
 
 /* Concepts Section */
-#concepts .section-subtext {
-  max-width: 62ch;
-  margin: 0 auto;
-  color: rgba(255, 255, 255, 0.82);
-}
-
 #concepts {
   position: relative;
   overflow: hidden;
-  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
-  align-items: center;
-  padding: 9rem 1.75rem 8rem 1.75rem;
+  /*
+   * Bottom-aligned, not centred: the halo letters ENGINEERING CAPABILITIES
+   * across its upper half, so the deck and the call to action hang off the
+   * bottom padding to stay clear of it.
+   *
+   * The bottom padding is the lever that separates the card from the word.
+   * initCapabilityField's rowLift() reads this layout and lifts the lettering to
+   * sit above the deck, but it is capped by the field's own top mask, so once
+   * that cap binds the only remaining room comes from pushing the deck down —
+   * which a smaller bottom pad does.
+   */
+  align-items: flex-end;
+  padding: 9rem 1.75rem 3rem 1.75rem;
 }
 
 /*
- * Full-bleed bubble field behind the cards. Same vertical fade as the other
- * scene sections, or the deep navy backdrop ends in a hard line against the
- * page gradient above and below. Pointer-events stay off so the cards keep
- * their hover and the button stays clickable — initCapabilityField() reads
- * the cursor from the section instead.
+ * Full-bleed grain-sphere field behind the cards. Same vertical fade as the
+ * other scene sections, or the scene's black backdrop ends in a hard line
+ * against the page gradient above and below. Pointer-events stay off so the
+ * cards keep their hover and the button stays clickable — initCapabilityField()
+ * reads the cursor from the section instead.
  */
 .capability-field {
   position: absolute;
@@ -1209,10 +1314,16 @@ nav .nav-links {
 }
 
 /*
- * Black scrim over the bubbles, the same treatment as .about-field. The rims
- * peak white-hot and the cards are only 5% white, so a rim drifting behind a
- * card washes its copy out. Darkening the field is the lever here because the
+ * Black scrim over the scene. The rings' core term peaks white-hot and the
+ * cards are only 5% white, so an orbiting hot segment passing behind a card
+ * washes its copy out. Darkening the field is the lever here because the
  * .liquid-glass recipe itself has to stay exactly as it is.
+ *
+ * Banded by height, like .makers-field and .projects-field, because the scrim is
+ * over the canvas and so dims the lettering along with the rings. The word and
+ * the card occupy different rows — the lettering lands in roughly 14%..24% of
+ * the height and the card in 28%..63% — so the wash is lighter across the word
+ * and keeps its full weight under the card, where the copy needs the contrast.
  *
  * Inside .capability-field, so it inherits the same top/bottom mask and can
  * never show as a hard-edged rectangle against the neighbouring sections.
@@ -1230,9 +1341,11 @@ nav .nav-links {
     linear-gradient(
       180deg,
       rgba(0, 0, 0, 0.38) 0%,
-      rgba(0, 0, 0, 0.66) 22%,
-      rgba(0, 0, 0, 0.7) 55%,
-      rgba(0, 0, 0, 0.66) 82%,
+      rgba(0, 0, 0, 0.42) 12%,
+      rgba(0, 0, 0, 0.42) 26%,
+      rgba(0, 0, 0, 0.7) 32%,
+      rgba(0, 0, 0, 0.7) 66%,
+      rgba(0, 0, 0, 0.66) 88%,
       rgba(0, 0, 0, 0.38) 100%
     );
 }
@@ -1304,32 +1417,59 @@ nav .nav-links {
   margin: 0 auto;
 }
 
-.concepts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.75rem;
-  margin-bottom: 4rem;
-}
-
-@media (min-width: 1100px) {
-  .concepts-grid { grid-template-columns: repeat(3, 1fr); }
+/*
+ * The deck. One card is visible at a time, so the cards are stacked absolutely
+ * inside a fixed-height track: only x, rotateY, opacity and filter animate, and
+ * nothing reflows per frame.
+ *
+ * Narrower than .concepts-inner on purpose — the card sits inside the halo,
+ * whose diameter is set by the smaller viewport dimension, so a full-bleed card
+ * would run straight out through the rings.
+ */
+.concepts-deck {
+  position: relative;
+  width: min(560px, 78vw);
+  height: clamp(190px, 24vh, 240px);
+  margin: 0 auto 2rem;
+  perspective: 1100px;
 }
 
 /*
  * Card surface comes entirely from .liquid-glass — only geometry and
  * type colour are set here so that effect stays untouched.
  */
-.concept-card {
+/*
+ * Scoped to the deck on purpose. `.liquid-glass` also sets `position: relative`
+ * and is declared further down this file, so a bare `.concept-card` rule loses
+ * the cascade at equal specificity and every card falls back into normal flow —
+ * which stacks all four down the page, overflowing the 244px track, and leaves
+ * the deck looking empty. Two classes beats one; .liquid-glass stays untouched.
+ */
+.concepts-deck .concept-card {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 0.9rem;
   border-radius: 20px;
   padding: 2.25rem 1.9rem;
-  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  opacity: 0;
+  transition: box-shadow 0.4s ease;
 }
 
-.concept-card:hover {
-  transform: translateY(-8px);
+/*
+ * Whichever card is on top before the script runs. Without it the deck is
+ * blank until the section scrolls into view and the cycle starts.
+ */
+.concepts-deck .concept-card:first-child { opacity: 1; }
+
+/*
+ * No translate on hover here, unlike the old grid: the cycle owns `transform`
+ * on the visible card, so lifting it would fight the tween mid-flight.
+ */
+.concept-card:hover,
+.concept-card:focus-within {
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 14px 40px rgba(0, 0, 0, 0.28);
 }
 
@@ -1358,48 +1498,17 @@ nav .nav-links {
   color: rgba(255, 255, 255, 0.35);
 }
 
-.concept-list {
-  position: relative;
-  z-index: 1;
-  list-style: none;
-  margin-top: 0.35rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
 
-.concept-list li {
-  position: relative;
-  padding-left: 1.1rem;
-  font-size: 0.92rem;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.72);
-}
 
-.concept-list li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.55em;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--brand-soft);
-}
 
 /*
  * The artwork behind these cards has hard bright streaks and the glass is
  * only 5% white, so light text alone disappears over them. A tight black
  * halo keeps every line readable wherever it lands.
  */
-#concepts h2,
-#concepts .section-subtext,
 .concept-index,
 .concept-card h4,
 .concept-card .concept-desc,
-.concept-list li,
 .concepts-action-text {
   text-shadow:
     0 1px 3px rgba(0, 0, 0, 0.95),
@@ -1452,6 +1561,468 @@ nav .nav-links {
   pointer-events: none;
 }
 
+/* =========================================================================
+ * About Us
+ *
+ * The card surfaces come from .liquid-glass; the geometry is here, and the
+ * light-trail ribbon sits behind it all in .about-us-field.
+ * ====================================================================== */
+#about-us {
+  position: relative;
+  overflow: hidden;
+  /*
+   * Same backdrop as #about and #contact. The hero canvas is fixed to the
+   * viewport for the whole scroll, so a section with no background of its own
+   * lets the chrome models through wherever its field's mask has faded out —
+   * and with #concepts fading out directly above, that seam would be a 200px
+   * window onto the hero. Black through the middle, feathered at the extremes
+   * so the page gradient carries the joins instead of a flat #000 band.
+   */
+  background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
+  padding: 9rem 1.75rem 5rem;
+  /*
+   * Taller than the copy needs. The stroke runs a long way across and folds at
+   * the right, and initAboutUsField() pulls the camera back on portrait boxes —
+   * a short section would frame it as a thin sliver instead of an arc.
+   */
+  min-height: 100svh;
+  display: flex;
+  /* the card hangs off the bottom padding; the word keeps the upper half */
+  align-items: flex-end;
+}
+
+/*
+ * Full-bleed trail field. Same vertical fade as every other scene section, or
+ * the scene's black backdrop ends in a hard line against the page gradient.
+ * Pointer-events stay off so the cards keep their hover — initAboutUsField()
+ * reads the cursor from the section instead.
+ */
+.about-us-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
+.about-us-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Black scrim over the trail — the heavier .about-field grade rather than the
+ * lighter .capability-field one, because this stroke is genuinely brighter.
+ * The three ribbon passes are additive and their peak terms sum to roughly 5x
+ * white before the framebuffer clamps, so the core lines are flat #fff, not a
+ * tint. At 0.83 that clamped white lands on rgb(43) — enough for the secondary
+ * copy to clear 4.5:1 both bare and through a .liquid-glass card, which only
+ * lifts the surface it sits on by 5% of white.
+ *
+ * Banded by height, though, for the same reason as .makers-field::after and
+ * .projects-field::after: the scrim is over the canvas, so a flat 0.83 dims
+ * ABOUT US along with the stroke. The word and the card occupy different rows —
+ * the glyphs and their echoes fall in roughly 18%..47% of the height, the card
+ * in 54%..89% — so the wash is light through the lettering and keeps the proven
+ * 0.83 only under the card. The word can afford it: the row spans x -1.4..1.4,
+ * where the stroke is down at its dip, so there is no hot core behind it.
+ */
+.about-us-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    /* vignette: sinks the corners into the section's black */
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0.34) 20%,
+      rgba(0, 0, 0, 0.34) 48%,
+      rgba(0, 0, 0, 0.83) 57%,
+      rgba(0, 0, 0, 0.83) 90%,
+      rgba(0, 0, 0, 0.45) 100%
+    );
+}
+
+.about-us-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/*
+ * The single copy card. Capped well short of the container so it sits under
+ * the left of the lettering rather than spanning the whole frame, and so the
+ * paragraph keeps a readable measure instead of running 1400px wide.
+ */
+.about-us-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 620px;
+  border-radius: 20px;
+  padding: 2.25rem 1.9rem;
+}
+
+/* Above .liquid-glass::before, which is an absolutely positioned overlay. */
+.about-us-card h4 {
+  position: relative;
+  z-index: 1;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.about-us-card p {
+  position: relative;
+  z-index: 1;
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+/* ======================================================================
+ * Services — the capability cards over the eclipse
+ *
+ * The field draws two orbs kissing at the centre of the frame and letters
+ * AI AND AUTOMATION across the dark band beneath them. So the card takes the
+ * middle — the kiss glows through the glass, which is the point — and the
+ * word follows the bottom of the copy rather than a fixed world y. That
+ * measurement is initServicesField's rowFraction(); the bottom padding here
+ * is what leaves it somewhere to land.
+ * ====================================================================== */
+#services {
+  position: relative;
+  overflow: hidden;
+  /* Same backdrop as the other scene sections: the hero canvas is fixed for
+     the whole scroll, so a transparent section lets it through wherever the
+     field's mask has faded out. */
+  background: linear-gradient(180deg, transparent 0%, #000000 8%, #000000 92%, transparent 100%);
+  padding: 6rem 1.75rem 9rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Full-bleed: the orbs are circles, and cropping one to the content box would
+   read as a gradient rather than a sphere. */
+.services-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+}
+
+.services-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Two columns, and the second is empty on purpose.
+ *
+ * The eclipse concentrates almost all of its light at the kiss, which the
+ * shader puts at the dead centre of the frame. A centred card sits straight on
+ * top of it and the section reads as a black box with a card on it. So the copy
+ * takes the left column and the right one is left to the artwork — the same
+ * split #about uses for the planet.
+ */
+.services-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+  align-items: center;
+  /* Sits over the canvas, but only the card and arrows swallow the pointer —
+     everywhere else the field keeps its parallax. */
+  pointer-events: none;
+}
+
+.services-stage {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/*
+ * All four cards share one grid cell, so the deck sizes itself to the tallest
+ * and never resizes as they swap.
+ *
+ * Grid rather than absolute-except-the-first: setupServiceDeck() appends the
+ * entering card to put it on top of the one leaving, which reorders the DOM —
+ * and with an in-flow first child that would hand the deck's height to a
+ * different card on every step.
+ */
+.services-deck {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.services-deck .service-card {
+  grid-area: 1 / 1;
+  border-radius: 22px;
+  padding: 2.25rem 2rem;
+  pointer-events: auto;
+}
+
+/* Above .liquid-glass::before, which is an absolutely positioned overlay. */
+.service-card h3,
+.service-card p,
+.service-card .service-points {
+  position: relative;
+  z-index: 1;
+}
+
+.service-card h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.service-card p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-bottom: 1.1rem;
+}
+
+.service-points {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.service-points li {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.service-points li::marker {
+  color: var(--brand-soft);
+}
+
+/*
+ * Outside the card, not on it. The card cross-fades and slides; an arrow
+ * riding along with it would be a moving target for the click that moves it.
+ */
+.services-arrow {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+
+.services-arrow:hover,
+.services-arrow:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--brand-soft);
+  transform: scale(1.08);
+}
+
+.services-hint {
+  grid-column: 1;
+  margin-top: 1.5rem;
+  /* Aligned with the card, not the stage: the arrows sit outside the deck. */
+  padding-left: calc(44px + 1.25rem);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-soft);
+}
+
+/* ======================================================================
+ * Built by Makers
+ *
+ * The field letters THE TEAM across its own middle, so the copy card is
+ * parked below the word rather than over it. The geometry, worked from the
+ * sketch's camera (fov 40 at z 6, so 4.368 world units of height fill the
+ * host):
+ *
+ *   - the glyph planes run y -0.34..0.10, i.e. 47.7%..57.8% of the height,
+ *     whatever the aspect — the word always sits in that band;
+ *   - the card is ~275px tall and sits on the bottom padding, so it clears
+ *     the word only while 0.422 x height - 80 - 275 stays positive.
+ *
+ * That solves to a section at least ~936px tall, hence the floor below. On a
+ * short viewport the section is therefore taller than the window, which is
+ * the right trade: scrolling past the word beats printing a card over it.
+ * ====================================================================== */
+#makers {
+  position: relative;
+  overflow: hidden;
+  /* Same backdrop as the other scene sections: the hero canvas is fixed for
+     the whole scroll, so a transparent section lets it through wherever the
+     field's mask has faded out. */
+  background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
+  padding: 6rem 1.75rem 4rem;
+  /* One screen, like every other scene. It used to run 118vh to give the orb
+     field room; the field is proportional, so it simply frames smaller. */
+  min-height: 100svh;
+  display: flex;
+  /* the card hangs off the bottom; the word keeps the middle */
+  align-items: flex-end;
+}
+
+/*
+ * The orb field, plus the THE TEAM lettering drawn over it. Full-bleed so the
+ * disc reads as a sphere rather than a cropped gradient, and so the word is
+ * centred on the section rather than on the card.
+ */
+.makers-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
+.makers-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Black scrim — deliberately lighter than .about-field and .about-us-field.
+ *
+ * The disc body alone tops out around rgb(139,110,217), but the rim is
+ * additive on top of it: body + 1.25x the rim colour + 0.55x its cubed core
+ * sums to roughly (1.66, 1.22, 2.63) before the framebuffer clamps. So the
+ * lower arc is flat #fff, not a tint, and it sweeps through the lower-left of
+ * the disc — which is exactly where the copy card lands.
+ *
+ * The trail field answers that with a 0.83 scrim, and that is wrong here: at
+ * 0.83 this disc stops reading as a lit sphere and becomes a flat gradient,
+ * which is the entire subject of the artwork. So the scrim stays at 0.62 and
+ * every line in the card is --text-primary instead. Against that clamped
+ * white the surface is rgb(97), which .liquid-glass lifts to rgb(105), and
+ * white copy still holds 5.5:1 — comfortably past AA, with the disc intact.
+ *
+ * The scrim sits over the canvas, so it dims THE TEAM as well as the disc —
+ * a flat wash heavy enough for the card crushes the word to mid-grey. Since
+ * the word and the card occupy different rows (48-58% and 66-92%), the scrim
+ * is banded by height instead: light through the word, heavy under the card.
+ */
+.makers-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    /* vignette: sinks the corners into the section's black. Only ~0.09 deep at
+       the word's outermost glyph, so it costs the lettering nothing. */
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.5) 100%),
+    /*
+     * Banded scrim. 0.26 through the word keeps the glyphs near rgb(178) on a
+     * rgb(31) disc; 0.74 under the card puts its surface at rgb(76) once
+     * .liquid-glass has added its 5% white, so white copy holds 8.6:1.
+     */
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.34) 0%,
+      rgba(0, 0, 0, 0.26) 40%,
+      rgba(0, 0, 0, 0.3) 58%,
+      rgba(0, 0, 0, 0.74) 66%,
+      rgba(0, 0, 0, 0.74) 92%,
+      rgba(0, 0, 0, 0.42) 100%
+    );
+}
+
+.makers-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/*
+ * The copy card. Left-aligned and capped well short of the container so it
+ * sits under the left half of the word rather than spanning the whole frame.
+ * Its height is what the geometry note on #makers is budgeting for, so the
+ * type below is sized to keep it near 275px at desktop widths.
+ */
+.makers-card {
+  display: flex;
+  flex-direction: column;
+  max-width: 620px;
+  border-radius: 20px;
+  padding: 2.1rem;
+}
+
+/* Above .liquid-glass::before, which is an absolutely positioned overlay. */
+#makers h2 {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1.1rem;
+  font-size: 1.75rem;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.makers-lead {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1.1rem;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+/*
+ * Three short sentences that read as a statement of practice. The step down
+ * from .makers-lead is carried by tracking and line-height, not colour — see
+ * the note on .makers-field::after for why nothing here drops to
+ * --text-secondary.
+ */
+.makers-creed {
+  position: relative;
+  z-index: 1;
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.8;
+  letter-spacing: 0.04em;
+}
+
 /* About Section */
 #about {
   position: relative;
@@ -1459,16 +2030,16 @@ nav .nav-links {
   /* Black behind the film, but transparent at the very edges so the page
      gradient carries through instead of butting against a flat #000 band. */
   background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
-  padding: 16rem 1.75rem;
   /*
-   * The letter column is framed for a tall viewport, and the liquid needs
-   * room either side of the copy or the blobs crowd it. Taller than the
-   * viewport on purpose: the content stays centred and the field gets the
-   * extra height, which also spreads its top/bottom fade over more pixels.
+   * Top-weighted: the planet owns the upper half and the lettering lands under
+   * the copy, so the copy sits high rather than centred. It used to run 145vh
+   * with the copy in the middle — as a one-screen scene that leaves nothing
+   * for the word.
    */
-  min-height: 145vh;
+  padding: 7rem 1.75rem 4rem;
+  min-height: 100svh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
 /*
@@ -1478,18 +2049,12 @@ nav .nav-links {
 .about-field {
   position: absolute;
   /*
-   * Starts below the header rather than spanning the section, so
-   * "Engineering Studio / for Scalable Products" reads on plain black.
-   * Measured: the header ends at 32% of the section.
-   *
-   * This is deliberately a shorter BOX rather than a full-height box with its
-   * top masked away. Masking hid the top of the ALPHINTRA column too — the
-   * word spans 3.4 world units and the masked-in band was only 2.0, so "ALP"
-   * was cut off with no shift that could fit all nine letters. Shrinking the
-   * element instead lets the scene reframe itself: the ResizeObserver rescales
-   * the column to the new box, and the whole word shows.
+   * Full-bleed now. It used to start at 32% so the HTML heading above it could
+   * read on plain black; the planet letters that heading itself, across the
+   * lower fifth of its own frame, so the field wants the whole section — the
+   * planet needs the upper half and the word needs the bottom.
    */
-  inset: 32% 0 0;
+  inset: 0;
   z-index: 0;
   overflow: hidden;
   /* The scene reads the pointer, so it must receive the events. */
@@ -1513,10 +2078,14 @@ nav .nav-links {
 .about-field:active { cursor: grabbing; }
 
 /*
- * Black scrim over the liquid. The blobs peak near-white, and the copy sits
- * straight on top of them, so without this the paragraphs wash out wherever a
- * bright lobe drifts underneath. Painted over the canvas rather than mixed
- * into the shader, so the sketch's own grade is left alone.
+ * Black scrim over the planet. Its lit crescent peaks near-white, and the copy
+ * sits straight on top of it, so without this the paragraphs wash out where the
+ * bright limb passes underneath. Painted over the canvas rather than mixed into
+ * the shader, so the sketch's own grade is left alone.
+ *
+ * Left flat rather than banded: unlike the other fields, this word is plated —
+ * every glyph carries its own dark backing (see letterTexture's opts.plate) —
+ * so the lettering does not need a lighter row to survive the wash.
  *
  * Inside .about-field, so it inherits the same top/bottom mask and never
  * shows as a hard-edged rectangle against the neighbouring sections.
@@ -1556,12 +2125,23 @@ nav .nav-links {
   /* Sits over the canvas, but only the copy itself should swallow the
      pointer — everywhere else the field keeps its parallax. */
   pointer-events: none;
-  max-width: 1400px;
+  /*
+   * Near full-bleed, like .concepts-inner. The planet is a wide piece of
+   * artwork and the lettering under it runs 21 characters, so a 1400px column
+   * of copy in the middle of it read as a narrow strip pasted on top.
+   */
+  max-width: 1900px;
   margin: 0 auto;
 }
 
+/*
+ * No margin: both children are .drawn-in-webgl, so this box is 0px tall and
+ * the old 6rem was 96px of nothing between the top padding and the copy — on a
+ * one-screen scene that was the difference between fitting and not. The
+ * reduced-motion block, where the heading comes back as real text, restores it.
+ */
 .about-header {
-  margin-bottom: 6rem;
+  margin-bottom: 0;
 }
 
 .about-title-top {
@@ -1581,7 +2161,12 @@ nav .nav-links {
 
 .about-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /*
+   * 1.15fr, not 1fr: the second column is empty — it is where the old WebGL
+   * blob sat, and now shows the planet through — so an even split left the copy
+   * narrower than it needs to be at this container width.
+   */
+  grid-template-columns: 1.15fr 1fr;
   gap: 6rem;
   align-items: center;
 }
@@ -1596,7 +2181,8 @@ nav .nav-links {
 /* Process steps from the live site's Discovery / Sprint phases. */
 .about-process {
   list-style: none;
-  margin: 2rem 0 2.5rem;
+  /* Tightened with the rest of the About copy so the scene holds one screen. */
+  margin: 1.25rem 0 1.5rem;
   padding: 0;
   display: grid;
   gap: 1.25rem;
@@ -1629,13 +2215,18 @@ nav .nav-links {
 
 .about-content h3 {
   font-size: 2rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.25rem;
 }
 
+/*
+ * 1.5 line-height and 1.25rem gaps, down from 1.8 and 2rem. The copy has to
+ * share one screen with the planet above it and the lettered heading below,
+ * and the old spacing put it 96px over on a 800px-tall laptop.
+ */
 .about-content p {
   font-size: 1.2rem;
-  line-height: 1.8;
-  margin-bottom: 2rem;
+  line-height: 1.55;
+  margin-bottom: 1.25rem;
   color: var(--text-secondary);
 }
 
@@ -1800,8 +2391,8 @@ body > footer {
 }
 
 /*
- * The same raymarched liquid as the About section, minus the letter column.
- * .contact-grid already carries z-index 1, so this sits behind it.
+ * The halftone dot sheet, with DELIVER TRACKS lettered inside its crater.
+ * .contact-inner already carries z-index 1, so this sits behind it.
  */
 .contact-field {
   position: absolute;
@@ -1824,7 +2415,15 @@ body > footer {
   display: block;
 }
 
-/* Matching scrim, so the form and the copy stay the subject. */
+/*
+ * Scrim, so the cards stay the subject.
+ *
+ * Much lighter than the one the liquid had. That shader filled every pixel
+ * with colour and needed 0.8 across the middle to sit down behind the copy;
+ * this one is sparse lavender points on near-black, and the same wash simply
+ * erased it. The band is heaviest down the sides, where the cards are, and
+ * clears through the centre so the crater and the lettering read.
+ */
 .contact-field::after {
   content: '';
   position: absolute;
@@ -1832,188 +2431,90 @@ body > footer {
   z-index: 1;
   pointer-events: none;
   background:
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
+    /* vignette: sinks the blob's outer edge into the section's own black
+       rather than ending it on a hard silhouette */
+    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 42%, rgba(0, 0, 0, 0.62) 100%),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.5) 0%,
+      rgba(0, 0, 0, 0.34) 22%,
+      rgba(0, 0, 0, 0) 42%,
+      rgba(0, 0, 0, 0) 58%,
+      rgba(0, 0, 0, 0.34) 78%,
+      rgba(0, 0, 0, 0.5) 100%
+    ),
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.45) 0%,
-      rgba(0, 0, 0, 0.8) 26%,
-      rgba(0, 0, 0, 0.83) 55%,
-      rgba(0, 0, 0, 0.8) 80%,
-      rgba(0, 0, 0, 0.45) 100%
+      rgba(0, 0, 0, 0.4) 0%,
+      rgba(0, 0, 0, 0.16) 22%,
+      rgba(0, 0, 0, 0.16) 78%,
+      rgba(0, 0, 0, 0.4) 100%
     );
 }
 
-.contact-grid {
+/*
+ * The two cards, parked either side of the crater.
+ *
+ * flex rather than a two-column grid: the middle of the frame is the artwork —
+ * the crater, and LET'S TALK seated inside it — so the cards are sized off the
+ * container and pushed to the edges instead of meeting in the centre.
+ */
+.contact-inner {
   position: relative;
   z-index: 1;
+  width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 4rem;
-  align-items: start;
-}
-
-.contact-eyebrow {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--brand-soft);
-  margin-bottom: 0.9rem;
-}
-
-.contact-subtext {
-  font-size: 1.1rem;
-  line-height: 1.65;
-  color: var(--text-secondary);
-  margin-bottom: 2.5rem;
-  max-width: 46ch;
-}
-
-/* Details panel — surface from .liquid-glass, geometry only here. */
-.contact-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  border-radius: 20px;
-  padding: 0.6rem;
-}
-
-.contact-detail-link {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  border-radius: 14px;
-  font-size: 1.05rem;
-  transition: background-color 0.25s ease;
+  justify-content: space-between;
+  gap: 2rem;
 }
 
-.contact-detail-link:hover {
-  background: rgba(255, 255, 255, 0.07);
-  opacity: 1;
-}
-
-.contact-detail-link .icon {
-  flex-shrink: 0;
-  stroke: var(--brand-soft);
-}
-
-.contact-detail-body {
+/* Surface from .liquid-glass, geometry only here. */
+.contact-card {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
+  gap: 1.1rem;
+  flex: 0 1 clamp(260px, 32%, 430px);
+  border-radius: 22px;
+  padding: 2.25rem 1.9rem;
 }
 
-.contact-detail-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--text-secondary);
-}
-
-.contact-detail-value {
-  font-size: 1.02rem;
-  color: var(--text-primary);
-  overflow-wrap: anywhere;
-}
-
-.contact-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
-  border-radius: 24px;
-  padding: 2.25rem;
-}
-
-.contact-form > * {
+/* Above .liquid-glass::before, which is an absolutely positioned overlay. */
+.contact-card h3 {
   position: relative;
   z-index: 1;
-}
-
-.input-group label {
-  display: block;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--text-secondary);
-  margin-bottom: 0.35rem;
-}
-
-.input-group input, .input-group textarea {
-  width: 100%;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 0.85rem 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.3;
   color: var(--text-primary);
-  font-family: inherit;
-  font-size: 1.1rem;
-  transition: border-color 0.3s ease;
-  resize: vertical;
 }
 
-.input-group input:focus, .input-group textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.input-group input:focus-visible, .input-group textarea:focus-visible {
-  outline: 2px solid var(--brand-soft);
-  outline-offset: 4px;
-}
-
-.input-group input[aria-invalid='true'],
-.input-group textarea[aria-invalid='true'] {
-  border-color: var(--danger);
-}
-
-.field-error:empty {
-  display: none;
-}
-
-.field-error {
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-  color: var(--danger);
-}
-
-/* Honeypot: off-screen rather than display:none, which some bots skip. */
-.honeypot {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.form-status:empty {
-  display: none;
-}
-
-.form-status {
-  font-size: 0.95rem;
-  line-height: 1.5;
-  padding: 0.9rem 1.1rem;
-  border-radius: 10px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.04);
+.contact-card p {
+  position: relative;
+  z-index: 1;
+  font-size: 0.98rem;
+  line-height: 1.7;
   color: var(--text-secondary);
 }
 
-.form-status[data-state='error'] {
-  border-color: rgba(255, 139, 139, 0.4);
-  color: var(--danger);
+.contact-card-points {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0;
+  padding-left: 1.15rem;
+  list-style: disc;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
-.form-status[data-state='success'] {
-  border-color: rgba(126, 224, 184, 0.4);
-  color: var(--success);
+.contact-card-points li::marker {
+  color: var(--brand-soft);
 }
 
 .btn:disabled {
@@ -2026,21 +2527,74 @@ body > footer {
 #faq {
   position: relative;
   overflow: hidden;
-  padding: 9rem 1.75rem;
+  /* 9rem either side put the five answers over one screen on a laptop. */
+  padding: 5.5rem 1.75rem 3rem;
+  display: flex;
+  align-items: center;
 }
 
 .faq-inner {
   position: relative;
   z-index: 2;
-  max-width: 900px;
+  /* #faq is a centring flex row, so the column has to claim the width. */
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
 /*
- * The FAQ copy is plain text rather than glass cards, so the still
- * background gets a scrim to keep questions readable. The scrim sits inside
- * the media layer, which means the cursor-revealed film still comes through
- * at full strength.
+ * The card is parked left, as in the reference, so the revealed film runs on
+ * past it rather than sitting entirely behind the copy.
+ */
+.cta-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.4rem;
+  max-width: 520px;
+  border-radius: 24px;
+  padding: 2.75rem 2.4rem;
+}
+
+/* Above .liquid-glass::before, which is an absolutely positioned overlay. */
+.cta-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.cta-card h2 {
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.cta-copy {
+  font-size: 1.02rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.cta-email {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.cta-email a {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  transition: color 0.25s ease;
+}
+
+.cta-email a:hover {
+  color: var(--brand-soft);
+}
+
+/*
+ * The still background keeps a scrim: the card is glass, so the film behind it
+ * comes through, and an unscrimmed frame put near-white video under the copy.
+ * The scrim sits inside the media layer, which means the cursor-revealed film
+ * still arrives at full strength.
  */
 .faq-scrim::after {
   content: '';
@@ -2050,83 +2604,60 @@ body > footer {
   pointer-events: none;
 }
 
-#faq .faq-question,
-#faq .faq-answer {
-  text-shadow: 0 1px 10px rgba(3, 1, 6, 0.8);
-}
-
-#faq .faq-item {
-  border-bottom-color: rgba(255, 255, 255, 0.16);
-}
-
-.faq-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.faq-item {
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.faq-heading {
-  margin: 0;
-  font: inherit;
-  letter-spacing: normal;
-}
-
-.faq-question {
-  width: 100%;
-  padding: 2rem 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1.5rem;
-  text-align: left;
-  font-family: 'Inter', sans-serif;
-  font-size: 1.3rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--text-primary);
-  background: none;
-  border: none;
-  transition: color 0.3s ease;
-}
-
-.faq-question:hover {
-  color: var(--brand-soft);
-}
-
-.faq-icon {
-  font-size: 2rem;
-  font-weight: 300;
-  transition: transform 0.3s ease;
-}
-
-.faq-item.active .faq-icon {
-  transform: rotate(45deg);
-}
-
-.faq-answer {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.4s ease, padding 0.4s ease;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  line-height: 1.6;
-}
-
-.faq-item.active .faq-answer {
-  max-height: 500px;
-  padding-bottom: 2rem;
-}
-
 /* Footer */
 footer {
   border-top: 1px solid var(--glass-border);
   padding: 6rem 4rem 2rem 4rem;
   margin-top: 5rem;
   position: relative;
+  overflow: hidden; /* the dawn is a full-bleed canvas */
   background: rgba(0,0,0,0.3);
+}
+
+/*
+ * The dawn behind the footer. pointer-events stays on: the scene reads the
+ * cursor for its parallax, and every link in the footer sits in .footer-top /
+ * .footer-bottom above it with its own z-index, so nothing is swallowed.
+ */
+.footer-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.footer-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Scrim. The shader is black above the limb and near-black below it, so this
+ * only has to hold the top edge down, where the footer's border meets the
+ * section above and the copy runs closest to the bloom.
+ */
+.footer-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.34) 34%,
+    rgba(0, 0, 0, 0.1) 62%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* Above .footer-field. */
+.footer-top,
+.footer-bottom,
+.scroll-to-top {
+  position: relative;
+  z-index: 1;
 }
 
 .footer-top {
@@ -2252,9 +2783,7 @@ footer {
   footer { padding-left: 2.5rem; padding-right: 2.5rem; }
 
   .projects-stage { padding-left: 2.5rem; padding-right: 2.5rem; }
-  .project-slide { gap: 1.75rem; padding: 1.75rem; }
-  .project-slide h3 { font-size: 1.8rem; }
-  .contact-grid { gap: 3rem; }
+  .contact-inner { gap: 2rem; }
 }
 
 /* Phones */
@@ -2265,6 +2794,14 @@ footer {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
   }
+  /*
+   * .projects-stage is already a full screen, so any vertical padding here is
+   * padding *around* a screen — it pushed the scene to 1.17x and left a strip
+   * of the next one showing at every snap. Desktop has never had any.
+   */
+  #projects { padding-top: 0; padding-bottom: 0; }
+  /* The two cards stack here, so the section needs the screen back. */
+  #contact { padding-top: 3rem; padding-bottom: 2.5rem; }
   #about { padding: 5rem 1.25rem; }
   #concepts { padding-top: 4.5rem; }
   footer { padding: 4rem 1.25rem 2rem; }
@@ -2291,51 +2828,105 @@ footer {
   .testimonial-text { font-size: 0.9rem; line-height: 1.55; }
   .quote-icon { width: 26px; height: 26px; }
 
-  .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2rem; }
-  .projects-inner { gap: 1.25rem; }
+  .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2.5rem; }
 
-  /*
-   * The card goes portrait on a phone, and stretching a 1.22:1 frame to
-   * roughly 0.4:1 mangles its corners. Drop it rather than distort it.
-   */
-  .projects-deck { padding: 0; }
-  .projects-deck::before { display: none; }
-
-  .project-slide {
-    grid-template-columns: 1fr;
-    gap: 1.1rem;
-    padding: 1.35rem;
-    border-radius: 28px;
-    align-content: center;
-    /* Copy first, screenshot under it, and never taller than the stage. */
-    max-height: calc(100dvh - var(--nav-height) - 9rem);
-    overflow-y: auto;
-  }
-  .project-slide h3 { font-size: 1.5rem; margin-bottom: 0.6rem; }
-  .project-slide p { font-size: 0.95rem; margin-bottom: 1.1rem; }
+  /* The word needs the upper third, so the track takes what is left. */
+  .projects-deck { height: clamp(340px, 46vh, 430px); }
+  .project-slide { padding: 1.35rem 1.4rem; border-radius: 18px; }
+  .project-slide h3 { margin-bottom: 0.6rem; }
+  .project-slide p { margin-bottom: 1.1rem; max-width: none; }
   .project-tags { margin-bottom: 0.75rem; }
   .tag { font-size: 0.68rem; padding: 0.2rem 0.6rem; }
 
   /* minmax(300px, …) still forces overflow on a 360px screen. */
-  .concepts-grid { grid-template-columns: 1fr; gap: 1.25rem; margin-bottom: 2.5rem; }
+  /*
+   * The phone breakpoint drops #concepts to a block, so align-items is inert and
+   * the deck sits at the top of the section while the halo stays centred in it.
+   * The top margin is the room the word needs between the field's top mask and
+   * the card.
+   *
+   * 6rem, not 4: rowLift() cannot lift the band above 14% of the field height
+   * without the field's own mask fading it out, and at this breakpoint that cap
+   * lands the band bottom within a couple of pixels of a deck set 4rem down —
+   * close enough that the card's top edge clipped CAPABILITIES.
+   */
+  .concepts-deck {
+    width: 100%;
+    height: clamp(210px, 30vh, 260px);
+    margin-top: 6rem;
+    margin-bottom: 2.5rem;
+  }
   .concept-card { padding: 1.6rem 1.4rem; gap: 0.7rem; }
-  .concept-index { font-size: 1.3rem; }
-  .concept-list { padding-top: 0.85rem; gap: 0.45rem; }
-  .concept-list li { font-size: 0.88rem; }
-  #concepts { min-height: 0; display: block; }
 
-  .about-header { margin-bottom: 3rem; }
+  /* Same minmax(300px, …) overflow, same fix. */
+  /* The stroke is framed for a landscape box; on a phone the section just
+     sizes to its copy and the trail fills whatever height that leaves. */
+  /* Still a full screen — it is a snap scene — but block flow, so the card
+     stacks under the ribbon instead of sharing a line with it. */
+  #about-us { padding: 5rem 1.25rem; display: block; }
+
+  /*
+   * Services on a phone: one column, and the arrows drop below the card.
+   *
+   * The desktop split keeps the copy off the eclipse's kiss; there is no room
+   * for that here, so the card simply covers it — the same trade every other
+   * scene makes at this width. Flanking arrows are the bigger problem: at
+   * 390px they took 100px of a 342px line and left the card 64px wide, so they
+   * move to a row under the deck instead, right-aligned so "the right side
+   * arrow" still means what the hint says it does.
+   */
+  #services { padding: 4.5rem 1.25rem 7rem; }
+  .services-inner { grid-template-columns: minmax(0, 1fr); }
+  .services-stage { flex-wrap: wrap; justify-content: flex-end; gap: 0.9rem; }
+  .services-deck { flex: 1 0 100%; order: -1; }
+  .services-deck .service-card { padding: 1.6rem 1.4rem; border-radius: 18px; }
+  .service-card h3 { font-size: 1.25rem; margin-bottom: 0.8rem; }
+  .service-card p { font-size: 0.95rem; margin-bottom: 0.9rem; }
+  .service-points li { font-size: 0.9rem; }
+  .services-arrow { width: 38px; height: 38px; }
+  /* The arrows are no longer beside the deck, so the indent that lined the
+     hint up with the card is now just a dent in it. */
+  .services-hint { padding-left: 0; margin-top: 1.1rem; font-size: 0.66rem; }
+
+  /*
+   * The block layout makes #about-us's align-items inert, so the card sits at
+   * the top of the section while the trail's ABOUT US lettering stays centred in
+   * the field — and lands underneath the card. The top margin is the room the
+   * word needs; 6rem is the point at which the card clears the band, allowing
+   * for the fact that lengthening the section also pushes the centred word down
+   * by about half of whatever is added.
+   */
+  .about-us-card {
+    max-width: none;
+    margin-top: 6rem;
+    padding: 1.6rem 1.4rem;
+    gap: 0.7rem;
+  }
+
+  /* Keeps the bottom-parked card, just narrower — the word still owns the
+     middle band, so the section cannot collapse to its content here. */
+  #makers { padding: 6rem 1.25rem 4rem; }
+  .makers-card { max-width: none; padding: 1.6rem 1.4rem; border-radius: 18px; }
+  #makers h2 { font-size: 1.5rem; margin-bottom: 0.9rem; }
+  .makers-lead { font-size: 1rem; margin-bottom: 0.9rem; }
+  .makers-creed { font-size: 0.95rem; line-height: 1.75; }
+
+  .concept-index { font-size: 1.3rem; }
+  /* Still a full screen — it is a snap scene — but block flow, because
+     align-items has nothing useful to do once the deck is the only child. */
+  #concepts { display: block; }
+
   .about-title-bottom { padding-left: 0; }
-  .about-grid, .contact-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .about-grid { grid-template-columns: 1fr; gap: 2.5rem; }
   .about-content p { font-size: 1.05rem; line-height: 1.7; margin-bottom: 1.25rem; }
 
-  .contact-subtext { margin-bottom: 1.5rem; }
-  .contact-details { gap: 0.25rem; padding: 0.5rem; }
-  .contact-detail-link { padding: 0.85rem 0.9rem; }
-  .contact-form { padding: 1.4rem; border-radius: 20px; gap: 1.4rem; }
+  /* No room either side of the crater on a phone: the pair stacks and the
+     dot sheet runs behind them, as every other field does here. */
+  .contact-inner { flex-direction: column; align-items: stretch; gap: 1.25rem; }
+  .contact-card { flex: 0 0 auto; width: 100%; padding: 1.6rem 1.4rem; border-radius: 18px; }
+  .contact-card h3 { font-size: 1.2rem; }
 
-  .faq-question { font-size: 1.05rem; padding: 1.4rem 0; gap: 1rem; }
-  .faq-answer { font-size: 1rem; }
+  .cta-card { max-width: none; padding: 1.9rem 1.5rem; border-radius: 20px; gap: 1.1rem; }
 
   .footer-top { gap: 2.5rem; margin-bottom: 3rem; }
 
@@ -2421,27 +3012,98 @@ footer {
 
   .cards-container { padding-top: 0; max-width: 860px; }
 
-  /* Projects: no pin, no cycling — the three simply stack down the page. */
+  /* Projects: no conveyor — the three simply stack down the page. */
   .projects-stage {
-    height: auto;
     min-height: 0;
     display: block;
-    overflow: visible;
     padding: 5rem 1.5rem;
   }
 
-  .about-field,
-  .contact-field { display: none; }
+  /*
+   * .contact-field is NOT hidden here, unlike the About planet: the contact
+   * heading is drawn in that canvas, so dropping it would leave the section
+   * headless. It renders one settled frame and never animates, which is what
+   * this query actually asks for.
+   */
+  .about-field { display: none; }
 
-  /* Slides stack down the page here, so one frame around the lot is wrong. */
-  .projects-deck { display: block; padding: 0; }
-  .projects-deck::before { display: none; }
-
-  .project-slide {
-    grid-area: auto;
-    opacity: 1;
-    margin-bottom: 5rem;
+  /*
+   * The planet is not drawn here, so the heading it would have lettered has to
+   * come back as real text — otherwise #about loses its heading entirely.
+   */
+  .drawn-in-webgl {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
   }
 
-  .projects-progress { display: none; }
+  /* The heading is a real box again, so it wants its air back. */
+  .about-header {
+    margin-bottom: 3rem;
+  }
+
+  /*
+   * The track sizes to the stacked cards instead of holding one card's height,
+   * and the cards leave the absolute stack so they can flow.
+   */
+  .projects-deck {
+    height: auto;
+    perspective: none;
+  }
+
+  .project-slide {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    cursor: auto;
+    margin-bottom: 2.5rem;
+  }
+
+  /*
+   * Same treatment for the capabilities deck, and for a sharper reason: its
+   * cycle is the only thing that ever advances past card one, so without this
+   * three of the four capabilities would never be shown at all.
+   */
+  .concepts-deck {
+    width: 100%;
+    height: auto;
+    perspective: none;
+  }
+
+  .concepts-deck .concept-card {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    margin-bottom: 1.5rem;
+  }
+
+  /*
+   * And the services deck, for the same reason. With all four cards down the
+   * page there is nothing left to step through, so the arrows and the hint
+   * that points at them both go — setupServiceDeck() returns early here.
+   */
+  .services-deck {
+    display: block;
+  }
+
+  .services-deck .service-card {
+    grid-area: auto;
+  }
+
+  .services-deck .service-card + .service-card {
+    margin-top: 1.5rem;
+  }
+
+  .services-arrow,
+  .services-hint {
+    display: none;
+  }
+
+  #services {
+    display: block;
+  }
 }

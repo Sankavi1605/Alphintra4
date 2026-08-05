@@ -48,39 +48,11 @@
     }
     </script>
 
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What services does Alphintra provide?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Alphintra specializes in AI engineering, full-stack web and mobile application development, enterprise cloud architecture, and immersive 3D WebGL experiences." }
-        },
-        {
-          "@type": "Question",
-          "name": "How does Alphintra approach custom project estimates?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Every project starts with a detailed technical discovery. Projects typically range from agile MVP sprints to full enterprise platform deployments. Schedule a call on Calendly and we will come back with an exact scope proposal." }
-        },
-        {
-          "@type": "Question",
-          "name": "How long does a typical digital product take to launch?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Interactive web and 3D landing experiences launch within 2 to 4 weeks. Full custom AI or cloud software platforms typically take 6 to 12 weeks with continuous iterative delivery." }
-        },
-        {
-          "@type": "Question",
-          "name": "Can Alphintra integrate with our existing team or cloud infrastructure?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes, we operate both as a standalone product delivery studio and as an extended engineering team integrated into your AWS/GCP cloud environments." }
-        },
-        {
-          "@type": "Question",
-          "name": "Who owns the IP and source code after project completion?",
-          "acceptedAnswer": { "@type": "Answer", "text": "You retain 100% full ownership of all source code, design assets, and intellectual property." }
-        }
-      ]
-    }
-    </script>
+    <!--
+      The FAQPage block that used to sit here has been removed along with the
+      accordion it described: FAQPage markup has to match questions and answers
+      that are actually visible on the page, and none of them are any more.
+    -->
     <script>
       /*
        * Runs before first paint, and before the deferred module. The hero's
@@ -234,147 +206,106 @@
       middle while each project is swapped through in front of it.
     -->
     <section id="projects" aria-labelledby="projects-heading">
+      <!--
+        Blades field, with OUR FEATURED WORK lettered over it in WebGL. The
+        word is canvas texture, so the real heading is the visually-hidden h2
+        below — it stays in the accessibility tree and the document outline.
+      -->
+      <div class="projects-field" id="projects-field" aria-hidden="true"></div>
+
       <div class="projects-stage">
-        <div class="projects-inner">
-          <div class="section-header projects-head">
-            <h2 id="projects-heading">Our Featured Work</h2>
-          </div>
+        <h2 id="projects-heading" class="visually-hidden">Our Featured Work</h2>
 
-          <div class="projects-deck" aria-live="polite">
-          <article class="project-slide liquid-glass" aria-roledescription="slide" aria-label="Project 1 of 3">
-        <div class="project-content">
-          <div class="project-tags">
-            <span class="tag">AI System</span>
-            <span class="tag">Web3</span>
-            <span class="tag">WebGL 3D</span>
-          </div>
-          <h3>CipherLux Platform</h3>
-          <p>Next-generation AI & Web3 intelligence ecosystem engineered with high-frequency data pipelines, real-time analytics, and an immersive WebGL interface.</p>
-          <a href="https://app.cipherlux.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the CipherLux Platform project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
-        </div>
-        <div class="project-image">
-          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/Screenshot%202026-02-28%20at%201.32.06%E2%80%AFPM.png" alt="The CipherLux platform dashboard" width="3024" height="1650" loading="lazy" decoding="async">
-        </div>
+        <!--
+          Carousel: one card holds centre while the next waits off-stage right.
+          The conveyor pauses whenever a card is hovered or focused, so the
+          project links are actually reachable.
+        -->
+        <div class="projects-deck" id="projects-deck" aria-live="polite">
+          <article class="project-slide work-glass" aria-roledescription="slide" aria-label="Project 1 of 3">
+            <div class="project-num" aria-hidden="true">01</div>
+            <div class="project-content">
+              <div class="project-tags">
+                <span class="tag">AI System</span>
+                <span class="tag">Web3</span>
+                <span class="tag">WebGL 3D</span>
+              </div>
+              <h3>CipherLux Platform</h3>
+              <p>Next-generation AI &amp; Web3 intelligence ecosystem engineered with high-frequency data pipelines, real-time analytics, and an immersive WebGL interface.</p>
+              <a href="https://app.cipherlux.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the CipherLux Platform project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+            </div>
           </article>
 
-          <article class="project-slide liquid-glass" aria-roledescription="slide" aria-label="Project 2 of 3">
-        <div class="project-content">
-          <div class="project-tags">
-            <span class="tag">Enterprise Portal</span>
-            <span class="tag">Cloud Architecture</span>
-            <span class="tag">Security</span>
-          </div>
-          <h3>MCAS Official Portal</h3>
-          <p>Enterprise academic & medical research portal featuring high-concurrency role management, secure document architecture, and real-time data sync.</p>
-          <a href="https://themcas.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the MCAS Official Portal project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
-        </div>
-        <div class="project-image">
-          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/Screenshot%202026-06-16%20230057.png" alt="The MCAS academic and medical research portal" width="1897" height="866" loading="lazy" decoding="async">
-        </div>
+          <article class="project-slide work-glass" aria-roledescription="slide" aria-label="Project 2 of 3">
+            <div class="project-num" aria-hidden="true">02</div>
+            <div class="project-content">
+              <div class="project-tags">
+                <span class="tag">Enterprise Portal</span>
+                <span class="tag">Cloud Architecture</span>
+                <span class="tag">Security</span>
+              </div>
+              <h3>MCAS Official Portal</h3>
+              <p>Enterprise academic &amp; medical research portal featuring high-concurrency role management, secure document architecture, and real-time data sync.</p>
+              <a href="https://themcas.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the MCAS Official Portal project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+            </div>
           </article>
 
-          <article class="project-slide liquid-glass" aria-roledescription="slide" aria-label="Project 3 of 3">
-        <div class="project-content">
-          <div class="project-tags">
-            <span class="tag">Industrial</span>
-            <span class="tag">Logistics ERP</span>
-            <span class="tag">Digital Web</span>
-          </div>
-          <h3>Thurka Metal Crushers</h3>
-          <p>Industrial & infrastructure platform showcasing heavy machinery logistics, quarry inventory automation, and modern brand digital presence.</p>
-          <a href="https://thurkametalcrushers.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the Thurka Metal Crushers project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
-        </div>
-        <div class="project-image">
-          <img src="https://pub-fb213824e9ea46ca978d90bf0c95ba46.r2.dev/Screenshot%202026-06-16%20225306.png" alt="The Thurka Metal Crushers industrial platform" width="1900" height="867" loading="lazy" decoding="async">
-        </div>
+          <article class="project-slide work-glass" aria-roledescription="slide" aria-label="Project 3 of 3">
+            <div class="project-num" aria-hidden="true">03</div>
+            <div class="project-content">
+              <div class="project-tags">
+                <span class="tag">Industrial</span>
+                <span class="tag">Logistics ERP</span>
+                <span class="tag">Digital Web</span>
+              </div>
+              <h3>Thurka Metal Crushers</h3>
+              <p>Industrial &amp; infrastructure platform showcasing heavy machinery logistics, quarry inventory automation, and modern brand digital presence.</p>
+              <a href="https://thurkametalcrushers.com/" target="_blank" rel="noopener" class="project-link" aria-label="Explore the Thurka Metal Crushers project">Explore Project <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+            </div>
           </article>
-
-          </div>
-
-          <div class="projects-progress" aria-hidden="true">
-            <span class="projects-counter"><span class="projects-current">1</span><span class="projects-total">/ 3</span></span>
-            <span class="projects-bar"><span class="projects-bar-fill"></span></span>
-          </div>
         </div>
       </div>
     </section>
 
     <!-- Concepts / Engineering Tracks Section -->
     <section id="concepts" aria-labelledby="concepts-heading">
-      <!-- Glass-bubble field: dark spheres lit only by their fresnel rims. -->
+      <!--
+        The halo: three orbiting rings with ENGINEERING CAPABILITIES lettered
+        inside them. The word is canvas texture, so the real heading is the
+        visually-hidden h2 below.
+      -->
       <div class="capability-field" id="capability-field" aria-hidden="true"></div>
 
       <div class="concepts-inner">
-        <div class="section-header">
-          <h2 id="concepts-heading">Engineering Capabilities</h2>
-          <p class="section-subtext">Six disciplines we bring to every build, from the first architecture diagram through to production scale.</p>
-        </div>
+        <h2 id="concepts-heading" class="visually-hidden">Engineering Capabilities</h2>
 
-        <div class="concepts-grid">
+        <!--
+          Four capabilities, shown one at a time inside the halo. The cycle
+          pauses on hover or focus so the copy can actually be read.
+        -->
+        <div class="concepts-deck" id="concepts-deck" aria-live="polite">
           <article class="concept-card liquid-glass">
             <span class="concept-index" aria-hidden="true">01</span>
             <h4>AI &amp; Intelligent Systems</h4>
             <p class="concept-desc">Autonomous AI agents, LLM integrations, and automated decision pipelines.</p>
-            <ul class="concept-list">
-              <li>LLM &amp; agent orchestration</li>
-              <li>Retrieval and knowledge pipelines</li>
-              <li>Automated decision workflows</li>
-            </ul>
           </article>
 
           <article class="concept-card liquid-glass">
             <span class="concept-index" aria-hidden="true">02</span>
             <h4>Web &amp; Mobile Engineering</h4>
             <p class="concept-desc">High-performance full-stack web platforms and cross-platform mobile apps.</p>
-            <ul class="concept-list">
-              <li>Full-stack product builds</li>
-              <li>Cross-platform mobile apps</li>
-              <li>Performance and Core Web Vitals</li>
-            </ul>
           </article>
 
           <article class="concept-card liquid-glass">
             <span class="concept-index" aria-hidden="true">03</span>
             <h4>Interactive 3D &amp; WebGL</h4>
             <p class="concept-desc">Immersive 3D web experiences, shader effects, and interactive product reveals.</p>
-            <ul class="concept-list">
-              <li>Real-time WebGL scenes</li>
-              <li>Custom shaders and materials</li>
-              <li>Scroll-driven product reveals</li>
-            </ul>
           </article>
 
           <article class="concept-card liquid-glass">
             <span class="concept-index" aria-hidden="true">04</span>
             <h4>Cloud &amp; DevOps</h4>
             <p class="concept-desc">Enterprise cloud architecture on AWS and GCP, provisioned and deployed as code.</p>
-            <ul class="concept-list">
-              <li>AWS &amp; GCP architecture</li>
-              <li>CI/CD and infrastructure as code</li>
-              <li>Observability and cost control</li>
-            </ul>
-          </article>
-
-          <article class="concept-card liquid-glass">
-            <span class="concept-index" aria-hidden="true">05</span>
-            <h4>Data &amp; Distributed Systems</h4>
-            <p class="concept-desc">Distributed infrastructure that carries heavy real-time data loads without falling over.</p>
-            <ul class="concept-list">
-              <li>High-frequency data pipelines</li>
-              <li>Real-time analytics and sync</li>
-              <li>Distributed compute at scale</li>
-            </ul>
-          </article>
-
-          <article class="concept-card liquid-glass">
-            <span class="concept-index" aria-hidden="true">06</span>
-            <h4>Security &amp; Reliability</h4>
-            <p class="concept-desc">Role-based access, secure document architecture, and high-concurrency systems.</p>
-            <ul class="concept-list">
-              <li>Role and permission modelling</li>
-              <li>Secure document architecture</li>
-              <li>High-concurrency hardening</li>
-            </ul>
           </article>
         </div>
 
@@ -385,15 +316,147 @@
       </div>
     </section>
 
+    <!--
+      About Us: who the company is and what sets it apart. Copy lifted
+      from alphintra.com's "About Alphintra", "Why Alphintra" and "The Team"
+      sections. The four delivery differentiators from that page are not
+      repeated here — they already run in the #about block below.
+    -->
+    <section id="about-us" aria-labelledby="about-us-heading">
+      <!--
+        Light-trail ribbon; a long-exposure brush stroke folding at the right,
+        with ABOUT US lettered over it. The word is canvas texture, so the real
+        heading is the visually-hidden h2 below.
+      -->
+      <div class="about-us-field" id="about-us-field" aria-hidden="true"></div>
+
+      <div class="about-us-inner">
+        <h2 id="about-us-heading" class="visually-hidden">About Us</h2>
+
+        <!-- One card, parked below the lettering. -->
+        <article class="about-us-card liquid-glass">
+          <h4>Architecture through deployment</h4>
+          <p>Alphintra builds scalable AI, web, mobile and cloud systems. We work alongside founders and product teams who own the outcome, combining technical depth with execution speed to carry a product from its first architecture decision all the way to production.</p>
+        </article>
+      </div>
+    </section>
+
+    <!--
+      Services: the capability detail. #concepts names the four tracks in a line
+      each; this is where one is actually argued at a time, stepped with the
+      arrows either side of the card.
+    -->
+    <section id="services" aria-labelledby="services-heading">
+      <!--
+        The eclipse: two orbs kissing at a white-hot point, silver lit from
+        below and violet lit from above, with AI AND AUTOMATION lettered across
+        the dark band beneath them. The word is canvas texture, so the real
+        heading is the visually-hidden h2 below.
+      -->
+      <div class="services-field" id="services-field" aria-hidden="true"></div>
+
+      <div class="services-inner">
+        <h2 id="services-heading" class="visually-hidden">AI and Automation</h2>
+
+        <div class="services-stage">
+          <button class="services-arrow services-arrow-prev" type="button"
+                  aria-label="Previous capability" aria-controls="services-deck">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+
+          <!--
+            One card at a time, stacked. The deck is stepped by hand rather than
+            on a timer like #concepts: these cards carry three bullets each, and
+            a card that reads for eight seconds cannot also leave on its own.
+          -->
+          <div class="services-deck" id="services-deck" aria-live="polite">
+            <article class="service-card liquid-glass">
+              <h3>AI &amp; Intelligent Systems</h3>
+              <p>We design AI-powered systems that integrate directly into business workflows. From LLM integrations and RAG architectures to automation pipelines, we build intelligent systems that deliver measurable operational value.</p>
+              <ul class="service-points">
+                <li>Outcome-driven AI strategies based on measurable business priorities.</li>
+                <li>Rapid delivery cycles that validate value before full-scale rollout.</li>
+                <li>Built-in data quality checks for stable and trustworthy outputs.</li>
+              </ul>
+            </article>
+
+            <article class="service-card liquid-glass">
+              <h3>Web &amp; Mobile Engineering</h3>
+              <p>We build high-performance full-stack web platforms and cross-platform mobile apps on one shared architecture, so a feature is specified once and ships to every surface your customers actually use.</p>
+              <ul class="service-points">
+                <li>One codebase across web, iOS and Android, with native behaviour where it counts.</li>
+                <li>Performance budgets set at design time, not measured after launch.</li>
+                <li>Accessibility and analytics built into the component layer.</li>
+              </ul>
+            </article>
+
+            <article class="service-card liquid-glass">
+              <h3>Interactive 3D &amp; WebGL</h3>
+              <p>We build immersive 3D web experiences, shader effects and interactive product reveals that run in the browser — no plugin, no install, no fallback screenshot.</p>
+              <ul class="service-points">
+                <li>Custom shaders written for the story, not lifted from a library.</li>
+                <li>Scenes that hold 60fps on a mid-range phone, not just a workstation.</li>
+                <li>Full reduced-motion and no-WebGL paths, so nothing is ever a blank frame.</li>
+              </ul>
+            </article>
+
+            <article class="service-card liquid-glass">
+              <h3>Cloud &amp; DevOps</h3>
+              <p>We deliver enterprise cloud architecture on AWS and GCP, provisioned and deployed as code, so every environment is reproducible and every change is reviewable.</p>
+              <ul class="service-points">
+                <li>Infrastructure as code from the first environment onward.</li>
+                <li>Pipelines that gate on tests, security scans and cost, not just a green build.</li>
+                <li>Observability wired in at deploy time, so incidents are diagnosed rather than guessed.</li>
+              </ul>
+            </article>
+          </div>
+
+          <button class="services-arrow services-arrow-next" type="button"
+                  aria-label="Next capability" aria-controls="services-deck">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <p class="services-hint" id="services-hint">Next card available, use the right side arrow</p>
+      </div>
+    </section>
+
+    <!--
+      Built by Makers: the team, stated as a claim rather than a card. This
+      used to be the third About Us card ("Engineers at the core") — same
+      sentence, so it has been lifted out rather than repeated 200px apart.
+    -->
+    <section id="makers" aria-labelledby="makers-heading">
+      <!--
+        Soft-focus orbs with THE TEAM lettered over them. The word is canvas
+        texture in WebGL, so it is decoration; the card below carries the real
+        heading, and the card is placed under the word rather than over it.
+      -->
+      <div class="makers-field" id="makers-field" aria-hidden="true"></div>
+
+      <div class="makers-inner">
+        <article class="makers-card liquid-glass">
+          <h2 id="makers-heading">Built by Makers</h2>
+          <p class="makers-lead">Alphintra was founded by engineers with deep expertise in frontend, backend, cloud infrastructure, AI systems, and interactive design.</p>
+          <p class="makers-creed">We are builders first. We think in systems. We execute with precision.</p>
+        </article>
+      </div>
+    </section>
+
     <!-- About Section -->
     <section id="about" aria-labelledby="about-heading">
-      <!-- Raymarched liquid field; the ALPHINTRA column lives inside it. -->
+      <!--
+        The planet, with ENGINEERING STUDIO / FOR SCALABLE PRODUCTS lettered
+        across its lower field. The word is canvas texture, so the real heading
+        is the pair below — visually hidden while the canvas is up, and restored
+        to view under reduced motion, where the field is not drawn at all.
+      -->
       <div class="about-field" id="about-field" aria-hidden="true"></div>
 
       <div class="about-inner">
       <div class="about-header">
-        <h2 class="about-title-top" id="about-heading">Engineering Studio</h2>
-        <p class="about-title-bottom">for Scalable Products</p>
+        <h2 class="about-title-top drawn-in-webgl" id="about-heading">Engineering Studio</h2>
+        <p class="about-title-bottom drawn-in-webgl">for Scalable Products</p>
       </div>
       <div class="about-grid">
         <div class="about-content">
@@ -412,80 +475,37 @@
 
     <!-- Contact Section -->
     <section id="contact" aria-labelledby="contact-heading">
-      <!-- Same raymarched liquid as the About section, without the letter column. -->
+      <!--
+        The halftone sheet: a tilted grid of dots rippling around a crater, with
+        DELIVER TRACKS lettered inside it. That row is decoration drawn in
+        canvas texture, so the real heading is the visually-hidden h2 below.
+      -->
       <div class="contact-field" id="contact-field" aria-hidden="true"></div>
 
-      <div class="contact-grid">
-        <div class="contact-info">
-          <p class="contact-eyebrow">LET&rsquo;S TALK</p>
-          <h2 id="contact-heading">Let&rsquo;s Build Something Meaningful</h2>
-          <p class="contact-subtext">Tell us what you are building: AI platform, SaaS product, enterprise system, or digital experience. We will help you architect it, build it, and scale it.</p>
+      <!--
+        Two cards, parked either side of the crater so the lettering and the
+        dot wave carry the middle of the frame.
+      -->
+      <div class="contact-inner">
+        <h2 id="contact-heading" class="visually-hidden">Let&rsquo;s Build Something Meaningful</h2>
 
-          <div class="contact-details liquid-glass">
-            <a href="mailto:contact@alphintra.com" class="contact-detail-link">
-              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" focusable="false"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <span class="contact-detail-body">
-                <span class="contact-detail-label">Email</span>
-                <span class="contact-detail-value">contact@alphintra.com</span>
-              </span>
-            </a>
-            <a href="tel:+94740886002" class="contact-detail-link">
-              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" focusable="false"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-              <span class="contact-detail-body">
-                <span class="contact-detail-label">Phone</span>
-                <span class="contact-detail-value">+94 74 088 6002</span>
-              </span>
-            </a>
-            <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="contact-detail-link">
-              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-              <span class="contact-detail-body">
-                <span class="contact-detail-label">Book a slot</span>
-                <span class="contact-detail-value">Schedule a Call</span>
-              </span>
-            </a>
-          </div>
-        </div>
+        <article class="contact-card liquid-glass">
+          <h3>Engineering Partner for Ambitious Teams</h3>
+          <p>Whether you are launching a startup product or modernizing enterprise infrastructure, we operate as a long-term engineering partner embedded into your roadmap and delivery model.</p>
+          <ul class="contact-card-points">
+            <li>Role-matched experts across frontend, backend, cloud, and AI systems.</li>
+            <li>Domain ownership with consistent technical decision-making across sprints.</li>
+          </ul>
+        </article>
 
-        <!--
-          Static site: with no `data-endpoint` the form validates in the browser
-          and hands the message to the visitor's mail client. To post to a real
-          backend instead, add data-endpoint="https://…" to the <form> below.
-        -->
-        <form class="contact-form liquid-glass" id="contact-form" novalidate>
-          <div class="input-group">
-            <label for="contact-name">Your name</label>
-            <input type="text" id="contact-name" name="name" autocomplete="name" required
-                   data-error-message="Please tell us your name."
-                   aria-describedby="contact-name-error">
-            <p class="field-error" id="contact-name-error" aria-live="polite"></p>
-          </div>
-          <div class="input-group">
-            <label for="contact-email">Your email</label>
-            <input type="email" id="contact-email" name="email" autocomplete="email" required
-                   data-error-message="Please enter a valid email address so we can reply."
-                   aria-describedby="contact-email-error">
-            <p class="field-error" id="contact-email-error" aria-live="polite"></p>
-          </div>
-          <div class="input-group">
-            <label for="contact-message">Project details &amp; timeline</label>
-            <textarea id="contact-message" name="message" rows="4" required
-                      data-error-message="A sentence or two about the project helps us reply usefully."
-                      aria-describedby="contact-message-error"></textarea>
-            <p class="field-error" id="contact-message-error" aria-live="polite"></p>
-          </div>
-
-          <!-- Honeypot: hidden from people, tempting to bots. -->
-          <div class="honeypot" aria-hidden="true">
-            <label for="company-website">Leave this field empty</label>
-            <input type="text" id="company-website" name="company_website" tabindex="-1" autocomplete="off">
-          </div>
-
-          <!-- Mount Cloudflare Turnstile here when a backend is wired up:
-               <div class="cf-turnstile" data-sitekey="YOUR_SITE_KEY"></div> -->
-
-          <button type="submit" class="btn btn-wide">SEND MESSAGE</button>
-          <p class="form-status" role="status" aria-live="polite"></p>
-        </form>
+        <article class="contact-card liquid-glass">
+          <h3>Execution Model Built for Scale</h3>
+          <p>We combine scalable cloud architecture and product-focused execution with predictable governance to deliver measurable outcomes over long-term partnerships.</p>
+          <ul class="contact-card-points">
+            <li>Predictable sprint delivery with low-surprise quality controls.</li>
+            <li>Long-term partnership model with measurable delivery outcomes.</li>
+          </ul>
+        </article>
       </div>
     </section>
 
@@ -504,63 +524,31 @@
       </div>
 
 
+      <!--
+        The closing call to action, in place of the old FAQ accordion: one card
+        carrying the line the contact section used to open with, plus the two
+        ways to start a conversation.
+      -->
       <div class="faq-inner">
-      <div class="section-header">
-        <h2 id="faq-heading">Frequently Asked Questions</h2>
-      </div>
-      <div class="faq-list">
-        <div class="faq-item">
-          <h3 class="faq-heading">
-            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a1" id="faq-q1">
-              <span>What services does Alphintra provide?</span>
-              <span class="faq-icon" aria-hidden="true">+</span>
-            </button>
-          </h3>
-          <div class="faq-answer" id="faq-a1" role="region" aria-labelledby="faq-q1">Alphintra specializes in AI engineering, full-stack web and mobile application development, enterprise cloud architecture, and immersive 3D WebGL experiences.</div>
-        </div>
-        <div class="faq-item">
-          <h3 class="faq-heading">
-            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a2" id="faq-q2">
-              <span>How does Alphintra approach custom project estimates?</span>
-              <span class="faq-icon" aria-hidden="true">+</span>
-            </button>
-          </h3>
-          <div class="faq-answer" id="faq-a2" role="region" aria-labelledby="faq-q2">Every project starts with a detailed technical discovery. Projects typically range from agile MVP sprints to full enterprise platform deployments. Schedule a call on Calendly and we will come back with an exact scope proposal.</div>
-        </div>
-        <div class="faq-item">
-          <h3 class="faq-heading">
-            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a3" id="faq-q3">
-              <span>How long does a typical digital product take to launch?</span>
-              <span class="faq-icon" aria-hidden="true">+</span>
-            </button>
-          </h3>
-          <div class="faq-answer" id="faq-a3" role="region" aria-labelledby="faq-q3">Interactive web and 3D landing experiences launch within 2 to 4 weeks. Full custom AI or cloud software platforms typically take 6 to 12 weeks with continuous iterative delivery.</div>
-        </div>
-        <div class="faq-item">
-          <h3 class="faq-heading">
-            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a4" id="faq-q4">
-              <span>Can Alphintra integrate with our existing team or cloud infrastructure?</span>
-              <span class="faq-icon" aria-hidden="true">+</span>
-            </button>
-          </h3>
-          <div class="faq-answer" id="faq-a4" role="region" aria-labelledby="faq-q4">Yes, we operate both as a standalone product delivery studio and as an extended engineering team integrated into your AWS/GCP cloud environments.</div>
-        </div>
-        <div class="faq-item">
-          <h3 class="faq-heading">
-            <button class="faq-question" type="button" aria-expanded="false" aria-controls="faq-a5" id="faq-q5">
-              <span>Who owns the IP and source code after project completion?</span>
-              <span class="faq-icon" aria-hidden="true">+</span>
-            </button>
-          </h3>
-          <div class="faq-answer" id="faq-a5" role="region" aria-labelledby="faq-q5">You retain 100% full ownership of all source code, design assets, and intellectual property.</div>
-        </div>
-      </div>
+        <article class="cta-card liquid-glass">
+          <h2 id="faq-heading">Let&rsquo;s Build Something Meaningful</h2>
+          <p class="cta-copy">Tell us what you are building: AI platform, SaaS product, enterprise system, or digital experience. We will help you architect it, build it, and scale it.</p>
+          <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="btn btn-glass liquid-glass">SCHEDULE A CALL</a>
+          <p class="cta-email">Email: <a href="mailto:contact@alphintra.com">contact@alphintra.com</a></p>
+        </article>
       </div>
     </section>
     </main>
 
     <!-- Footer -->
     <footer>
+      <!--
+        The dawn: a vast analytic planet whose limb is drawn as a hairline from
+        the centre outward, with the purple bloom rising behind it. The footer's
+        own columns sit above it and keep their existing scroll reveal.
+      -->
+      <div class="footer-field" id="footer-field" aria-hidden="true"></div>
+
       <div class="footer-top">
         <div class="footer-col">
           <a href="#hero">Home</a>
