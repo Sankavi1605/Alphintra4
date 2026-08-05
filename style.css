@@ -698,7 +698,7 @@ nav .nav-links {
 .hero-title {
   position: absolute;
   /*
-   * Centres the line box on 24% of the hero. line-height is 0.9, so half the
+   * Centres the line box on 28% of the hero. line-height is 0.9, so half the
    * line box is 0.45em. Nudge this one number to slide the word up or down
    * relative to the model.
    *
@@ -709,29 +709,46 @@ nav .nav-links {
    *
    * Measured, not guessed — the painted glyph box from TextMetrics, not the
    * line box, which carries ~25px of dead leading below the caps at this size.
-   * At 1265x800 the caps run y 90..266 and the model's apex starts at 287: 21px
-   * of daylight under the word, 30px over it to the nav pill.
    *
-   * This pair is the furthest the two can separate without cropping the model's
-   * feet — at 26%/-2.95 the word had 33px of air but the frame cut 39px off the
-   * bottom of the legs.
+   * There is no longer a gap to protect: the model is asked to overlap the
+   * bottom of the row, which is what the z-order was always set up for — the
+   * canvas is z 2 and this is z 1, so the chrome crosses in front of the
+   * letters. At 1250x800 the caps run y 122..314 and the apex reaches 280, so
+   * the tip cuts about 34px into the bottom of the middle letters.
+   *
+   * How much it cuts is not constant across window heights, and cannot be while
+   * the word is sized in rem and placed in %: the apex sits at a near-fixed 36%
+   * of the hero, so a shorter hero means a deeper crossing.
    *
    * Paired with model.position.y in initHeroScene — moving one without the
    * other closes the gap again.
    */
-  top: calc(24% - 0.45em);
+  top: calc(28% - 0.45em);
   left: 0;
   right: 0;
   z-index: 1;
   margin: 0;
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Moonwalk', 'Inter', sans-serif;
+  /* Moonwalk ships one weight; the @font-face declares it as normal. */
   font-weight: 400;
   /*
-   * Spec ladder below, each capped at 21vw. "ALPHINTRA" is nine characters —
-   * a full 16rem would run off the side of anything under ~1600px, so the vw
+   * Spec ladder below, each capped at 10.7vw. "ALPHINTRA" is nine characters —
+   * a full 12rem would run off the side of anything under ~1300px, so the vw
    * cap keeps it as large as will actually fit.
+   *
+   * Both terms are three quarters of what they were, which is the whole of the
+   * size reduction — the ladder tops out at 12rem rather than 16, and the vw cap
+   * came down with it so the word keeps one proportion at every width instead of
+   * shrinking only where the rem term happened to bind.
+   *
+   * The vw cap is 10.7 rather than the 21 this carried under Instrument Serif
+   * because Moonwalk is a much wider face: measured at 256px, the same nine
+   * letters set 1055px in Instrument Serif and 1552px in Moonwalk. The row is
+   * `white-space: nowrap` inside an `overflow: hidden` hero, so a cap that is
+   * too generous is clipped at both ends rather than wrapped. At 10.7vw the word
+   * fills ~65% of the width once the vw term binds.
    */
-  font-size: min(4.5rem, 21vw);
+  font-size: min(3.4rem, 10.7vw);
   line-height: 0.9;
   letter-spacing: 0.01em;
   text-transform: uppercase;
@@ -752,19 +769,19 @@ nav .nav-links {
 }
 
 @media (min-width: 475px) {
-  .hero-title { font-size: min(5.5rem, 21vw); }
+  .hero-title { font-size: min(4.1rem, 10.7vw); }
 }
 
 @media (min-width: 640px) {
-  .hero-title { font-size: min(10rem, 21vw); }
+  .hero-title { font-size: min(7.5rem, 10.7vw); }
 }
 
 @media (min-width: 768px) {
-  .hero-title { font-size: min(13rem, 21vw); }
+  .hero-title { font-size: min(9.75rem, 10.7vw); }
 }
 
 @media (min-width: 1024px) {
-  .hero-title { font-size: min(16rem, 21vw); }
+  .hero-title { font-size: min(12rem, 10.7vw); }
 }
 
 .hero-content {
@@ -814,26 +831,104 @@ nav .nav-links {
   z-index: 10;
 }
 
+/*
+ * The scrim and the copy share row 1; the card has row 2. Pinned explicitly
+ * because the scrim is a third child of a two-row grid — left to auto-placement
+ * it would take row 1 for itself and push the other two down a row each.
+ */
+.hole-scrim,
+.hole-text { grid-row: 1; grid-column: 1; }
+.cards-container { grid-row: 2; grid-column: 1; }
+
 .hole-text {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   opacity: 0; /* hidden before JS loads */
+  position: relative;
+  z-index: 1; /* over .hole-scrim, which shares this cell */
 }
 
 /*
- * This copy sits directly over the chrome model, whose bright metal washes
- * white text out completely. A soft dark halo behind the glyphs keeps it
- * legible against both the light and dark parts of the model.
+ * The dark pad the copy reads against.
+ *
+ * By the end of the zoom the backdrop here is the world model's daylit face,
+ * which peaks near white — and white text on white is invisible no matter how
+ * much shadow it carries. A blurred halo only darkens the pixels immediately
+ * around each stroke, so the glyphs still read white-on-white a few pixels out.
+ * This is an actual dark field behind the whole block.
+ *
+ * Two earlier attempts put it on .hole-text::before and neither reached the
+ * screen. This is the construct the testimonial card uses — an ordinary element
+ * with a background — and its opacity is its own, not inherited from a parent
+ * the reveal is fading.
+ *
+ * `stretch` on both axes plus negative margins is what lets it bleed past the
+ * copy without growing the grid row: the used size resolves to the grid area
+ * plus the margins, and the row is still sized by .hole-text.
+ */
+.hole-scrim {
+  justify-self: stretch;
+  align-self: stretch;
+  margin: -5.5rem -10rem;
+  z-index: 0;
+  opacity: 0; /* the timeline brings it in just ahead of the copy */
+  pointer-events: none;
+  /*
+   * The paragraph is 600px at its widest and this box is 920, so its outer
+   * corners land at 0.74 of the ellipse radius; the plateau runs past that on
+   * purpose. The ellipse reaches zero exactly at the box edge, so there is no
+   * rectangle to see. Measured against the model's brightest face that leaves
+   * the copy at ~14:1 and the heading at ~19:1.
+   */
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(3, 1, 6, 0.93) 0%,
+    rgba(3, 1, 6, 0.91) 60%,
+    rgba(3, 1, 6, 0.8) 78%,
+    rgba(3, 1, 6, 0.42) 90%,
+    rgba(3, 1, 6, 0) 100%
+  );
+}
+
+/*
+ * The dark aura that actually carries the contrast.
+ *
+ * Six opaque shadows at doubling radii rather than three translucent ones. A
+ * single blurred shadow spreads one glyph's worth of ink over its whole radius,
+ * so it never gets dark enough to matter; stacking opaque copies composites
+ * them — 1 - (1-a)^n — which is solid black within a few pixels of every stroke
+ * and falls off to nothing by 44px. It follows the letterforms instead of
+ * boxing them, and being part of the text's own paint it cannot be layered
+ * away, which is the failing that three attempts at a pad behind the copy all
+ * shared.
  */
 .hole-text h2,
 .hole-text p {
   text-shadow:
-    0 2px 10px rgba(3, 1, 6, 0.95),
-    0 0 32px rgba(3, 1, 6, 0.85),
-    0 0 70px rgba(3, 1, 6, 0.7);
+    0 0 2px #030106,
+    0 0 4px #030106,
+    0 0 9px #030106,
+    0 0 18px #030106,
+    0 0 30px rgba(3, 1, 6, 0.9),
+    0 0 44px rgba(3, 1, 6, 0.7);
 }
+
+/*
+ * No -webkit-text-stroke here, deliberately.
+ *
+ * A keyline under the fill looked like free insurance against the model's
+ * highlights. It is not: text-stroke is centred on the outline, so half of it
+ * is painted inwards. Measured at the rendered sizes, Moonwalk's stems are 5px
+ * and the body face's are 3px, so the 2.5px and 1.5px strokes that were here
+ * were each replacing half the white ink in every stem with near-black. The
+ * heading in particular read as hollow and greyed — dimmer with the stroke than
+ * without it, which is the opposite of what it was for.
+ *
+ * Contrast is the pad's job, and the halo's. Both sit behind the glyphs and
+ * neither touches the letterforms.
+ */
 
 .hole-text h2 {
   font-size: 3rem;
@@ -862,9 +957,16 @@ nav .nav-links {
   pointer-events: none; /* prevents hover effects while hidden */
 }
 
+/*
+ * 0.94, not 0.85. The card lands over the world model's lit face, and at 0.85
+ * enough of that near-white came through the fill to raise the card to a mid
+ * grey — which cost the text most of its contrast even though the text itself
+ * had not changed. Nearly opaque here; the blur still does its work on the
+ * edges and on whatever passes behind the corners.
+ */
 .testimonial-card {
-  background: rgba(14, 7, 20, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 6, 18, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 20px;
   padding: 2.2rem 3rem;
   backdrop-filter: blur(20px);
@@ -888,7 +990,7 @@ nav .nav-links {
 .quote-icon {
   width: 36px;
   height: 36px;
-  opacity: 0.4;
+  opacity: 0.55;
   color: #d8b4fe;
 }
 
@@ -908,8 +1010,14 @@ nav .nav-links {
   font-weight: 600;
 }
 
+/*
+ * Stated rather than inherited. This was picking up --text-secondary (#a0a0a0),
+ * which is a body-copy grey on a flat dark page and far too weak for a caption
+ * on a card that floats over a bright model.
+ */
 .author-company {
   font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.74);
 }
 
 /* =========================================================================
@@ -995,6 +1103,14 @@ nav .nav-links {
   padding: calc(var(--nav-height) + 2.5rem) clamp(1.5rem, 5vw, 4rem) clamp(3rem, 7vh, 5.5rem);
 }
 
+/* The arrows sit outside the track, same arrangement as .services-stage. */
+.projects-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  justify-content: center;
+}
+
 /*
  * The carousel track. Every card is absolutely stacked in the same box and
  * moved on x, so the entering and leaving cards pass each other without any
@@ -1008,6 +1124,9 @@ nav .nav-links {
   margin-inline: auto;
   height: clamp(300px, 42vh, 420px);
   perspective: 1100px;
+  /* min-width: 0 so a flex row cannot be widened past the stage by the track. */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .project-slide {
@@ -1418,20 +1537,24 @@ nav .nav-links {
 }
 
 /*
- * The deck. One card is visible at a time, so the cards are stacked absolutely
- * inside a fixed-height track: only x, rotateY, opacity and filter animate, and
- * nothing reflows per frame.
+ * The deck. All four capabilities at once, as a row that crosses the halo.
  *
- * Narrower than .concepts-inner on purpose — the card sits inside the halo,
- * whose diameter is set by the smaller viewport dimension, so a full-bleed card
- * would run straight out through the rings.
+ * They used to cross-fade through a fixed-height track one at a time, which
+ * meant three of the four were always hidden and reading the one you wanted
+ * meant waiting for it to come round. The track, its perspective and the
+ * cycle that drove it are all gone; the cards are ordinary grid items now.
+ *
+ * Still capped well inside .concepts-inner: the halo's diameter is set by the
+ * smaller viewport dimension, and a full-bleed row would run straight out
+ * through the rings instead of banding across them.
  */
 .concepts-deck {
   position: relative;
-  width: min(560px, 78vw);
-  height: clamp(190px, 24vh, 240px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  width: min(1200px, 92vw);
   margin: 0 auto 2rem;
-  perspective: 1100px;
 }
 
 /*
@@ -1439,34 +1562,28 @@ nav .nav-links {
  * type colour are set here so that effect stays untouched.
  */
 /*
- * Scoped to the deck on purpose. `.liquid-glass` also sets `position: relative`
- * and is declared further down this file, so a bare `.concept-card` rule loses
- * the cascade at equal specificity and every card falls back into normal flow —
- * which stacks all four down the page, overflowing the 244px track, and leaves
- * the deck looking empty. Two classes beats one; .liquid-glass stays untouched.
+ * Still scoped to the deck: `.liquid-glass` is declared further down this file,
+ * so a bare `.concept-card` rule would lose the cascade to it at equal
+ * specificity. Two classes beats one; .liquid-glass stays untouched — including
+ * the `position: relative` it sets, which the copy's z-index needs.
+ *
+ * Copy is top-aligned rather than centred now that the four sit side by side:
+ * grid stretches them to a common height, and centring each one's text made
+ * the four headings land at four different heights.
  */
 .concepts-deck .concept-card {
-  position: absolute;
-  inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 0.9rem;
+  justify-content: flex-start;
+  gap: 0.75rem;
   border-radius: 20px;
-  padding: 2.25rem 1.9rem;
-  opacity: 0;
+  padding: 1.75rem 1.4rem;
   transition: box-shadow 0.4s ease;
 }
 
 /*
- * Whichever card is on top before the script runs. Without it the deck is
- * blank until the section scrolls into view and the cycle starts.
- */
-.concepts-deck .concept-card:first-child { opacity: 1; }
-
-/*
- * No translate on hover here, unlike the old grid: the cycle owns `transform`
- * on the visible card, so lifting it would fight the tween mid-flight.
+ * Shadow only, no translate. The entrance stagger owns `transform` on these
+ * cards, so a lift would fight it for anything hovered mid-reveal.
  */
 .concept-card:hover,
 .concept-card:focus-within {
@@ -1828,7 +1945,12 @@ nav .nav-links {
  * Outside the card, not on it. The card cross-fades and slides; an arrow
  * riding along with it would be a moving target for the click that moves it.
  */
-.services-arrow {
+/*
+ * One recipe for both decks' arrows. The projects carousel got the same control
+ * afterwards, and two copies of this would drift apart.
+ */
+.services-arrow,
+.projects-arrow {
   flex: none;
   width: 44px;
   height: 44px;
@@ -1844,7 +1966,9 @@ nav .nav-links {
 }
 
 .services-arrow:hover,
-.services-arrow:focus-visible {
+.services-arrow:focus-visible,
+.projects-arrow:hover,
+.projects-arrow:focus-visible {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--brand-soft);
   transform: scale(1.08);
@@ -2775,6 +2899,13 @@ footer {
 
 /* Tablet / small laptop */
 @media (max-width: 1100px) {
+  /* Four across stops fitting the halo well before the cards themselves run
+     out of room, so they go two up and the deck narrows with them. */
+  .concepts-deck {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(760px, 92vw);
+  }
+
   .nav-links a { padding-left: 0.7rem; padding-right: 0.7rem; }
 
   #projects, #contact, #faq { padding-left: 2.5rem; padding-right: 2.5rem; }
@@ -2830,6 +2961,15 @@ footer {
 
   .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2.5rem; }
 
+  /*
+   * Arrows beside a full-width track would cost it ~100px on a 360px screen, so
+   * the track takes a row of its own and they wrap underneath it — the same
+   * rearrangement .services-stage makes at this breakpoint.
+   */
+  .projects-row { flex-wrap: wrap; justify-content: flex-end; gap: 0.9rem; }
+  .projects-deck { flex: 1 0 100%; order: -1; }
+  .projects-arrow { width: 38px; height: 38px; }
+
   /* The word needs the upper third, so the track takes what is left. */
   .projects-deck { height: clamp(340px, 46vh, 430px); }
   .project-slide { padding: 1.35rem 1.4rem; border-radius: 18px; }
@@ -2852,7 +2992,6 @@ footer {
    */
   .concepts-deck {
     width: 100%;
-    height: clamp(210px, 30vh, 260px);
     margin-top: 6rem;
     margin-bottom: 2.5rem;
   }
@@ -2951,6 +3090,23 @@ footer {
  * animate it more gently we drop the WebGL layer (main.js skips it too) and
  * lay the hero out as three ordinary stacked blocks.
  * ====================================================================== */
+/*
+ * One column, finally. Two 190px-wide cards side by side wrap this copy to
+ * eight or nine lines each, which is taller than stacking them.
+ *
+ * This is the one place where showing all four at once costs something: four
+ * cards plus the halo margin and the call to action do not fit a phone screen,
+ * so #concepts stops being exactly one snap scene here and grows to about 1.5.
+ * Mandatory snap treats an over-tall section as a large snap area and lets the
+ * scroller rest anywhere inside it, so it degrades to ordinary scrolling rather
+ * than breaking.
+ */
+@media (max-width: 560px) {
+  .concepts-deck {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -3063,22 +3219,21 @@ footer {
     margin-bottom: 2.5rem;
   }
 
+  /* All three are on the page, so there is nothing left to step through. */
+  .projects-arrow { display: none; }
+
+  /* No hero scene in this mode, so there is no bright model to read against. */
+  .hole-scrim { display: none; }
+
   /*
-   * Same treatment for the capabilities deck, and for a sharper reason: its
-   * cycle is the only thing that ever advances past card one, so without this
-   * three of the four capabilities would never be shown at all.
+   * Nothing needed for the capabilities deck any more. It used to have to be
+   * un-stacked here, because the cycle was the only thing that ever advanced
+   * past card one and a cycle that never runs would have left three of the four
+   * capabilities permanently invisible. All four are in flow by default now.
    */
   .concepts-deck {
+    grid-template-columns: 1fr;
     width: 100%;
-    height: auto;
-    perspective: none;
-  }
-
-  .concepts-deck .concept-card {
-    position: relative;
-    inset: auto;
-    opacity: 1;
-    margin-bottom: 1.5rem;
   }
 
   /*

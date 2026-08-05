@@ -180,6 +180,15 @@
         0fr, which keeps the pair centred without measuring anything in JS.
       -->
       <div class="hole-stage">
+        <!--
+          The dark pad the copy reads against. A real element, not a pseudo, and
+          deliberately a sibling of .hole-text rather than a child: .hole-text's
+          opacity is animated through the zoom, and anything inside it fades with
+          it — which left the pad weak at exactly the moment the world model is
+          brightest behind it.
+        -->
+        <div class="hole-scrim" aria-hidden="true"></div>
+
         <div class="hole-text">
           <h2>See For Yourself</h2>
           <p>Real products say more than any promise. Discover what our clients build with Alphintra and how their digital platforms come to life.</p>
@@ -218,9 +227,17 @@
 
         <!--
           Carousel: one card holds centre while the next waits off-stage right.
-          The conveyor pauses whenever a card is hovered or focused, so the
-          project links are actually reachable.
+          It advances on its own and can also be stepped with the arrows either
+          side, which reverse the sweep when they go back. The auto-advance
+          pauses whenever a card is hovered or focused, so the project links are
+          actually reachable.
         -->
+        <div class="projects-row">
+          <button class="projects-arrow projects-arrow-prev" type="button"
+                  aria-label="Previous project" aria-controls="projects-deck">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+
         <div class="projects-deck" id="projects-deck" aria-live="polite">
           <article class="project-slide work-glass" aria-roledescription="slide" aria-label="Project 1 of 3">
             <div class="project-num" aria-hidden="true">01</div>
@@ -264,6 +281,12 @@
             </div>
           </article>
         </div>
+
+          <button class="projects-arrow projects-arrow-next" type="button"
+                  aria-label="Next project" aria-controls="projects-deck">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -280,10 +303,10 @@
         <h2 id="concepts-heading" class="visually-hidden">Engineering Capabilities</h2>
 
         <!--
-          Four capabilities, shown one at a time inside the halo. The cycle
-          pauses on hover or focus so the copy can actually be read.
+          Four capabilities, all four at once, banded across the halo. No
+          aria-live: nothing in here changes after load any more.
         -->
-        <div class="concepts-deck" id="concepts-deck" aria-live="polite">
+        <div class="concepts-deck" id="concepts-deck">
           <article class="concept-card liquid-glass">
             <span class="concept-index" aria-hidden="true">01</span>
             <h4>AI &amp; Intelligent Systems</h4>

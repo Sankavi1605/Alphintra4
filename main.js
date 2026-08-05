@@ -88,7 +88,6 @@ if (prefersReducedMotion) {
      setupScrollAnimations — which only fires once the GLTF has resolved. */
   queueMicrotask(setupProjectsCarousel);
   queueMicrotask(setupWorkGlass);
-  queueMicrotask(setupCapabilityCycle);
   queueMicrotask(setupServiceDeck);
 } else {
   initHeroScene();
@@ -113,7 +112,6 @@ if (prefersReducedMotion) {
      setupScrollAnimations — which only fires once the GLTF has resolved. */
   queueMicrotask(setupProjectsCarousel);
   queueMicrotask(setupWorkGlass);
-  queueMicrotask(setupCapabilityCycle);
   queueMicrotask(setupServiceDeck);
 }
 
@@ -152,13 +150,34 @@ function initHeroScene() {
   const PORTRAIT_PULLBACK = 0.6;
   const MAX_CAMERA_Z = 9;
 
+  /*
+   * The other end of the same problem. A short landscape window — a laptop with
+   * two browser toolbars, anything past about 16:9 — gives the hero far less
+   * height than the model was posed for, while the wordmark above it is sized
+   * off vw and so keeps growing. The model ends up filling the frame bottom to
+   * apex with its feet flush against the edge and nothing between it and the
+   * letters.
+   *
+   * Easing the camera back shrinks the model toward the centre of the frame,
+   * which lifts the feet off the bottom edge. Ramped by aspect rather than
+   * applied flat, because at 3:2 and taller the original framing is right.
+   */
+  const WIDE_RAMP_START = 1.3;
+  const WIDE_RAMP_END = 2.3;
+  const WIDE_PULLBACK = 0.2;
+
   function frameCamera() {
     const aspect = window.innerWidth / window.innerHeight;
     camera.aspect = aspect;
-    camera.position.z =
-      aspect >= 1
-        ? BASE_CAMERA_Z
-        : Math.min(MAX_CAMERA_Z, BASE_CAMERA_Z * (1 + (1 / aspect - 1) * PORTRAIT_PULLBACK));
+    if (aspect >= 1) {
+      const t = Math.min(1, Math.max(0, (aspect - WIDE_RAMP_START) / (WIDE_RAMP_END - WIDE_RAMP_START)));
+      camera.position.z = BASE_CAMERA_Z * (1 + t * WIDE_PULLBACK);
+    } else {
+      camera.position.z = Math.min(
+        MAX_CAMERA_Z,
+        BASE_CAMERA_Z * (1 + (1 / aspect - 1) * PORTRAIT_PULLBACK)
+      );
+    }
     camera.updateProjectionMatrix();
   }
   frameCamera();
@@ -241,10 +260,17 @@ function initHeroScene() {
        * the model the rest of the way, so the two occupy the frame in turn
        * instead of fighting over the middle of it.
        *
-       * -2.72 is the floor: one world unit is ~138px at this depth, and any
-       * lower starts cutting the feet off the bottom of the frame.
+       * -2.35, raised again once the wordmark moved to Moonwalk at three quarters
+       * of its old size: shorter caps left the apex 13px clear of them, and the
+       * overlap is wanted. One world unit is ~131px at this depth on a 1920x862
+       * hero, so this lifts the model about 30px and the tip crosses ~17px into
+       * the bottom of the letters. The canvas is z 2 and the wordmark z 1, so it
+       * passes in front. The rest of the lift at
+       * short landscape sizes, where it was worst, comes from the wide-aspect
+       * pullback in frameCamera() rather than from here — the scroll timeline
+       * animates position.y, so it cannot be owned in a resize handler.
        */
-      model.position.y = -2.72;
+      model.position.y = -2.35;
       model.rotation.x = 0.1;
       model.rotation.y = 0;
 
@@ -437,7 +463,19 @@ function setupScrollAnimations(model, model3) {
   if (model3) {
     model3.traverse((child) => {
       if (child.isMesh && child.material) {
-        tl.to(child.material, { opacity: 0.9, duration: 2 }, 2);
+        /*
+         * 0.55, down from 0.9, and envMapIntensity halved with it.
+         *
+         * This is the one place on the page where white copy sits over the model
+         * at full size, and the model wins: its daylit face clipped to white and
+         * no treatment behind the text could recover it. Opacity caps the
+         * composite — the world blends over a near-black scene, so 0.55 puts a
+         * ceiling of ~140 on it — while the envMap term is what was clipping in
+         * the first place, so halving that stops the highlights blowing out
+         * rather than just fading the result.
+         */
+        tl.to(child.material, { opacity: 0.55, duration: 2 }, 2);
+        tl.to(child.material, { envMapIntensity: 2.0, duration: 2 }, 2);
       }
     });
     tl.to(model3.scale, { x: 6.5, y: 6.5, z: 6.5, duration: 5 }, 2);
@@ -445,6 +483,13 @@ function setupScrollAnimations(model, model3) {
   }
 
   // --- "See For Yourself" reveal, scrubbed with the zoom ---
+  /*
+   * The pad leads the copy by a beat and then stays. Tweened separately from
+   * .hole-text on purpose: it used to be a child of it and inherited its
+   * opacity, so at every rest position short of the end of the timeline the pad
+   * was as faint as the text it was supposed to be backing.
+   */
+  tl.to('.hole-scrim', { opacity: 1, duration: 1.2 }, 1.2);
   gsap.set('.hole-text', { scale: 0.5 });
   tl.to('.hole-text', { opacity: 0.3, duration: 1 }, 1.5);
   tl.to('.hole-text', { opacity: 1, scale: 1, duration: 3.5 }, 2.5);
@@ -480,12 +525,20 @@ function setupScrollAnimations(model, model3) {
   /*
    * 1. CAPABILITIES
    *
-   * The heading and the cards are not animated here any more. The heading is
-   * lettered in WebGL and faded in by initCapabilityField's own entrance, and
-   * the cards are owned by setupCapabilityCycle — a scroll-triggered stagger
-   * would set opacity:1 on all four and fight the cross-fade for control of the
-   * same properties. Only the tail below the deck is left.
+   * The heading is still not animated here — it is lettered in WebGL and faded
+   * in by initCapabilityField's own entrance. The four cards are, now that they
+   * are all on screen together: there is no cross-fade left to fight over
+   * opacity, so they come in as a stagger across the row.
+   *
+   * fromTo, so the from-state is written by GSAP rather than sitting in the
+   * stylesheet — the cards stay visible if this script never runs.
    */
+  gsap.fromTo('.concept-card',
+    { opacity: 0, y: 28, filter: 'blur(6px)' },
+    { scrollTrigger: { trigger: '.concepts-deck', start: 'top 82%' },
+      opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, ease: 'power3.out', stagger: 0.12 }
+  );
+
   const at = { trigger: '.concepts-action', start: 'top 90%' };
   reveal('.concepts-action-text', at, { y: 20, blur: 4 }, { duration: 0.6 });
   reveal('.concepts-action .btn-outline', at, { y: 25, scale: 0.9 },
@@ -576,17 +629,21 @@ function setupScrollAnimations(model, model3) {
 function setupProjectsCarousel() {
   const stage = document.querySelector('.projects-deck');
   const slides = gsap.utils.toArray('.project-slide');
+  const prev = document.querySelector('.projects-arrow-prev');
+  const next = document.querySelector('.projects-arrow-next');
   if (!stage || slides.length === 0) return;
 
   /*
-   * The stacked layout and the conveyor only exist above the phone breakpoint
-   * and outside reduced motion; below that the cards flow down the page (see
-   * the matching CSS), and driving x on them there would fight the layout.
+   * Under reduced motion the CSS lifts the cards out of the absolute stack and
+   * lays all three down the page, and hides the arrows with them.
+   *
+   * No breakpoint gate here any more. It used to return below 769px on the
+   * grounds that the cards flow at that width — they do not; only reduced
+   * motion un-stacks them. So on a phone the conveyor never started and the
+   * track showed card 01 for ever, with 02 and 03 stacked invisibly underneath
+   * and unreachable.
    */
-  const stacked = window.matchMedia('(min-width: 769px)');
-  if (prefersReducedMotion || !stacked.matches) return;
-
-  gsap.set(slides, { opacity: 0 });
+  if (prefersReducedMotion) return;
 
   /*
    * Just far enough to be fully clear of the track, plus a little for the blur.
@@ -600,49 +657,124 @@ function setupProjectsCarousel() {
    */
   const travel = () => stage.clientWidth * 0.5 + slides[0].offsetWidth * 0.6;
 
+  const HOLD = 2.6; /* seconds a card sits before the next one is pulled in */
+  const SWEEP = 1.15; /* the unhurried automatic sweep */
+  const STEP = 0.62; /* a click wants an answer sooner than that */
+
+  let current = 0;
   let cycle = null;
+  let timer = null;
+  let held = false;
 
-  function showCard(i) {
-    const card = slides[i];
+  /*
+   * inert, not hidden: all three keep their box because they share one track,
+   * but the two off-stage must not be tab stops — each carries an "Explore
+   * Project" link, and while they were merely at opacity 0 all three were
+   * reachable and announced.
+   */
+  function mark() {
+    slides.forEach((slide, i) => {
+      slide.inert = i !== current;
+      slide.setAttribute('aria-hidden', i === current ? 'false' : 'true');
+    });
+  }
+
+  function schedule() {
+    if (timer) timer.kill();
+    timer = gsap.delayedCall(HOLD, () => go(1, false));
+    if (held) timer.pause();
+  }
+
+  function go(dir, quick) {
+    /*
+     * A click mid-sweep finishes the running one rather than being dropped.
+     * Ignoring it instead makes the arrows feel dead when pressed twice
+     * quickly, and leaves the deck a step behind the clicks.
+     */
+    if (cycle) cycle.progress(1).kill();
+    /*
+     * After that, not before: forcing the running cycle to its end fires its
+     * onComplete, which schedules a fresh advance. Killing the timer first left
+     * that one alive and pending behind the step just requested.
+     */
+    if (timer) timer.kill();
+
+    const from = slides[current];
+    current = (current + dir + slides.length) % slides.length;
+    const to = slides[current];
+    mark();
+
     /* Entering card on top of the one leaving. */
-    stage.appendChild(card);
+    stage.appendChild(to);
 
+    /* Signed by direction, so going back sweeps back the way it came. */
+    const d = quick ? STEP : SWEEP;
     cycle = gsap
-      .timeline()
-      .fromTo(
-        card,
-        { x: travel(), opacity: 0, rotateY: 14, filter: 'blur(8px)' },
-        { x: 0, opacity: 1, rotateY: 0, filter: 'blur(0px)', duration: 1.15, ease: 'power3.out' }
-      )
-      .to(card, { duration: 2.1 })
-      .to(card, {
-        x: -travel(),
-        opacity: 0,
-        rotateY: -14,
-        filter: 'blur(8px)',
-        duration: 1.15,
-        ease: 'power3.in',
-        onStart() {
-          showCard((i + 1) % slides.length);
+      .timeline({
+        onComplete() {
+          cycle = null;
+          schedule();
         },
-      });
+      })
+      .to(
+        from,
+        { x: -travel() * dir, opacity: 0, rotateY: -14 * dir, filter: 'blur(8px)', duration: d, ease: 'power3.in' },
+        0
+      )
+      .fromTo(
+        to,
+        { x: travel() * dir, opacity: 0, rotateY: 14 * dir, filter: 'blur(8px)' },
+        { x: 0, opacity: 1, rotateY: 0, filter: 'blur(0px)', duration: d, ease: 'power3.out' },
+        0
+      );
   }
 
   /*
-   * Paused on the whole deck rather than per card: the pointer has to cross the
-   * card that is leaving to reach the one arriving, and pausing only the hovered
-   * card would leave the other mid-flight.
+   * Hover and focus hold the advance, not the animation.
+   *
+   * The conveyor itself used to be paused, which meant catching it mid-sweep
+   * froze two half-faded cards over each other for as long as the pointer
+   * stayed. Pausing only the timer keeps the promise that matters — the card
+   * you are reading will not leave — and lets whatever is in flight land.
    */
-  const hold = () => cycle && cycle.pause();
+  const hold = () => {
+    held = true;
+    if (timer) timer.pause();
+  };
   const release = () => {
-    if (cycle && !stage.matches(':hover') && !stage.contains(document.activeElement)) cycle.resume();
+    if (stage.matches(':hover') || stage.contains(document.activeElement)) return;
+    held = false;
+    if (timer) timer.resume();
   };
   stage.addEventListener('pointerenter', hold);
   stage.addEventListener('pointerleave', release);
   stage.addEventListener('focusin', hold);
   stage.addEventListener('focusout', release);
 
-  showCard(0);
+  if (prev) prev.addEventListener('click', () => go(-1, true));
+  if (next) next.addEventListener('click', () => go(1, true));
+
+  /*
+   * Left/right on the track itself, so the cards can be stepped without hunting
+   * for the arrows once focus is already inside them.
+   */
+  stage.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      go(1, true);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      go(-1, true);
+    }
+  });
+
+  gsap.set(slides, { opacity: 0 });
+  mark();
+  gsap.fromTo(
+    slides[0],
+    { x: travel(), opacity: 0, rotateY: 14, filter: 'blur(8px)' },
+    { x: 0, opacity: 1, rotateY: 0, filter: 'blur(0px)', duration: SWEEP, ease: 'power3.out', onComplete: schedule }
+  );
 }
 
 /* -------------------------------------------------------------------------
@@ -997,63 +1129,6 @@ function initProjectsField() {
  * ~3.3s each is a 13s round trip, and a card that moves while it is being read
  * is worse than no rotation at all.
  */
-function setupCapabilityCycle() {
-  const deck = document.querySelector('.concepts-deck');
-  const cards = gsap.utils.toArray('.concept-card');
-  if (!deck || cards.length === 0) return;
-
-  /*
-   * Under reduced motion the CSS un-stacks the deck and shows all four down the
-   * page, because a cycle that never advances would leave three of the four
-   * capabilities permanently invisible.
-   */
-  if (prefersReducedMotion) return;
-
-  gsap.set(cards, { opacity: 0 });
-
-  let cycle = null;
-
-  function show(i) {
-    const card = cards[i];
-    /* the entering card on top of the one leaving */
-    deck.appendChild(card);
-    cycle = gsap
-      .timeline()
-      .fromTo(
-        card,
-        { opacity: 0, y: 26, scale: 0.965, filter: 'blur(6px)' },
-        { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.85, ease: 'power3.out' }
-      )
-      .to(card, { duration: 2.4 })
-      .to(card, {
-        opacity: 0,
-        y: -26,
-        scale: 0.965,
-        filter: 'blur(6px)',
-        duration: 0.85,
-        ease: 'power3.in',
-        onStart() {
-          show((i + 1) % cards.length);
-        },
-      });
-  }
-
-  /*
-   * Paused on the deck rather than per card: the cards overlap during the
-   * cross-fade, so pausing only the hovered one would leave the other mid-flight.
-   */
-  const hold = () => cycle && cycle.pause();
-  const release = () => {
-    if (cycle && !deck.matches(':hover') && !deck.contains(document.activeElement)) cycle.resume();
-  };
-  deck.addEventListener('pointerenter', hold);
-  deck.addEventListener('pointerleave', release);
-  deck.addEventListener('focusin', hold);
-  deck.addEventListener('focusout', release);
-
-  show(0);
-}
-
 /**
  * The liquid in the glass: the specular pool tracks the pointer over each card
  * and drifts on its own when idle, so the surface never looks like a static
@@ -2720,6 +2795,23 @@ function initAboutUsField() {
     const pos = [];
     const uv = [];
     const idx = [];
+    /*
+     * The width vector has to vary continuously along the path.
+     *
+     * It used to be flipped per-vertex with `if (dir.y < 0) dir.negate()` to
+     * keep uv.y = 1 on the geometric top edge. But dir.y is T.x, so that test
+     * changes sign exactly where the path stops heading right and folds back —
+     * the hairpin. One vertex ring there came out mirrored against its
+     * neighbour, so the quads spanning the seam were built as bow-ties and the
+     * stroke looked torn in two at the turn.
+     *
+     * The raw perpendicular is already continuous, since the tangent of a
+     * CatmullRom curve is. Seed the run so uv.y = 1 starts as the top edge and
+     * then only correct an actual reversal, which a tangent sampled at 220
+     * segments will not produce — the guard is there for a degenerate tangent,
+     * not for the turn.
+     */
+    let prevDir = null;
     for (let i = 0; i <= SEGS; i++) {
       const t = i / SEGS;
       const p = PATH.getPoint(t);
@@ -2727,7 +2819,12 @@ function initAboutUsField() {
       /* 2D perpendicular in the view plane — the ribbon always faces
          the camera flat, like the long-exposure artwork it mimics */
       const dir = new THREE.Vector3(-T.y, T.x, 0).normalize();
-      if (dir.y < 0) dir.negate(); /* uv.y = 1 is always the top edge */
+      if (prevDir === null) {
+        if (dir.y < 0) dir.negate();
+      } else if (dir.dot(prevDir) < 0) {
+        dir.negate();
+      }
+      prevDir = dir.clone();
       const half = (widthAt(t) * widthMul) / 2;
       for (let j = 0; j <= COLS; j++) {
         const v = j / COLS;
