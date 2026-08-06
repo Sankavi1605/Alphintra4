@@ -169,7 +169,17 @@ export function initHorizonField(selector = '#horizon-field') {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    /*
+     * No multisampling: the sphere's edge is antialiased analytically inside
+     * the shader (see the sub-pixel width above) and the atmosphere is a
+     * closed-form falloff, so there is no geometric edge for MSAA to work on —
+     * it was costing a 4x colour and depth buffer for nothing. Same call the
+     * home page's fields make.
+     */
+    renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Horizon field: no WebGL context', error);
     return;
@@ -181,7 +191,8 @@ export function initHorizonField(selector = '#horizon-field') {
    * highlights through an sRGB transfer on top and blow the dawn out to white.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  /* 1.5, matching the home page's fields — see the note there. */
+  renderer.setPixelRatio(pixelRatioFor(1.5, 1.25));
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
 
@@ -373,8 +384,27 @@ export function initHorizonField(selector = '#horizon-field') {
     renderer.render(planetScene, bgCam);
   }
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     const t = clock.getElapsedTime();
 
     starUni.uTime.value = t;
@@ -415,15 +445,58 @@ export function initHorizonField(selector = '#horizon-field') {
     tl.to(bgUni.uGlow, { value: 0.9, duration: 5, repeat: -1, yoyo: true, ease: 'sine.inOut' }, 5);
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   new IntersectionObserver(
@@ -432,6 +505,12 @@ export function initHorizonField(selector = '#horizon-field') {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);

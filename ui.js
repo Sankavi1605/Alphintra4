@@ -101,31 +101,6 @@ function initNavAutoHide() {
 /* -------------------------------------------------------------------------
  * FAQ accordion — real buttons, so keyboard and screen readers work
  * ---------------------------------------------------------------------- */
-function initFaq() {
-  const items = document.querySelectorAll('.faq-item');
-  if (!items.length) return;
-
-  items.forEach((item) => {
-    const button = item.querySelector('.faq-question');
-    const answer = item.querySelector('.faq-answer');
-    if (!button || !answer) return;
-
-    button.addEventListener('click', () => {
-      const willOpen = !item.classList.contains('active');
-
-      items.forEach((other) => {
-        other.classList.remove('active');
-        other.querySelector('.faq-question')?.setAttribute('aria-expanded', 'false');
-      });
-
-      if (willOpen) {
-        item.classList.add('active');
-        button.setAttribute('aria-expanded', 'true');
-      }
-    });
-  });
-}
-
 /* -------------------------------------------------------------------------
  * Scroll to top
  * ---------------------------------------------------------------------- */
@@ -136,103 +111,6 @@ function initScrollTop() {
   button.addEventListener('click', () => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
-  });
-}
-
-/* -------------------------------------------------------------------------
- * Contact form
- *
- * The site is static, so there is no server to post to. The form validates
- * in the browser and then hands off to the visitor's mail client with the
- * message pre-filled. Point `data-endpoint` at a real handler (Formspree,
- * a Worker, an API route) and it will POST there instead.
- * ---------------------------------------------------------------------- */
-function initContactForm() {
-  const form = document.querySelector('#contact-form');
-  if (!form) return;
-
-  const status = form.querySelector('.form-status');
-  const submitButton = form.querySelector('button[type="submit"]');
-  const endpoint = form.dataset.endpoint;
-
-  const fieldError = (field) => form.querySelector(`#${field.id}-error`);
-
-  const validate = (field) => {
-    const error = fieldError(field);
-    const valid = field.checkValidity();
-
-    field.setAttribute('aria-invalid', String(!valid));
-    if (error) error.textContent = valid ? '' : field.dataset.errorMessage || field.validationMessage;
-    return valid;
-  };
-
-  const fields = Array.from(form.querySelectorAll('input[required], textarea[required]'));
-
-  fields.forEach((field) => {
-    // Only nag after the visitor has left the field once.
-    field.addEventListener('blur', () => validate(field));
-    field.addEventListener('input', () => {
-      if (field.getAttribute('aria-invalid') === 'true') validate(field);
-    });
-  });
-
-  const setStatus = (message, state) => {
-    if (!status) return;
-    status.textContent = message;
-    status.dataset.state = state;
-  };
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-
-    // Honeypot: real people never fill a field they cannot see.
-    if (form.querySelector('#company-website')?.value) return;
-
-    const allValid = fields.map(validate).every(Boolean);
-    if (!allValid) {
-      setStatus('Please correct the highlighted fields and try again.', 'error');
-      fields.find((field) => field.getAttribute('aria-invalid') === 'true')?.focus();
-      return;
-    }
-
-    const data = new FormData(form);
-    const name = String(data.get('name') || '').trim();
-    const email = String(data.get('email') || '').trim();
-    const message = String(data.get('message') || '').trim();
-
-    if (endpoint) {
-      submitButton.disabled = true;
-      setStatus('Sending your message…', 'pending');
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { Accept: 'application/json' },
-          body: data,
-        });
-        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-        form.reset();
-        setStatus('Thanks — your message is on its way. We reply within one business day.', 'success');
-      } catch {
-        setStatus(
-          'Something went wrong sending that. Please email contact@alphintra.com directly.',
-          'error'
-        );
-      } finally {
-        submitButton.disabled = false;
-      }
-      return;
-    }
-
-    const subject = `Project enquiry from ${name}`;
-    const body = `${message}\n\n—\n${name}\n${email}`;
-    window.location.href = `mailto:contact@alphintra.com?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
-
-    setStatus(
-      'Opening your email app with the message ready to send. If nothing happens, write to contact@alphintra.com.',
-      'success'
-    );
   });
 }
 
@@ -390,9 +268,7 @@ function initYear() {
 export function initUI() {
   initNav();
   initNavAutoHide();
-  initFaq();
   initScrollTop();
-  initContactForm();
   initSpotlights();
   initYear();
 }

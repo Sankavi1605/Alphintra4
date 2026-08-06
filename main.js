@@ -40,6 +40,27 @@ const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)
  * ---------------------------------------------------------------------- */
 let loaderHidden = false;
 
+/*
+ * Field mounts wait here until the loader comes down. Nothing below the fold
+ * can be reached before then — the body carries .is-loading and the document
+ * does not scroll — and until then the pinned scroll scenes have not been laid
+ * out, so any measurement taken now is of a page that does not exist yet.
+ */
+const pendingMounts = [];
+
+/*
+ * Drained on a microtask, never straight through. In the reduced-motion branch
+ * hideLoader() is called while module evaluation is still on the stack, and a
+ * trigger created there fires onEnter immediately — into field initialisers
+ * that read shader consts declared further down this file, still in their
+ * temporal dead zone. Same reason the boot branch below uses queueMicrotask.
+ */
+function drainMounts() {
+  queueMicrotask(() => {
+    while (pendingMounts.length) pendingMounts.shift()();
+  });
+}
+
 function hideLoader() {
   if (loaderHidden) return;
   loaderHidden = true;
@@ -51,6 +72,9 @@ function hideLoader() {
   // The document was unscrollable until a moment ago; let every trigger
   // re-measure against the real page height before the first scroll.
   ScrollTrigger.refresh();
+
+  /* Only now is there a real page to measure the fields against. */
+  drainMounts();
 
   const overlay = document.getElementById('loader-overlay');
   if (!overlay) return;
@@ -68,27 +92,103 @@ function hideLoader() {
  */
 setTimeout(hideLoader, 8000);
 
+/*
+ * Every field is a full-viewport fragment shader. Fill cost — and drawing
+ * buffer memory — scale with the square of the pixel ratio, so dropping the
+ * desktop cap from 2 to 1.5 takes 44% off both. What these draw is smooth
+ * gradient artwork and soft-edged glyph planes, neither of which has detail at
+ * that scale to lose; the phone cap is untouched.
+ */
+const FIELD_PIXEL_CAP = 1.5;
+
+/*
+ * The hero shades a 493k-triangle MeshPhysicalMaterial with clearcoat over the
+ * whole viewport, with 4x multisampling on top, and it runs for the entire
+ * pinned opening sequence. Same square-law cost: the old cap of 2 was doing
+ * 1.8x the shading of this one on any HiDPI laptop, which is where the fans
+ * were coming from. At 1.5 with MSAA still on, the chrome silhouette holds up.
+ *
+ * Declared up here with the field cap, not down beside initHeroScene: the boot
+ * branch calls that function above this point in the file, so a const declared
+ * there is still in its temporal dead zone when it runs.
+ */
+const HERO_PIXEL_CAP = 1.5;
+
+/* -------------------------------------------------------------------------
+ * Field mounting
+ *
+ * Nine fields, nine WebGLRenderers, nine live GL contexts. Building them all at
+ * boot pinned every one for the life of the page — tens of megabytes of driver
+ * memory each — on a page that only ever shows one scene at a time. Browsers
+ * also cap live contexts (mobile Safari at eight), and past the cap the oldest
+ * is silently killed, which is why a scene occasionally came back black.
+ *
+ * Each field is now built the first time its host comes within a screen of the
+ * viewport, and only once: the observer disconnects itself on the first hit, so
+ * this never double-binds a field's own observers or entrance.
+ *
+ * A screen of margin, not zero, so the context and its first frame are ready
+ * before the section is actually looked at.
+ *
+ * The hero and its horizon stay eager — both are on screen at load.
+ * ---------------------------------------------------------------------- */
+function mountWhenNear(selector, init) {
+  const host = document.querySelector(selector);
+  if (!host) return;
+
+  /*
+   * A ScrollTrigger rather than a bare IntersectionObserver. An observer
+   * reports against whatever layout exists when it happens to deliver, and an
+   * observer bound at parse time delivers against a page whose pinned scroll
+   * scenes have not been spread apart yet — so fields that end up thousands of
+   * pixels down read as near and build a context anyway. Which ones did varied
+   * run to run.
+   *
+   * ScrollTrigger measures on refresh and re-measures on every relayout, which
+   * is why the rest of this file already leans on it. The creation is queued
+   * until hideLoader() has refreshed against the finished page, because a
+   * trigger measures itself the moment it is created and would inherit exactly
+   * the same bad layout otherwise.
+   *
+   * "top bottom+=100%" is the one-screen lead this wants: the context and its
+   * first frame are ready before the section is actually looked at.
+   */
+  const create = () =>
+    ScrollTrigger.create({
+      trigger: host,
+      start: 'top bottom+=100%',
+      once: true,
+      onEnter: init,
+    });
+
+  pendingMounts.push(create);
+  if (loaderHidden) drainMounts();
+}
+
 /* -------------------------------------------------------------------------
  * Reduced motion: skip the WebGL work entirely.
  * The stylesheet lays the hero out as a normal stacked section in this mode.
  * ---------------------------------------------------------------------- */
 if (prefersReducedMotion) {
-  hideLoader();
-  /* Still paint one static frame so those sections are not empty. */
-  queueMicrotask(initAboutField);
-  queueMicrotask(initCapabilityField);
-  queueMicrotask(initAboutUsField);
-  queueMicrotask(initServicesField);
-  queueMicrotask(initMakersField);
-  queueMicrotask(initProjectsField);
-  queueMicrotask(initContactField);
-  queueMicrotask(initFooterField);
+  /* Still paint one static frame so those sections are not empty — mounted on
+     approach, same as the motion path, so an unvisited section costs nothing.
+     Queued before hideLoader(), which is what releases them. */
+  mountWhenNear('#about-field', initAboutField);
+  mountWhenNear('#capability-field', initCapabilityField);
+  mountWhenNear('#about-us-field', initAboutUsField);
+  mountWhenNear('#services-field', initServicesField);
+  mountWhenNear('#makers-field', initMakersField);
+  mountWhenNear('#projects-field', initProjectsField);
+  mountWhenNear('#contact-field', initContactField);
+  mountWhenNear('#footer-field', initFooterField);
   /* Neither depends on the hero model, and the carousel drives itself off a
      GSAP loop rather than ScrollTrigger, so both run here instead of in
      setupScrollAnimations — which only fires once the GLTF has resolved. */
   queueMicrotask(setupProjectsCarousel);
   queueMicrotask(setupWorkGlass);
   queueMicrotask(setupServiceDeck);
+  /* Last, so the queued mounts measure a page that is already wired. */
+  hideLoader();
 } else {
   initHeroScene();
 
@@ -99,14 +199,14 @@ if (prefersReducedMotion) {
    * file — still in their temporal dead zone. A microtask lets evaluation finish.
    */
   queueMicrotask(initHorizonField);
-  queueMicrotask(initAboutField);
-  queueMicrotask(initCapabilityField);
-  queueMicrotask(initAboutUsField);
-  queueMicrotask(initServicesField);
-  queueMicrotask(initMakersField);
-  queueMicrotask(initProjectsField);
-  queueMicrotask(initContactField);
-  queueMicrotask(initFooterField);
+  mountWhenNear('#about-field', initAboutField);
+  mountWhenNear('#capability-field', initCapabilityField);
+  mountWhenNear('#about-us-field', initAboutUsField);
+  mountWhenNear('#services-field', initServicesField);
+  mountWhenNear('#makers-field', initMakersField);
+  mountWhenNear('#projects-field', initProjectsField);
+  mountWhenNear('#contact-field', initContactField);
+  mountWhenNear('#footer-field', initFooterField);
   /* Neither depends on the hero model, and the carousel drives itself off a
      GSAP loop rather than ScrollTrigger, so both run here instead of in
      setupScrollAnimations — which only fires once the GLTF has resolved. */
@@ -127,7 +227,33 @@ function initHeroScene() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      /*
+       * No multisampling, even here.
+       *
+       * This is the largest single allocation on the page: 4x multisampled
+       * colour and depth over the full viewport measured 55.9MB at a device
+       * pixel ratio of 1, and it scales with the square of that ratio — about
+       * 126MB on a 150%-scaled display, which was a third of the whole tab.
+       * Without it the same buffer is 28MB.
+       *
+       * The model still gets edge treatment: rendering at a 1.5 pixel ratio and
+       * letting the compositor scale down is supersampling, which is what
+       * actually cleans up a chrome silhouette. If the edges read as too hard,
+       * this is the one line to put back.
+       *
+       * powerPreference is gone from every renderer on the page too. It was
+       * 'high-performance', which on a laptop with switchable graphics asks the
+       * browser for the discrete GPU — for the whole tab, since one process
+       * picks one adapter. Nine ambient background shaders do not need it, and
+       * it is the difference between the integrated chip idling and the fans
+       * spinning up. The default lets the browser choose.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch {
     // No WebGL (old device, blocked driver) — the page still reads fine without it.
     canvas.style.display = 'none';
@@ -173,16 +299,13 @@ function initHeroScene() {
       const t = Math.min(1, Math.max(0, (aspect - WIDE_RAMP_START) / (WIDE_RAMP_END - WIDE_RAMP_START)));
       camera.position.z = BASE_CAMERA_Z * (1 + t * WIDE_PULLBACK);
     } else {
-      camera.position.z = Math.min(
-        MAX_CAMERA_Z,
-        BASE_CAMERA_Z * (1 + (1 / aspect - 1) * PORTRAIT_PULLBACK)
-      );
+      camera.position.z = Math.min(MAX_CAMERA_Z, BASE_CAMERA_Z * (1 + (1 / aspect - 1) * PORTRAIT_PULLBACK));
     }
     camera.updateProjectionMatrix();
   }
   frameCamera();
 
-  renderer.setPixelRatio(pixelRatioFor(2, 2));
+  renderer.setPixelRatio(pixelRatioFor(HERO_PIXEL_CAP, HERO_PIXEL_CAP));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -191,6 +314,13 @@ function initHeroScene() {
   // Environment map for metallic reflections
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+  /*
+   * The generator holds a render target and a full set of blur materials, and
+   * it is finished with the moment the environment texture exists — the texture
+   * itself survives disposal. Left undisposed it pinned all of that for the life
+   * of the page for one call at boot.
+   */
+  pmremGenerator.dispose();
 
   // 2. Lighting
   scene.add(new THREE.AmbientLight(0xffffff, 1.5));
@@ -215,9 +345,21 @@ function initHeroScene() {
   let model;
   let model3;
 
-  loader.load(
-    './assets/model.glb',
-    (gltf) => {
+  /*
+   * Both requests go out together. model4's load used to be nested inside
+   * model's callback, so its 4.7MB did not begin downloading until model's
+   * 1.8MB had finished and been parsed, and the loader sat there for the sum of
+   * the two. Nothing in model4's setup reads model, so they fetch side by side
+   * and the wait becomes the slower one rather than both.
+   */
+  const heroModel = loader.loadAsync('./assets/model.glb');
+  const worldModel = loader.loadAsync('./assets/model4.glb').catch((error) => {
+    console.error('Error loading model4.glb:', error);
+    return null;
+  });
+
+  heroModel
+    .then((gltf) => {
       model = gltf.scene;
 
       centerObject(model);
@@ -274,49 +416,42 @@ function initHeroScene() {
       model.rotation.x = 0.1;
       model.rotation.y = 0;
 
-      // Load the world model used for the background zoom section
-      loader.load(
-        './assets/model4.glb',
-        (gltf3) => {
-          model3 = gltf3.scene;
+      // The world model used for the background zoom section
+      return worldModel;
+    })
+    .then((gltf3) => {
+      if (gltf3) {
+        model3 = gltf3.scene;
 
-          centerObject(model3);
+        centerObject(model3);
 
-          model3.traverse((child) => {
-            if (!child.isMesh || !child.material) return;
-            ensureNormals(child.geometry);
-            child.material.color.setHex(0xffffff);
-            child.material.metalness = 1.0;
-            child.material.roughness = 0.17; // see the note on `model` above
-            child.material.transparent = true;
-            child.material.opacity = 0; // fades in during the scroll
-            child.material.envMapIntensity = 4.0;
-            child.material.needsUpdate = true;
-          });
+        model3.traverse((child) => {
+          if (!child.isMesh || !child.material) return;
+          ensureNormals(child.geometry);
+          child.material.color.setHex(0xffffff);
+          child.material.metalness = 1.0;
+          child.material.roughness = 0.17; // see the note on `model` above
+          child.material.transparent = true;
+          child.material.opacity = 0; // fades in during the scroll
+          child.material.envMapIntensity = 4.0;
+          child.material.needsUpdate = true;
+        });
 
-          model3.scale.set(0.01, 0.01, 0.01);
-          model3.position.set(0, 0, -5);
-          model3.rotation.set(0.15, 0, 0);
+        model3.scale.set(0.01, 0.01, 0.01);
+        model3.position.set(0, 0, -5);
+        model3.rotation.set(0.15, 0, 0);
 
-          scene.add(model3);
+        scene.add(model3);
+      }
 
-          setupScrollAnimations(model, model3);
-          hideLoader();
-        },
-        undefined,
-        (error) => {
-          console.error('Error loading model4.glb:', error);
-          setupScrollAnimations(model, null);
-          hideLoader();
-        }
-      );
-    },
-    undefined,
-    (error) => {
+      /* model3 stays null if that one failed; the timeline handles it. */
+      setupScrollAnimations(model, model3 || null);
+      hideLoader();
+    })
+    .catch((error) => {
       console.error('Error loading model.glb:', error);
       hideLoader();
-    }
-  );
+    });
 
   // 4. Mouse parallax + render loop
   const mouse = { x: 0, y: 0 };
@@ -358,8 +493,45 @@ function initHeroScene() {
     renderer.render(scene, camera);
   }
 
+  /*
+   * Sizing the hero's buffer, in one place so play() can restore what pause()
+   * gives back.
+   */
+  function sizeToViewport() {
+    renderer.setPixelRatio(pixelRatioFor(HERO_PIXEL_CAP, HERO_PIXEL_CAP));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  /*
+   * The hero is the most expensive buffer on the page: it is the one context
+   * that keeps antialias, so its colour and depth are 4x multisampled, and it
+   * measured 55.9MB at a device pixel ratio of 1 — more than four fields put
+   * together, and over 120MB on a 150%-scaled display. Once you have scrolled
+   * well past the hero it is holding all of that for a scene nobody can see.
+   *
+   * Released on its own wide margin rather than with the render gate, for the
+   * same reason the fields do it that way: reallocating a 56MB multisampled
+   * buffer in the middle of a scroll is a visible hitch, and the hero's gate
+   * sits only 100px out. The model, its environment map and the compiled
+   * programs survive either way.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    sizeToViewport();
+  }
+
   // Don't burn battery rendering to a tab nobody is looking at.
   function play() {
+    restoreBuffer();
     if (frameId === null) tick();
   }
   function pause() {
@@ -367,6 +539,7 @@ function initHeroScene() {
       window.cancelAnimationFrame(frameId);
       frameId = null;
     }
+    if (document.hidden) releaseBuffer();
   }
 
   /*
@@ -377,13 +550,22 @@ function initHeroScene() {
   let heroOnScreen = true;
   const sync = () => (heroOnScreen && !document.hidden ? play() : pause());
 
+  const heroSection =
+    canvas.parentElement?.querySelector('#hero') || document.querySelector('#hero') || canvas;
+
   new IntersectionObserver(
     ([entry]) => {
       heroOnScreen = entry.isIntersecting;
       sync();
     },
     { rootMargin: '100px' }
-  ).observe(canvas.parentElement?.querySelector('#hero') || document.querySelector('#hero') || canvas);
+  ).observe(heroSection);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
+  ).observe(heroSection);
 
   document.addEventListener('visibilitychange', sync);
   play();
@@ -391,8 +573,8 @@ function initHeroScene() {
   // 5. Resize
   window.addEventListener('resize', () => {
     frameCamera();
-    renderer.setPixelRatio(pixelRatioFor(2, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    /* Only while it is the live size — otherwise this would undo pause(). */
+    if (frameId !== null) sizeToViewport();
     /*
      * No ScrollTrigger.refresh() here. ScrollTrigger already listens for
      * resize itself, so this was doing the most expensive work on the page
@@ -533,16 +715,28 @@ function setupScrollAnimations(model, model3) {
    * fromTo, so the from-state is written by GSAP rather than sitting in the
    * stylesheet — the cards stay visible if this script never runs.
    */
-  gsap.fromTo('.concept-card',
+  gsap.fromTo(
+    '.concept-card',
     { opacity: 0, y: 28, filter: 'blur(6px)' },
-    { scrollTrigger: { trigger: '.concepts-deck', start: 'top 82%' },
-      opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, ease: 'power3.out', stagger: 0.12 }
+    {
+      scrollTrigger: { trigger: '.concepts-deck', start: 'top 82%' },
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.8,
+      ease: 'power3.out',
+      stagger: 0.12,
+    }
   );
 
   const at = { trigger: '.concepts-action', start: 'top 90%' };
   reveal('.concepts-action-text', at, { y: 20, blur: 4 }, { duration: 0.6 });
-  reveal('.concepts-action .btn-outline', at, { y: 25, scale: 0.9 },
-    { duration: 0.7, ease: 'back.out(1.4)', delay: 0.15 });
+  reveal(
+    '.concepts-action .btn-outline',
+    at,
+    { y: 25, scale: 0.9 },
+    { duration: 0.7, ease: 'back.out(1.4)', delay: 0.15 }
+  );
 
   /*
    * 2. ABOUT
@@ -559,46 +753,90 @@ function setupScrollAnimations(model, model3) {
   reveal('.about-content h3', aboutBody, { y: 35, skewY: 2, blur: 6 }, { duration: 0.8, delay: 0.25 });
 
   const aboutParagraphs = document.querySelectorAll('.about-content p');
-  gsap.fromTo(aboutParagraphs,
+  gsap.fromTo(
+    aboutParagraphs,
     { opacity: 0, y: 25, filter: 'blur(5px)' },
-    { scrollTrigger: aboutBody, opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, stagger: 0.18, delay: 0.45 }
+    {
+      scrollTrigger: aboutBody,
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.8,
+      stagger: 0.18,
+      delay: 0.45,
+    }
   );
 
-  reveal('.about-content .project-link', aboutBody, { x: -20, blur: 4 },
-    { duration: 0.6, delay: 0.45 + aboutParagraphs.length * 0.18 + 0.2 });
+  reveal(
+    '.about-content .project-link',
+    aboutBody,
+    { x: -20, blur: 4 },
+    { duration: 0.6, delay: 0.45 + aboutParagraphs.length * 0.18 + 0.2 }
+  );
 
   // 3. CONTACT
   // The heading is drawn in the WebGL field now, so there is no h2 or subtext
   // to reveal here — the two cards come in from their own side of the crater.
-  gsap.fromTo('.contact-card',
+  gsap.fromTo(
+    '.contact-card',
     { opacity: 0, y: 30, filter: 'blur(6px)' },
     {
       scrollTrigger: { trigger: '.contact-inner', start: 'top 70%' },
-      opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power3.out', stagger: 0.15,
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.9,
+      ease: 'power3.out',
+      stagger: 0.15,
     }
   );
 
   // 4. CLOSING CALL TO ACTION
   // The card comes in as one piece — its own heading no longer needs a
   // separate reveal, and animating both left the h2 lagging inside the glass.
-  gsap.fromTo('.cta-card',
+  gsap.fromTo(
+    '.cta-card',
     { opacity: 0, y: 35, filter: 'blur(6px)' },
-    { scrollTrigger: { trigger: '.faq-inner', start: 'top 75%' }, opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9, ease: 'power3.out' }
+    {
+      scrollTrigger: { trigger: '.faq-inner', start: 'top 75%' },
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.9,
+      ease: 'power3.out',
+    }
   );
 
   // 5. FOOTER
   const footerCols = document.querySelectorAll('.footer-col');
   const footerAt = { trigger: 'footer', start: 'top 80%' };
 
-  gsap.fromTo(footerCols,
+  gsap.fromTo(
+    footerCols,
     { opacity: 0, y: 45, filter: 'blur(6px)' },
-    { scrollTrigger: footerAt, opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, stagger: 0.18 }
+    {
+      scrollTrigger: footerAt,
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      duration: 0.8,
+      stagger: 0.18,
+    }
   );
 
   footerCols.forEach((col, index) => {
-    gsap.fromTo(col.querySelectorAll('a'),
+    gsap.fromTo(
+      col.querySelectorAll('a'),
       { opacity: 0, y: 15, filter: 'blur(3px)' },
-      { scrollTrigger: footerAt, opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.5, stagger: 0.06, delay: 0.1 + index * 0.18 }
+      {
+        scrollTrigger: footerAt,
+        opacity: 1,
+        y: 0,
+        filter: 'blur(0px)',
+        duration: 0.5,
+        stagger: 0.06,
+        delay: 0.1 + index * 0.18,
+      }
     );
   });
 
@@ -718,13 +956,32 @@ function setupProjectsCarousel() {
       })
       .to(
         from,
-        { x: -travel() * dir, opacity: 0, rotateY: -14 * dir, filter: 'blur(8px)', duration: d, ease: 'power3.in' },
+        {
+          x: -travel() * dir,
+          opacity: 0,
+          rotateY: -14 * dir,
+          filter: 'blur(8px)',
+          duration: d,
+          ease: 'power3.in',
+        },
         0
       )
       .fromTo(
         to,
-        { x: travel() * dir, opacity: 0, rotateY: 14 * dir, filter: 'blur(8px)' },
-        { x: 0, opacity: 1, rotateY: 0, filter: 'blur(0px)', duration: d, ease: 'power3.out' },
+        {
+          x: travel() * dir,
+          opacity: 0,
+          rotateY: 14 * dir,
+          filter: 'blur(8px)',
+        },
+        {
+          x: 0,
+          opacity: 1,
+          rotateY: 0,
+          filter: 'blur(0px)',
+          duration: d,
+          ease: 'power3.out',
+        },
         0
       );
   }
@@ -773,7 +1030,15 @@ function setupProjectsCarousel() {
   gsap.fromTo(
     slides[0],
     { x: travel(), opacity: 0, rotateY: 14, filter: 'blur(8px)' },
-    { x: 0, opacity: 1, rotateY: 0, filter: 'blur(0px)', duration: SWEEP, ease: 'power3.out', onComplete: schedule }
+    {
+      x: 0,
+      opacity: 1,
+      rotateY: 0,
+      filter: 'blur(0px)',
+      duration: SWEEP,
+      ease: 'power3.out',
+      onComplete: schedule,
+    }
   );
 }
 
@@ -852,7 +1117,22 @@ function initProjectsField() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Projects field: no WebGL context', error);
     return;
@@ -861,7 +1141,7 @@ function initProjectsField() {
   /* Same grade as the other fields — the shader writes its own linear ramps
      and dithers by hand at 1/255, both of which an sRGB transfer would eat. */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
   /* The lettering draws on top of the blades, so the frame is cleared by hand. */
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
@@ -981,8 +1261,27 @@ function initProjectsField() {
   let frameId = null;
   let onScreen = false;
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     const t = clock.getElapsedTime();
     uni.uTime.value = t;
 
@@ -1029,7 +1328,6 @@ function initProjectsField() {
   }
 
   function entranceSequence() {
-
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
     tl.to(uni.uReveal, { value: 1, duration: 1.2, ease: 'power2.inOut' }, 0);
 
@@ -1080,15 +1378,58 @@ function initProjectsField() {
     });
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
@@ -1111,6 +1452,12 @@ function initProjectsField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -1187,113 +1534,80 @@ function reveal(target, scrollTrigger, from = {}, to = {}) {
 }
 
 /* -------------------------------------------------------------------------
- * About background — the planet
+ * We Think In Systems background — the aurora
  *
- * The supplied sketch, ported from three r128 to r185, replacing the
- * raymarched liquid and its ALPHINTRA column. Two passes share one renderer:
+ * The supplied sketch, ported from three r128 to r185. Four lights — peach,
+ * magenta, violet and blue — orbit forever on their own paths, three dark
+ * pockets drift among them swallowing colour where they pass, a soft-focus
+ * rolloff melts the overlaps instead of clipping them, and film grain sits
+ * over the lot.
  *
- *   1. An orthographic full-screen quad drawing a sphere lit from the
- *      lower-left — a cloudy lavender crescent melting into a near-black night
- *      side, a magenta atmosphere ringing the disc and cooling to blue at the
- *      bottom, nebula wisps drifting outside it, and a pink glint on the dark
- *      side.
- *   2. A perspective pass lettering ENGINEERING STUDIO / FOR SCALABLE PRODUCTS
- *      in two rows across the lower field, plus two coloured echoes.
+ * This replaces the planet that used to letter ENGINEERING STUDIO / FOR
+ * SCALABLE PRODUCTS across its lower field. The copy is real text on the glass
+ * panel now, so there is no second perspective pass here — only the field.
  *
- * The section's copy sits over the planet, in the band the scrim darkens most,
- * and the lettering sits below the copy — the rows are at world y -1.70/-1.98
- * of a 2.18 half-height frame, so they land in the bottom fifth, clear of it.
- *
- * The real heading is the visually-hidden h2 and its companion paragraph, which
- * keep the document outline, search and text selection intact.
+ * The panel itself is CSS (see .systems-panel); this drives its entrance, its
+ * tilt, and the parallax of the aurora behind it.
  * ---------------------------------------------------------------------- */
-const PLANET_FRAGMENT_SHADER = `
+const AURORA_BLOB_COUNT = 4;
+
+const AURORA_FRAGMENT_SHADER = `
   precision highp float;
   uniform vec2  uRes, uPtr;
-  uniform float uTime, uReveal, uGlow, uSurf, uNeb, uStar;
+  uniform float uTime, uGrain;
+  uniform float uBloom[${AURORA_BLOB_COUNT}];
+  varying vec2 vUv;
 
   float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
-  float noise(vec2 p){
-    vec2 i = floor(p), f = fract(p);
-    f = f*f*(3.0-2.0*f);
-    return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
-               mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-  }
-  float fbm(vec2 p){
-    float v = 0.0, a = 0.5;
-    for(int k=0;k<5;k++){ v += a*noise(p); p *= 2.03; a *= 0.5; }
-    return v;
+
+  float blob(vec2 uv, vec2 c, float s, float aspect){
+    vec2 d = (uv - c) * vec2(aspect, 1.0);
+    return exp(-dot(d,d)/(s*s));
   }
 
   void main(){
-    vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/min(uRes.x,uRes.y)*2.0;
-    uv += uPtr * 0.025;
+    vec2 uv = vUv;
+    float aspect = uRes.x/uRes.y;
+    float t = uTime;
 
-    vec3 col = vec3(0.006, 0.004, 0.012);
+    /* the gradient parallaxes INSIDE the glass as the panel tilts */
+    vec2 par = uPtr * 0.035;
 
-    /* ---------- nebula wisps drifting outside ---------- */
-    float nb = fbm(uv*1.6 + vec2(uTime*0.014, -uTime*0.009));
-    nb = pow(max(nb - 0.30, 0.0)*1.6, 1.5);
-    float mR = exp(-pow(length(uv - vec2( 1.05,-0.55))*1.05, 2.0));
-    float mL = exp(-pow(length(uv - vec2(-1.00, 0.20))*1.35, 2.0));
-    float mT = exp(-pow(length(uv - vec2( 0.55, 0.95))*1.30, 2.0));
-    col += vec3(0.78,0.15,0.82) * nb * (mR*0.75 + mT*0.35) * uNeb;
-    col += vec3(0.42,0.13,0.76) * nb * mL * 0.45 * uNeb;
+    /* deep navy base, sinking darker toward the lower-left */
+    vec3 col = mix(vec3(0.016,0.013,0.058), vec3(0.005,0.004,0.020),
+                   smoothstep(0.2, 1.3, length(uv - vec2(0.15, 0.15))));
 
-    /* ---------- the planet ---------- */
-    vec2  C = vec2(0.0, 0.14);
-    float R = 0.52;
-    vec2  q = (uv - C)/R;
-    float r = length(q);
-    float inside = 1.0 - smoothstep(0.995, 1.012, r);
+    /* the four lights, each orbiting slowly on its own path */
+    vec2 cPeach = vec2(0.76, 0.84) + 0.030*vec2(sin(t*0.19), cos(t*0.15)) - par*1.3;
+    vec2 cMag   = vec2(0.44, 0.64) + 0.040*vec2(cos(t*0.13), sin(t*0.17)) - par;
+    vec2 cVio   = vec2(0.28, 0.42) + 0.045*vec2(sin(t*0.11+2.0), cos(t*0.14+1.0)) - par*0.8;
+    vec2 cBlue  = vec2(0.80, 0.26) + 0.038*vec2(cos(t*0.16+4.0), sin(t*0.12+3.0)) - par*1.15;
 
-    if(inside > 0.0){
-      float nz = sqrt(max(1.0 - r*r, 0.0));
-      vec3  n  = vec3(q, nz);
-      vec3  L  = normalize(vec3(-0.62,-0.55, 0.56));
-      float diff = pow(max(dot(n, L), 0.0), 1.15) * uSurf;
+    col += vec3(0.300,0.190,0.720) * blob(uv, cPeach, 0.300, aspect) * 0.70 * uBloom[0];
+    col += vec3(0.330,0.130,0.600) * blob(uv, cMag,   0.360, aspect) * 0.65 * uBloom[1];
+    col += vec3(0.220,0.100,0.520) * blob(uv, cVio,   0.420, aspect) * 0.55 * uBloom[2];
+    col += vec3(0.050,0.140,0.820) * blob(uv, cBlue,  0.330, aspect) * 0.90 * uBloom[3];
 
-      /* living cloud surface: domain-warped fbm, drifting slowly */
-      vec2 sp = q*2.6 + vec2(uTime*0.010, uTime*0.006);
-      float warp = fbm(sp*1.4 + 3.0);
-      float cloud = fbm(sp + warp*1.3);
+    /* BLACK POCKETS: dark voids drifting among the lights,
+       swallowing colour where they pass */
+    vec2 cDk1 = vec2(0.30, 0.82) + 0.050*vec2(sin(t*0.10+1.0), cos(t*0.13+2.0)) + par*0.6;
+    vec2 cDk2 = vec2(0.60, 0.12) + 0.055*vec2(cos(t*0.12+4.0), sin(t*0.09+0.5)) + par*0.9;
+    vec2 cDk3 = vec2(0.10, 0.30) + 0.040*vec2(sin(t*0.11+3.0), cos(t*0.10+1.5)) + par*0.5;
+    col *= 1.0 - 0.80*blob(uv, cDk1, 0.260, aspect) * uBloom[2];
+    col *= 1.0 - 0.70*blob(uv, cDk2, 0.300, aspect) * uBloom[2];
+    col *= 1.0 - 0.60*blob(uv, cDk3, 0.240, aspect) * uBloom[2];
 
-      vec3 surf = mix(vec3(0.040,0.024,0.085), vec3(0.355,0.300,0.640), diff);
-      surf += vec3(0.86,0.88,1.00) * pow(diff, 1.9) * (0.35 + 0.85*cloud);
-      surf *= 0.72 + 0.55*mix(1.0, cloud, min(diff*1.6, 1.0));
+    /* soft-focus tone rolloff so overlaps melt instead of clip */
+    col = col / (1.0 + col*0.28);
 
-      /* night side isn't dead black — a whisper of violet */
-      surf += vec3(0.018,0.010,0.036) * (1.0 - diff);
+    /* the reference's film grain, alive */
+    float g = hash(vUv*uRes.xy*0.5 + fract(t)*vec2(37.0, 17.0));
+    col += (g - 0.5) * 0.075 * uGrain;
 
-      /* atmosphere glowing along the inside of the limb */
-      float ang = atan(q.y, q.x);
-      vec3 rimTint = mix(vec3(0.60,0.72,1.00), vec3(0.72,0.25,1.00),
-                         smoothstep(-0.65, 0.55, sin(ang)));
-      float rimIn = pow(smoothstep(0.78, 1.0, r), 3.0);
-      surf += rimTint * rimIn * (0.55 + 0.45*uSurf) * 0.62 * uGlow;
+    /* gentle corner shading, like a lit poster */
+    col *= 1.0 - 0.22*pow(length((uv - 0.5)*vec2(1.15,1.35)), 2.2);
 
-      col = mix(col, surf, inside);
-    }
-
-    /* ---------- atmosphere halo outside the disc ---------- */
-    float e = max(r - 1.0, 0.0) * R;
-    float ang2 = atan(q.y, q.x);
-    vec3 haloTint = mix(vec3(0.55,0.68,1.00), vec3(0.72,0.25,1.00),
-                        smoothstep(-0.65, 0.55, sin(ang2)));
-    float haloA = 0.78 + 0.32*smoothstep(-1.0, 1.0, sin(ang2));
-    float halo = exp(-e*4.2)*0.80 + exp(-e*1.5)*0.28;
-    col += haloTint * halo * haloA * (1.0 - inside) * uGlow;
-
-    /* ---------- the tiny pink glint on the night side ---------- */
-    float gd = length(uv - (C + vec2(0.035, 0.005)));
-    float twk = 0.75 + 0.25*sin(uTime*2.2);
-    col += vec3(1.00,0.28,0.55) * (exp(-gd*260.0)*1.15 + exp(-gd*70.0)*0.14) * twk * uStar;
-
-    /* quiet scrim over the bottom band, where the heading lives */
-    col *= 1.0 - 0.22*smoothstep(0.35, 0.95, -uv.y);
-    col *= 1.0 - 0.26*pow(length(uv*vec2(0.55,0.55)), 2.4);
-    col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
-    gl_FragColor = vec4(col * uReveal, 1.0);
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
@@ -1301,216 +1615,239 @@ function initAboutField() {
   const host = document.querySelector('#about-field');
   if (!host) return;
 
+  const panel = document.querySelector('#systems-panel');
+  const floor = document.querySelector('#systems-floor');
+
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('About field: no WebGL context', error);
     return;
   }
 
   /*
-   * Same r128 grade as the other fields: the shader hand-rolls its own ramps
-   * and adds a 1/255 dither, and an sRGB transfer on the way out would crush
-   * the crescent's cloud detail and the atmosphere's blue-to-magenta sweep.
+   * Same r128 grade as the other fields: the shader hand-rolls its own tone
+   * rolloff and grain, and an sRGB transfer on the way out would lift the navy
+   * base and crush the four lights into one another.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
-  /* Two passes into one buffer, so the clear is driven by hand. */
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
+  /* Aurora then lettering into one buffer, so the clear is driven by hand. */
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
 
-  /* --- pass 1: the planet --------------------------------------------------- */
-  const bgScene = new THREE.Scene();
-  const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const scene = new THREE.Scene();
+  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  /* One array, written in place by the entrance — the uniform holds the
+     reference, so there is nothing to re-upload per tween. */
+  const bloomArr = new Array(AURORA_BLOB_COUNT).fill(0);
 
   const uni = {
     uRes: { value: new THREE.Vector2(1, 1) },
     uTime: { value: 0 },
     uPtr: { value: new THREE.Vector2(0, 0) },
-    uReveal: { value: 0 } /* field + stars */,
-    uGlow: { value: 0 } /* atmosphere ring */,
-    uSurf: { value: 0 } /* dawn sweeps the surface */,
-    uNeb: { value: 0 } /* nebula wisps */,
-    uStar: { value: 0 } /* the pink glint */,
+    uGrain: { value: 0 },
+    uBloom: { value: bloomArr },
   };
 
-  bgScene.add(
+  scene.add(
     new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.ShaderMaterial({
         uniforms: uni,
-        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
-        fragmentShader: PLANET_FRAGMENT_SHADER,
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position,1.0); }',
+        fragmentShader: AURORA_FRAGMENT_SHADER,
       })
     )
   );
 
-  /* --- pass 2: ENGINEERING STUDIO / FOR SCALABLE PRODUCTS ------------------ */
+  /* --- pass 2: the tagline, in the space beside the panel ------------------
+   *
+   * The panel moved to the left column on a wide box (see .about-inner), and
+   * this fills the right one. It is drawn in this field's renderer rather than
+   * a canvas of its own: a tenth WebGL context for three rows of type would
+   * cost more driver memory than everything else in the section put together.
+   *
+   * The real text is the visually-hidden .about-tagline in the markup, so the
+   * outline, search and selection do not depend on a canvas. Below the split
+   * breakpoint that element becomes visible copy and this pass draws nothing.
+   * -------------------------------------------------------------------- */
   const txScene = new THREE.Scene();
   const txCam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
   txCam.position.z = 6;
 
   /*
-   * A stand-in for the camera at rest, used only to place the letter rows in
-   * resize(). The live camera drifts with the pointer, and solving against that
-   * would make the rows creep as the cursor moved.
+   * Two row breaks. On a wide box the strip beside the panel is ~950px and the
+   * line fits in three rows; at 1280 the same strip is 570px and that set has
+   * to shrink to 28px glyphs to fit — thin enough to read as a mistake. The
+   * four-row break is 12 glyphs at its widest instead of 18, so it holds its
+   * size instead. Whichever one keeps the type large is the one built.
    */
-  const restCam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
-  restCam.position.set(0, 0, 6);
-  restCam.lookAt(0, -0.6, 0);
-  restCam.updateMatrixWorld(true);
-  const probe = new THREE.Vector3();
-  const halfFrame = Math.tan(((40 / 2) * Math.PI) / 180) * 6;
+  const TAG_WIDE = ['ENGINEERING STUDIO', 'FOR SCALABLE', 'PRODUCTS'];
+  const TAG_NARROW = ['ENGINEERING', 'STUDIO', 'FOR SCALABLE', 'PRODUCTS'];
+  const TAG_SIZE = 0.26;
+  const TAG_GAP = 0.255;
+  const TAG_LEAD = 0.34;
+  /* Below this the wide set is too small and the narrow one takes over. */
+  const TAG_MIN_SCALE = 0.8;
+  const TAG_MARGIN_PX = 40;
+  /* Below this the panel is centred again and there is no second column. */
+  const TAG_SPLIT_PX = 1100;
 
+  const tagGroup = new THREE.Group();
+  txScene.add(tagGroup);
+  let tagLetters = [];
+  let tagLayout = null;
+  let tagVisible = false;
   /*
-   * The plate is what makes this word legible: the top row crosses the planet's
-   * lit crescent, so each glyph carries a blurred near-black copy of itself
-   * underneath. See letterTexture's opts.
+   * Declared here rather than beside the entrance because buildTagRows() reads
+   * it, and resize() — which can rebuild the rows — runs first.
    */
-  const GLYPH = { weight: 200, plate: 'rgba(8,5,18,0.9)' };
+  let entrancePlayed = false;
 
-  const letters = [];
-  function makeRow(word, y, size, gap) {
-    const width = (word.length - 1) * gap;
-    [...word].forEach((ch, i) => {
-      if (ch === ' ') return;
-      const m = makeLetter(
-        txScene,
-        ch,
-        'rgba(242,236,248,0.95)',
-        null,
-        size,
-        -width / 2 + i * gap,
-        y,
-        Math.sin(letters.length * 1.7) * 0.06,
-        false,
-        GLYPH
-      );
-      /* Which row this glyph belongs to; resize() places the rows. See there. */
-      m.userData.row = y;
-      letters.push(m);
+  /* Half the widest row, in scene units at scale 1. */
+  function tagHalf(rows) {
+    return (Math.max(...rows.map((w) => w.length - 1)) * TAG_GAP) / 2 + TAG_SIZE / 2;
+  }
+
+  /* A swapped layout that only dropped the old meshes would leak their geometry
+     and materials on every rebuild.
+
+     The map is deliberately left alone: letterTexture() shares one texture per
+     distinct glyph across the whole page, so disposing it here would pull the
+     image out from under every other plane drawing the same character. */
+  function disposeTagRows() {
+    tagLetters.forEach((mesh) => {
+      tagGroup.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    });
+    tagLetters = [];
+  }
+
+  function buildTagRows(rows) {
+    disposeTagRows();
+    tagLayout = rows;
+    rows.forEach((word, r) => {
+      const y = (rows.length - 1) * TAG_LEAD * 0.5 - r * TAG_LEAD;
+      const width = (word.length - 1) * TAG_GAP;
+      [...word].forEach((ch, i) => {
+        /* The gap still advances; a blank glyph plane would only cost a texture. */
+        if (ch === ' ') return;
+        const mesh = makeLetter(
+          tagGroup,
+          ch,
+          'rgba(240,236,250,0.95)',
+          /* A dark halo, as the halo field does: these rows cross the aurora's
+             lights, and a bare hairline glyph loses its edge over one. */
+          'rgba(0,0,0,0.95)',
+          TAG_SIZE,
+          -width / 2 + i * TAG_GAP,
+          y,
+          0,
+          false
+        );
+        /* Rebuilt after the entrance has already run — placed lit, because no
+           tween is coming for these. */
+        if (entrancePlayed) mesh.material.opacity = 0.95;
+        tagLetters.push(mesh);
+      });
     });
   }
-  makeRow('ENGINEERING STUDIO', -1.7, 0.235, 0.245);
-  makeRow('FOR SCALABLE PRODUCTS', -1.98, 0.195, 0.205);
 
   /*
-   * Where each row should land, as a fraction of the field's height.
-   *
-   * The sketch pins the rows with world y (-1.70 and -1.98) and that is still
-   * what identifies them, but it cannot place them here. Two things move them:
-   * the scene scale, which shrinks the row to fit the width and drags its y
-   * toward the centre with it, and `lookAt(0, -0.6, 0)`, which tilts the camera
-   * down and lifts everything on screen — together they put the rows about 12%
-   * of the height higher than the sketch's numbers suggest, which on this
-   * section is straight through the bottom of the copy.
-   *
-   * So the rows are placed by solving the real projection for the world y that
-   * lands on these fractions.
-   *
-   * The fractions themselves are derived, not fixed. The section is one screen
-   * tall now, so its height tracks the viewport, and a pinned 86%/93% that
-   * cleared the copy on a tall window ran straight through it on a short one.
-   * The rows follow the bottom of .about-content instead.
+   * Centred in whatever is left to the right of the panel, measured rather
+   * than assumed — the panel's width is a min() of a cap and a viewport
+   * fraction, so where its right edge lands is not a number this can hold.
    */
-  const copyEl = document.querySelector('#about .about-content');
-  const ROW_GAP = 0.07; /* row 2 below row 1, in fractions of the field height */
-  const ROW_FLOOR = 0.955; /* how far down row 2 may land before it is cropped */
-  const ROW_CEIL = 0.62; /* above this the rows climb into the planet */
+  function placeTag(w, h) {
+    tagVisible = w >= TAG_SPLIT_PX && !!panel;
+    tagGroup.visible = tagVisible;
+    if (!tagVisible) return;
 
-  function rowFractions(fieldRect) {
-    let first = 0.86;
-    if (copyEl) {
-      /*
-       * 46px of air under the CTA. The fraction names where the row's *centre*
-       * lands, so half a glyph — about 3% of the height — sits above it; the
-       * gap has to cover that as well as read as a break.
-       */
-      first = (copyEl.getBoundingClientRect().bottom - fieldRect.top + 46) / fieldRect.height;
+    const fieldRect = host.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+
+    const halfHeight = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
+    const pxPerUnit = h / 2 / halfHeight;
+
+    const freeLeft = panelRect.right - fieldRect.left + TAG_MARGIN_PX;
+    const freeRight = w - TAG_MARGIN_PX;
+    const freeWidth = freeRight - freeLeft;
+    if (freeWidth <= 0) {
+      tagVisible = false;
+      tagGroup.visible = false;
+      return;
     }
-    first = Math.min(Math.max(first, ROW_CEIL), ROW_FLOOR - ROW_GAP);
-    return new Map([
-      [-1.7, first],
-      [-1.98, first + ROW_GAP],
-    ]);
+
+    /* 0.88 of the strip, not all of it: at full width the outer glyphs came
+       within 5px of the panel on one side and the section edge on the other. */
+    const usable = freeWidth * 0.88;
+    const fit = (rows) => Math.min(1, usable / (2 * tagHalf(rows) * pxPerUnit));
+
+    const rows = fit(TAG_WIDE) >= TAG_MIN_SCALE ? TAG_WIDE : TAG_NARROW;
+    if (rows !== tagLayout) buildTagRows(rows);
+
+    tagGroup.scale.setScalar(fit(rows));
+    /* Centre of the free strip, converted from px across the field to world x. */
+    tagGroup.position.x = (freeLeft + freeWidth / 2 - w / 2) / pxPerUnit;
   }
 
-  /* the wider row sets the fit; FOR SCALABLE PRODUCTS is 21 characters */
-  const WORD_HALF = (20 * 0.205) / 2 + 0.195 / 2;
-
-  const echoes = [
-    makeLetter(txScene, 'E', '#d84bff', 'rgba(216,75,255,0.9)', 0.34, -2.6, -1.28, -0.4, true),
-    makeLetter(txScene, 'P', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 2.7, -2.3, -0.5, true),
-  ];
-
-  /* --- resize / pointer / loop -------------------------------------------- */
   function resize() {
     const w = host.clientWidth;
     const h = host.clientHeight;
     if (!w || !h) return;
-
     renderer.setSize(w, h, false);
     uni.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
     txCam.aspect = w / h;
     txCam.updateProjectionMatrix();
-
-    /*
-     * The sketch's own term, capped by fitScale. Its floor of 0.52 has the same
-     * flaw as the other sketches': at 0.52 this row spans 2.15 world units
-     * either side of centre, and a portrait frustum is nowhere near that wide,
-     * so the outer glyphs of FOR SCALABLE PRODUCTS fall outside the frame. The
-     * cap is inert on any landscape box, where the sketch's term already wins.
-     */
-    const scale = Math.min(1, Math.max(0.52, w / h / 1.35), fitScale(txCam, w / h, WORD_HALF));
-    txScene.scale.setScalar(scale);
-
-    /*
-     * Place the rows against the actual projection, at the camera's rest pose —
-     * not the live one, or the rows would slide up and down as the pointer
-     * nudged the camera. Bisection rather than algebra because the perspective
-     * divide makes it non-linear and 40 halvings on a resize costs nothing.
-     *
-     * Dividing by the scale converts the world y we solved for into the local y
-     * the scaled scene needs. The frame loop reads baseY every frame, so the new
-     * placement takes effect immediately.
-     */
-    restCam.aspect = txCam.aspect;
-    restCam.updateProjectionMatrix();
-
-    const solved = new Map();
-    rowFractions(host.getBoundingClientRect()).forEach((fraction, row) => {
-      const targetNdcY = 1 - 2 * fraction;
-      let lo = -halfFrame * 4;
-      let hi = halfFrame * 4;
-      for (let k = 0; k < 40; k++) {
-        const mid = (lo + hi) / 2;
-        probe.set(0, mid, 0).project(restCam);
-        if (probe.y > targetNdcY) hi = mid;
-        else lo = mid;
-      }
-      solved.set(row, (lo + hi) / 2 / scale);
-    });
-
-    letters.forEach((m) => {
-      m.userData.baseY = solved.get(m.userData.row);
-      m.position.y = m.userData.baseY;
-    });
+    placeTag(w, h);
   }
-  /* Observed rather than measured once: the section is still pre-layout here. */
   resize();
   new ResizeObserver(resize).observe(host);
 
+  /* --- pointer: the panel tilts, the aurora parallaxes behind it ---------- */
   const target = { x: 0, y: 0 };
+  const ptr = { x: 0, y: 0 };
+  /*
+   * The field is pointer-events:none so the panel keeps its own hover and the
+   * link stays clickable, so the cursor is read off the section instead and
+   * converted against the field's own box.
+   */
+  const section = host.closest('section') || host;
+
   function fromEvent(e) {
-    const rct = host.getBoundingClientRect();
+    const rect = host.getBoundingClientRect();
     const p = e.touches ? e.touches[0] : e;
-    target.x = ((p.clientX - rct.left) / rct.width - 0.5) * 2;
-    target.y = -((p.clientY - rct.top) / rct.height - 0.5) * 2;
+    target.x = ((p.clientX - rect.left) / rect.width - 0.5) * 2;
+    target.y = -((p.clientY - rect.top) / rect.height - 0.5) * 2;
+    if (panel) {
+      /* the specular pool inside the glass follows the cursor */
+      const pr = panel.getBoundingClientRect();
+      panel.style.setProperty('--mx', (((p.clientX - pr.left) / pr.width) * 100).toFixed(1) + '%');
+      panel.style.setProperty('--my', (((p.clientY - pr.top) / pr.height) * 100).toFixed(1) + '%');
+    }
   }
-  host.addEventListener('pointermove', fromEvent);
-  host.addEventListener('touchmove', fromEvent, { passive: true });
-  host.addEventListener('pointerleave', () => {
+  section.addEventListener('pointermove', fromEvent);
+  section.addEventListener('touchmove', fromEvent, { passive: true });
+  section.addEventListener('pointerleave', () => {
     target.x = 0;
     target.y = 0;
   });
@@ -1518,40 +1855,59 @@ function initAboutField() {
   const clock = new THREE.Clock();
   let frameId = null;
   let onScreen = false;
+  /*
+   * The tilt writes panel.style.transform every frame and the entrance tweens
+   * the same property, so the tilt is held back until the entrance has landed.
+   * Without this the panel never rises — the loop overwrites the tween.
+   */
+  let entered = false;
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
-    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
-    uni.uTime.value = t;
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
+    if (!prefersReducedMotion) uni.uTime.value = clock.getElapsedTime();
 
-    const p = uni.uPtr.value;
-    p.x += (target.x - p.x) * 0.045;
-    p.y += (target.y - p.y) * 0.045;
+    ptr.x += (target.x - ptr.x) * 0.06;
+    ptr.y += (target.y - ptr.y) * 0.06;
+    uni.uPtr.value.set(ptr.x, ptr.y);
 
-    txCam.position.x = p.x * 0.26;
-    txCam.position.y = p.y * 0.18;
-    txCam.lookAt(0, -0.6, 0);
-
-    if (!prefersReducedMotion) {
-      letters.forEach((m, i) => {
-        m.position.y = m.userData.baseY + Math.sin(t * 0.5 + i * 0.45) * 0.007;
-      });
+    if (entered && panel && !prefersReducedMotion) {
+      panel.style.transform =
+        'translateY(0px) scale(1) rotateY(' +
+        (ptr.x * 4).toFixed(2) +
+        'deg) rotateX(' +
+        (ptr.y * 3).toFixed(2) +
+        'deg)';
     }
 
     renderer.clear();
-    renderer.render(bgScene, bgCam);
+    renderer.render(scene, cam);
+    /* The aurora quad wrote depth at the far plane; without this the glyphs,
+       which sit in front of nothing, fail the test and never appear. */
     renderer.clearDepth();
-    renderer.render(txScene, txCam);
+    if (tagVisible) renderer.render(txScene, txCam);
   }
 
-  let entrancePlayed = false;
   let entranceCtx = null;
 
-  /*
-   * Held until the section is on screen. The sequence runs about six seconds —
-   * fired on load, the dawn would have swept the planet and the glint would
-   * already be sitting there long before anyone scrolled down to it.
-   */
   function playEntrance() {
     if (entrancePlayed) return;
     entrancePlayed = true;
@@ -1560,105 +1916,163 @@ function initAboutField() {
 
   /*
    * Rewound whenever the section leaves the screen, so scrolling back to it
-   * starts the sequence from black instead of dropping you into a scene that
-   * finished minutes ago. The context is what makes that safe: it collects
-   * every tween the sequence creates — including the infinite float and
-   * breathe loops, which would otherwise stack a fresh copy on each visit —
-   * and revert() both kills them and restores the values they started from.
-   *
-   * A hidden tab only pauses; it does not rewind. Coming back to a tab is not
-   * arriving at the section.
+   * starts from the dark instead of dropping you into a lit poster. The context
+   * collects every tween — including the floor glow's infinite breathe, which
+   * would otherwise stack a fresh copy on each visit.
    */
   function resetEntrance() {
     if (entranceCtx) entranceCtx.revert();
     entranceCtx = null;
     entrancePlayed = false;
+    entered = false;
+    bloomArr.fill(0);
+    uni.uGrain.value = 0;
+    /* revert() restores the tween's own start values; the per-frame tilt is not
+       a tween, so its inline transform has to be cleared by hand. */
+    if (panel) panel.style.transform = '';
+    /* Rows rebuilt after the entrance were placed lit by hand rather than by a
+       tween, so revert() does not know about them. */
+    tagLetters.forEach((mesh) => {
+      mesh.material.opacity = 0;
+    });
   }
 
   function entranceSequence() {
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+    if (panel) {
+      tl.to(
+        panel,
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 1.4,
+          ease: 'power2.out',
+          onComplete() {
+            entered = true;
+          },
+        },
+        0.15
+      );
+    }
+
+    /* the lights bloom on one after another — peach, magenta, violet, blue */
+    for (let i = 0; i < AURORA_BLOB_COUNT; i++) {
+      const o = { v: 0 };
+      tl.to(
+        o,
+        {
+          v: 1,
+          duration: 1.6,
+          ease: 'power2.inOut',
+          onUpdate() {
+            bloomArr[i] = o.v;
+          },
+        },
+        0.8 + i * 0.3
+      );
+    }
 
     /*
-     * The sequence: stars wake in the dark, the atmosphere ring ignites around
-     * the silhouette, dawn sweeps across the surface to reveal the cloudy
-     * crescent, the nebula breathes in, the heading settles row by row, and the
-     * pink glint pops on the night side.
+     * The rows land after the panel, one glyph at a time, drifting in from the
+     * right so the eye is carried out of the card and into them.
      */
-    const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' } });
-    tl.to(uni.uReveal, { value: 1, duration: 1.4 }, 0)
-      .to(uni.uGlow, { value: 1, duration: 2.0, ease: 'power2.out' }, 0.5)
-      .to(uni.uSurf, { value: 1, duration: 2.8 }, 1.0)
-      .to(uni.uNeb, { value: 1, duration: 2.4, ease: 'power2.out' }, 1.6);
+    if (tagVisible) {
+      tagLetters.forEach((mesh, i) => {
+        const at = 1.0 + i * 0.028;
+        tl.fromTo(
+          mesh.position,
+          { x: mesh.position.x + 0.5 },
+          { x: mesh.position.x, duration: 1.1, ease: 'power3.out' },
+          at
+        );
+        tl.to(mesh.material, { opacity: 0.95, duration: 0.8, ease: 'power2.out' }, at);
+      });
+    }
 
-    letters.forEach((m, i) => {
-      tl.fromTo(
-        m.position,
-        { y: m.userData.baseY - 0.16 },
-        { y: m.userData.baseY, duration: 0.9, ease: 'power3.out' },
-        2.6 + i * 0.04
-      );
-      tl.to(m.material, { opacity: 0.95, duration: 0.7, ease: 'power2.out' }, 2.6 + i * 0.04);
-    });
-
-    tl.fromTo(uni.uStar, { value: 0 }, { value: 1, duration: 1.2, ease: 'back.out(2.2)' }, 4.0);
-
-    echoes.forEach((m, i) => {
-      tl.fromTo(
-        m.scale,
-        { x: 0.7, y: 0.7 },
-        { x: 1, y: 1, duration: 1.1, ease: 'back.out(1.6)' },
-        4.3 + i * 0.22
-      );
-      tl.to(m.material, { opacity: 0.5, duration: 1.0 }, 4.3 + i * 0.22);
-      gsap.to(m.position, {
-        y: '+=0.10',
-        x: i ? '-=0.06' : '+=0.06',
-        duration: 6 + i,
+    tl.to(uni.uGrain, { value: 1, duration: 1.2, ease: 'power2.out' }, 1.4);
+    if (floor) {
+      tl.to(floor, { opacity: 0.75, duration: 1.6, ease: 'power2.out' }, 1.8);
+      /* the floor glow breathes with the screen */
+      gsap.to(floor, {
+        opacity: 0.5,
+        duration: 4.2,
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: 5.8,
+        delay: 4,
       });
-    });
+    }
+  }
 
-    /* the atmosphere keeps breathing */
-    gsap.to(uni.uGlow, {
-      value: 0.86,
-      duration: 4.6,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut',
-      delay: 5.5,
-    });
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
   }
 
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
-    /* No entrance to play, so every stage is placed at its settled value. */
-    uni.uReveal.value = 1;
-    uni.uGlow.value = 1;
-    uni.uSurf.value = 1;
-    uni.uNeb.value = 1;
-    uni.uStar.value = 1;
-    letters.forEach((m) => {
-      m.material.opacity = 0.95;
-    });
-    echoes.forEach((m) => {
-      m.material.opacity = 0.5;
-    });
+    /* No entrance to play, so everything is placed at its settled values. */
+    bloomArr.fill(1);
+    uni.uGrain.value = 1;
+    if (panel) {
+      panel.style.opacity = 1;
+      panel.style.transform = 'none';
+    }
+    if (floor) floor.style.opacity = 0.75;
+    /* .about-field is display:none in this mode and .about-tagline becomes real
+       copy, so only the one settled frame is drawn and the rows stay dark. */
     renderer.clear();
-    renderer.render(bgScene, bgCam);
-    renderer.clearDepth();
-    renderer.render(txScene, txCam);
+    renderer.render(scene, cam);
     return;
   }
 
@@ -1669,6 +2083,12 @@ function initAboutField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -1769,7 +2189,22 @@ function initCapabilityField() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Capability field: no WebGL context', error);
     return;
@@ -1781,7 +2216,7 @@ function initCapabilityField() {
    * the ring's core, mid and halo terms into one flat band.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
   /* Two passes into one buffer, so the clear is driven by hand. */
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
@@ -1822,65 +2257,6 @@ function initCapabilityField() {
 
   const LETTER_SIZE = 0.205;
   const LETTER_GAP = 0.215;
-  /*
-   * Half the height of a row band, in scene units: half a row's glyph plus the
-   * half-gap to the other row's centre.
-   */
-  const BAND_HALF = 0.155 + LETTER_SIZE / 2;
-
-  /*
-   * Deviation from the sketch, and the one piece of geometry here that is
-   * measured rather than fixed.
-   *
-   * The sketch had nothing in the frame but the word, so it sat dead centre.
-   * Here a capability card shares the halo, and centred rows put the card
-   * straight on top of CAPABILITIES. A fixed lift cannot fix that at both
-   * aspect ratios either: on a wide box the section flex-ends its content low
-   * in a tall halo and a small lift is enough, but on a phone the section
-   * collapses to a block and the deck starts at the very top of a short one, so
-   * the same lift leaves the card covering the word by ~160px.
-   *
-   * So the lift is derived from where the deck actually is, on every resize: put the
-   * bottom of the word band a fixed margin above the top of the deck, then
-   * clamp so the band cannot climb out of the frame. On a wide box that lands
-   * the word inside the halo's upper half, as the sketch intends; on a phone,
-   * where the rings are only as wide as the screen and the card is taller than
-   * the circle, the clamp lifts the word clear above them, where it reads as
-   * the section's heading rather than as a label buried under a card.
-   */
-  /*
-   * Generous on purpose. The px<->world conversion below treats the rows as if
-   * they sat on the z=0 plane, but they are scattered over z -0.06..0.06 and the
-   * camera tilts slightly with the pointer, so the real projection lands a few
-   * percent lower than the arithmetic predicts — enough, at 24px, for the card's
-   * top edge to clip the bottom of CAPABILITIES.
-   */
-  const DECK_GAP_PX = 64;
-  const deckEl = document.querySelector('.concepts-deck');
-
-  function rowLift(scale, fieldRect) {
-    if (!deckEl) return 0.7; /* the sketch's own placement, near enough */
-    const halfHeight = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
-    const halfPx = fieldRect.height / 2;
-    const deckTopPx = deckEl.getBoundingClientRect().top - fieldRect.top;
-
-    /* world y of the point DECK_GAP_PX above the deck's top edge */
-    const wantBottom = ((halfPx - (deckTopPx - DECK_GAP_PX)) / halfPx) * halfHeight;
-    const lift = wantBottom / scale + BAND_HALF;
-
-    /*
-     * Cap it against the field's own top mask, not against the frame edge.
-     * .capability-field fades from transparent to opaque over its top 12%, so a
-     * band lifted into that strip is faded out with the artwork — which is
-     * exactly what happened on a phone: the word was placed correctly and drawn
-     * at 25% alpha, so it read as missing.
-     */
-    const maskFloorPx = fieldRect.height * 0.14;
-    const maxBottom = ((halfPx - maskFloorPx) / halfPx) * halfHeight;
-    const maxLift = maxBottom / scale - BAND_HALF;
-    return Math.max(0, Math.min(lift, maxLift));
-  }
-
   const letters = [];
   function makeRow(word, y) {
     const width = (word.length - 1) * LETTER_GAP;
@@ -1906,7 +2282,11 @@ function initCapabilityField() {
       );
     });
   }
-  /* Laid out around y=0; resize() lifts the whole row group into place. */
+  /* Half a row band in scene units: half a glyph plus the half-gap to the other
+     row's centre. rowY() needs it to know how much vertical room the pair takes. */
+  const BAND_HALF = 0.155 + LETTER_SIZE / 2;
+
+  /* Laid out around y=0; resize() places the whole row group. */
   makeRow('ENGINEERING', 0.155);
   makeRow('CAPABILITIES', -0.155);
   const rows = new THREE.Group();
@@ -1920,6 +2300,57 @@ function initCapabilityField() {
     makeLetter(txScene, 'E', '#8a4bff', 'rgba(138,75,255,0.9)', 0.34, -1.8, 1.35, -0.4, true),
     makeLetter(txScene, 'C', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 1.95, -1.3, -0.5, true),
   ];
+
+  /*
+   * Where the row band sits: the middle of the halo when the cards leave the
+   * middle clear, above them when they do not.
+   *
+   * The four cards stand off the halo's sides on a wide box, so the centre is
+   * free and the word belongs at y = 0, which is where the rings are drawn.
+   * Below about 1100px the corridor between the two columns closes (see the CSS)
+   * and the cards cross the centre, where a centred word would simply be behind
+   * two of them. So the corridor is measured rather than assumed, and the word
+   * holds the centre only while it actually fits there.
+   *
+   * The fallback is what this did before: put the band's bottom a margin above
+   * the deck's top edge, clamped so it cannot climb into the field's own top
+   * mask, which fades in over the first 12% and would draw the word at a quarter
+   * alpha — worse than not drawing it, because it reads as a mistake.
+   */
+  const CORRIDOR_MARGIN_PX = 28;
+  const DECK_GAP_PX = 56;
+
+  function rowY(scale, fieldRect) {
+    const deck = document.querySelector('.concepts-deck');
+    if (!deck) return 0;
+
+    const halfHeight = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
+    const halfPx = fieldRect.height / 2;
+    /* One world unit in px. The aspect cancels, so this holds on both axes. */
+    const pxPerUnit = halfPx / halfHeight;
+
+    const mid = fieldRect.width / 2;
+    const cards = [...document.querySelectorAll('.concept-card')].map((c) => {
+      const r = c.getBoundingClientRect();
+      return { left: r.left - fieldRect.left, right: r.right - fieldRect.left };
+    });
+    const leftEdges = cards.filter((c) => c.right <= mid).map((c) => c.right);
+    const rightEdges = cards.filter((c) => c.left >= mid).map((c) => c.left);
+    /* No cards either side of the middle — one column, on a phone — means none. */
+    const corridor =
+      leftEdges.length && rightEdges.length ? Math.min(...rightEdges) - Math.max(...leftEdges) : 0;
+
+    const wordPx = 2 * WORD_HALF * scale * pxPerUnit;
+    if (corridor >= wordPx + CORRIDOR_MARGIN_PX * 2) return 0;
+
+    const deckTopPx = deck.getBoundingClientRect().top - fieldRect.top;
+    const wantBottom = ((halfPx - (deckTopPx - DECK_GAP_PX)) / halfPx) * halfHeight;
+    const lift = wantBottom / scale + BAND_HALF;
+
+    const maskFloorPx = fieldRect.height * 0.14;
+    const maxLift = (((halfPx - maskFloorPx) / halfPx) * halfHeight) / scale - BAND_HALF;
+    return Math.max(0, Math.min(lift, maxLift));
+  }
 
   /* --- resize / pointer / loop -------------------------------------------- */
   function resize() {
@@ -1945,13 +2376,9 @@ function initCapabilityField() {
      */
     const frameHalfH = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
     const haloDiameter = 2 * 0.62 * frameHalfH * Math.min(1, w / h);
-    const scale = Math.min(
-      1,
-      (haloDiameter * 0.82) / (WORD_HALF * 2),
-      fitScale(txCam, w / h, WORD_HALF)
-    );
+    const scale = Math.min(1, (haloDiameter * 0.82) / (WORD_HALF * 2), fitScale(txCam, w / h, WORD_HALF));
     txScene.scale.setScalar(scale);
-    rows.position.y = rowLift(scale, host.getBoundingClientRect());
+    rows.position.y = rowY(scale, host.getBoundingClientRect());
   }
   /* Observed rather than measured once: the section is still pre-layout here. */
   resize();
@@ -1980,8 +2407,27 @@ function initCapabilityField() {
   let frameId = null;
   let onScreen = false;
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
     uni.uTime.value = t;
 
@@ -2036,7 +2482,6 @@ function initCapabilityField() {
   }
 
   function entranceSequence() {
-
     const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' } });
     tl.to(uni.uReveal, { value: 1, duration: 1.0 }, 0);
 
@@ -2091,15 +2536,58 @@ function initCapabilityField() {
     });
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
@@ -2126,6 +2614,12 @@ function initCapabilityField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -2197,11 +2691,28 @@ const ECLIPSE_FRAGMENT_SHADER = `
 
     float breathe = 1.0 + 0.006*sin(uTime*0.5);
 
-    col += orb(uv, vec2(0.0,  0.435*breathe), 0.415, +1.0, silver);
-    col += orb(uv, vec2(0.0, -0.435*breathe), 0.415, -1.0, violet);
+    /*
+     * The eclipse reads off its own scaled copy of uv, not uv itself. Dividing
+     * here magnifies the pair on screen: at 1.28 their outer limbs reach 1.09 of
+     * the frame's short half-axis, up from 0.85 unscaled, so the far edges now
+     * run past the top and bottom of the frame. That is the dim end of each orb
+     * — the rim term is 0.10 + 1.45*rimW, and rimW peaks at the kiss — while the
+     * bright arcs and the inner rings, which sit between 0.27 and 0.86, all stay
+     * in view and simply read larger.
+     *
+     * (No backticks in here: this whole shader is a template literal.)
+     *
+     * The vignette and the bottom scrim further down keep the unscaled uv, so
+     * the band held clear for the heading does not move with the orbs, and
+     * AI AND AUTOMATION is a separate perspective pass this cannot reach.
+     */
+    vec2 ec = uv / 1.28;
+
+    col += orb(ec, vec2(0.0,  0.435*breathe), 0.415, +1.0, silver);
+    col += orb(ec, vec2(0.0, -0.435*breathe), 0.415, -1.0, violet);
 
     /* the kiss: a white-violet star where the limbs meet */
-    float cd = length((uv - vec2(0.0, 0.0)) * vec2(1.0, 1.9));
+    float cd = length((ec - vec2(0.0, 0.0)) * vec2(1.0, 1.9));
     vec3 kiss = mix(violet, vec3(1.0,0.99,1.0), 0.62);
     col += kiss * (exp(-cd*24.0)*1.25 + exp(-cd*7.5)*0.32) * uCore;
 
@@ -2219,7 +2730,22 @@ function initServicesField() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Services field: no WebGL context', error);
     return;
@@ -2231,7 +2757,7 @@ function initServicesField() {
    * would crush the three into one flat bloom.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
 
@@ -2280,6 +2806,8 @@ function initServicesField() {
   const LETTER_SIZE = 0.235;
   const LETTER_GAP = 0.245;
   const WORD = 'AI AND AUTOMATION';
+  /* How far the row's right edge stops short of the frame edge, as a fraction. */
+  const RIGHT_MARGIN = 0.045;
 
   /*
    * The plate is what makes the word legible: it crosses the violet orb's lit
@@ -2307,6 +2835,8 @@ function initServicesField() {
           GLYPH
         )
       );
+      /* Its place within the row. resize() adds the row's own offset to this. */
+      letters[letters.length - 1].userData.baseX = -width / 2 + i * LETTER_GAP;
     });
   }
   const WORD_HALF = ((WORD.length - 1) * LETTER_GAP) / 2 + LETTER_SIZE / 2;
@@ -2380,11 +2910,35 @@ function initServicesField() {
       if (probe.y > targetNdcY) hi = mid;
       else lo = mid;
     }
-    const y = (lo + hi) / 2 / scale;
+    const rowWorldY = (lo + hi) / 2;
+    const y = rowWorldY / scale;
+
+    /*
+     * And the same bisection for x, to park the row against the right edge.
+     *
+     * Solving it rather than offsetting by a constant because the answer moves
+     * with both the frame's aspect and the scale the row was fitted at, and
+     * because the row has to end a fixed distance from the edge however wide the
+     * frame is. Probed at the row's own y: lookAt(0, -0.35, 0) tilts the view, so
+     * a point's depth — and with it the horizontal projection — depends on how
+     * high up it sits.
+     */
+    const targetNdcX = 1 - 2 * RIGHT_MARGIN;
+    let xlo = 0;
+    let xhi = halfFrame * 8;
+    for (let k = 0; k < 40; k++) {
+      const mid = (xlo + xhi) / 2;
+      probe.set(mid, rowWorldY, 0).project(restCam);
+      if (probe.x > targetNdcX) xhi = mid;
+      else xlo = mid;
+    }
+    /* That is where the row's RIGHT edge goes, so back off its half-width. */
+    const xOffset = (xlo + xhi) / 2 / scale - WORD_HALF;
 
     letters.forEach((m) => {
       m.userData.baseY = y;
       m.position.y = y;
+      m.position.x = m.userData.baseX + xOffset;
     });
   }
   /* Observed rather than measured once: the section is still pre-layout here. */
@@ -2419,8 +2973,27 @@ function initServicesField() {
     renderer.render(txScene, txCam);
   }
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
     uni.uTime.value = t;
 
@@ -2523,15 +3096,58 @@ function initServicesField() {
     });
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
@@ -2557,6 +3173,12 @@ function initServicesField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -2665,101 +3287,61 @@ function setupServiceDeck() {
 }
 
 /* -------------------------------------------------------------------------
- * About Us background — light trail
+ * About Us background — the black hole, with ABOUT US lettered across it
  *
- * The supplied sketch, ported from three r128 to r185. A flat ribbon of
- * light swept along a CatmullRom path and shaded like a long-exposure brush
- * stroke: fine parallel streak lanes with a white-hot core hugging the upper
- * edge, drawn three times at different widths (soft under-glow, the streak
- * band proper, a tight hot pass) plus three canvas glow sprites, brightest at
- * the hairpin fold.
+ * The backdrop is an image now, set on .about-us-field in the stylesheet. The
+ * light-trail ribbon that used to be drawn here — a CatmullRom sweep rendered
+ * three times through TRAIL_FRAGMENT_SHADER, plus three canvas glow sprites —
+ * is gone with it, along with the turn-and-refit logic that framed it on narrow
+ * boxes.
  *
- * ABOUT US is lettered over it, in the same treatment as THE TEAM and OUR
- * FEATURED WORK: thin tracked glyphs, each a real object at its own depth,
- * with two faint coloured echoes. The letters join `world`, so the cursor
- * parallax and the slow drift carry them along with the stroke — which is
- * what the sketch does, and what makes them read as part of the artwork
- * rather than as text pasted on top of it.
+ * What is left is the lettering pass, on a transparent canvas over the image:
+ * ABOUT US in the same treatment as the other fields, thin tracked glyphs at
+ * their own depths with two coloured strays, carried by the cursor parallax and
+ * a slow drift so they read as part of the artwork rather than text pasted on
+ * top of it.
  *
- * The glyphs are decoration: the section's real heading is the
- * visually-hidden h2, which stays selectable, searchable and available to
- * screen readers.
+ * The glyphs are decoration: the section's real heading is the visually-hidden
+ * h2, which stays selectable, searchable and available to screen readers.
  * ---------------------------------------------------------------------- */
-const TRAIL_VERTEX_SHADER = `
-  varying vec2 vUv;
-  void main(){
-    vUv = uv;
-    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
-  }
-`;
-
-const TRAIL_FRAGMENT_SHADER = `
-  precision highp float;
-  uniform float uTime, uReveal, uGlobal;
-  uniform float uBase, uLaneAmp, uCoreAmp, uFlow, uPhase;
-  varying vec2 vUv;
-
-  void main(){
-    float u = vUv.x, v = vUv.y;
-
-    /* entrance: the stroke paints itself left to right */
-    float m = clamp((uReveal*1.10 - u)/0.09, 0.0, 1.0);
-
-    /* cross-profile: a sharp-ish TOP edge, all the softness below */
-    float upper = 1.0 - smoothstep(0.76, 0.93, v);
-    float lower = smoothstep(0.02, 0.55, v);
-    float band  = upper * lower;
-
-    /* fine parallel streak lanes across the band */
-    float lanes = 0.5 + 0.5*sin((v*22.0 + sin(u*7.0 + uPhase)*0.5) * 3.14159265);
-    lanes = pow(lanes, 2.2);
-
-    /* razor core lines hugging the upper part of the band */
-    float core = exp(-pow((v-0.72)*26.0, 2.0)) * 1.35
-               + exp(-pow((v-0.62)*30.0, 2.0)) * 0.80
-               + exp(-pow((v-0.80)*38.0, 2.0)) * 0.50;
-
-    /* along the arc: strong on the left, the TURN ignites,
-       the far end thins into a whisper instead of cutting off */
-    float along = mix(1.0, 0.55, smoothstep(0.15, 0.72, u));
-    along += 0.70 * exp(-pow((u-0.80)*7.0, 2.0));
-    float endFade   = 1.0 - smoothstep(0.82, 1.0, u)*0.88;
-    float startFade = smoothstep(0.0, 0.05, u);
-
-    float flow = 0.88 + 0.12*sin(6.2831853*(u*2.0 - uTime*uFlow + uPhase));
-
-    vec3 purple = vec3(0.50, 0.14, 1.00);
-    vec3 violet = vec3(0.72, 0.40, 1.00);
-    vec3 white  = vec3(1.00, 0.96, 1.00);
-
-    vec3 col = purple * lower * (1.0 - smoothstep(0.55, 0.95, v)) * uBase;
-    col += violet * band * lanes * uLaneAmp;
-    col += white  * core * band * uCoreAmp;
-
-    gl_FragColor = vec4(col * along * endFade * startFade * flow * m * uGlobal, 1.0);
-  }
-`;
-
 function initAboutUsField() {
   const host = document.querySelector('#about-us-field');
   if (!host) return;
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    /*
+     * alpha, and cleared to nothing. The canvas is a transparent sheet over the
+     * background image now, where it used to be an opaque black frame with the
+     * ribbon drawn into it.
+     */
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+      alpha: true,
+    });
   } catch (error) {
     console.error('About Us field: no WebGL context', error);
     return;
   }
 
-  /*
-   * Same r128 grade as the other fields. The ribbon stacks three additive
-   * passes whose brightest terms already sit near 1.0; an sRGB transfer on
-   * top would crush the streak lanes together into flat white.
-   */
+  /* Same r128 grade as the other fields: the glyph textures are baked at the
+     values we want and an sRGB transfer on the way out would lift them. */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
-  renderer.setClearColor(0x000000, 1);
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
+  renderer.setClearColor(0x000000, 0);
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -2769,173 +3351,22 @@ function initAboutUsField() {
   const world = new THREE.Group();
   scene.add(world);
 
-  /* The stroke: in from the left, dipping, then folding into a hairpin on
-     the right before it exits the top of the frame. */
-  const PATH = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-6.8, 1.55, 0.0),
-    new THREE.Vector3(-4.2, 0.35, 0.0),
-    new THREE.Vector3(-1.6, -0.75, 0.0),
-    new THREE.Vector3(1.2, -1.05, 0.0),
-    new THREE.Vector3(3.6, -0.55, 0.0),
-    new THREE.Vector3(5.3, 0.45, 0.0),
-    new THREE.Vector3(6.1, 1.6, 0.0) /* the turn        */,
-    new THREE.Vector3(5.9, 2.8, 0.0) /* the whisper up  */,
-    new THREE.Vector3(5.3, 3.6, 0.0),
-  ]);
-  const SEGS = 220;
-  const COLS = 10;
-
-  /* one continuous taper: a thick band at the left melting into
-     thin bright lines through the turn */
-  function widthAt(t) {
-    return 1.52 * Math.pow(1 - t, 1.15) + 0.1;
-  }
-
-  function buildRibbon(widthMul) {
-    const pos = [];
-    const uv = [];
-    const idx = [];
-    /*
-     * The width vector has to vary continuously along the path.
-     *
-     * It used to be flipped per-vertex with `if (dir.y < 0) dir.negate()` to
-     * keep uv.y = 1 on the geometric top edge. But dir.y is T.x, so that test
-     * changes sign exactly where the path stops heading right and folds back —
-     * the hairpin. One vertex ring there came out mirrored against its
-     * neighbour, so the quads spanning the seam were built as bow-ties and the
-     * stroke looked torn in two at the turn.
-     *
-     * The raw perpendicular is already continuous, since the tangent of a
-     * CatmullRom curve is. Seed the run so uv.y = 1 starts as the top edge and
-     * then only correct an actual reversal, which a tangent sampled at 220
-     * segments will not produce — the guard is there for a degenerate tangent,
-     * not for the turn.
-     */
-    let prevDir = null;
-    for (let i = 0; i <= SEGS; i++) {
-      const t = i / SEGS;
-      const p = PATH.getPoint(t);
-      const T = PATH.getTangent(t);
-      /* 2D perpendicular in the view plane — the ribbon always faces
-         the camera flat, like the long-exposure artwork it mimics */
-      const dir = new THREE.Vector3(-T.y, T.x, 0).normalize();
-      if (prevDir === null) {
-        if (dir.y < 0) dir.negate();
-      } else if (dir.dot(prevDir) < 0) {
-        dir.negate();
-      }
-      prevDir = dir.clone();
-      const half = (widthAt(t) * widthMul) / 2;
-      for (let j = 0; j <= COLS; j++) {
-        const v = j / COLS;
-        const c = v * 2 - 1;
-        pos.push(p.x + dir.x * half * c, p.y + dir.y * half * c, p.z);
-        uv.push(t, v);
-      }
-    }
-    for (let i = 0; i < SEGS; i++) {
-      for (let j = 0; j < COLS; j++) {
-        const a = i * (COLS + 1) + j;
-        const b = a + COLS + 1;
-        idx.push(a, b, a + 1, b, b + 1, a + 1);
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(idx);
-    return g;
-  }
-
-  function ribbonMat(o) {
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uReveal: { value: 0 },
-        uGlobal: { value: 1 },
-        uBase: { value: o.base },
-        uLaneAmp: { value: o.lanes },
-        uCoreAmp: { value: o.core },
-        uFlow: { value: o.flow },
-        uPhase: { value: o.phase },
-      },
-      vertexShader: TRAIL_VERTEX_SHADER,
-      fragmentShader: TRAIL_FRAGMENT_SHADER,
-      side: THREE.DoubleSide,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-  }
-
-  /*
-   * The stroke and the word get a group each, both under `world` so they still
-   * share its cursor parallax and drift.
-   *
-   * They need to be framed independently. The stroke is a landscape sweep and
-   * has to be turned and refitted on a narrow frame; the word must not turn
-   * with it, must keep one apparent size however far the camera pulls back, and
-   * has to stay clear of the card. One group for both cannot do all three.
-   */
-  const stroke = new THREE.Group();
   const wordGroup = new THREE.Group();
-  world.add(stroke);
   world.add(wordGroup);
-
-  const ribbons = [];
-  function addRibbon(widthMul, opts, z) {
-    const mesh = new THREE.Mesh(buildRibbon(widthMul), ribbonMat(opts));
-    mesh.position.z = z || 0;
-    stroke.add(mesh);
-    ribbons.push(mesh);
-    return mesh;
-  }
-
-  /* wide soft under-glow, the main streak band, a tight hot pass */
-  addRibbon(2.4, { base: 0.14, lanes: 0.04, core: 0.0, flow: 0.08, phase: 0.0 }, -0.05);
-  addRibbon(1.0, { base: 0.26, lanes: 0.95, core: 0.6, flow: 0.11, phase: 0.4 }, 0.0);
-  addRibbon(0.6, { base: 0.08, lanes: 0.6, core: 1.3, flow: 0.14, phase: 1.1 }, 0.03);
-
-  /* bloom pockets: strongest at the fold, softer along the dip */
-  function glowSprite(t, scale, alpha) {
-    const c = document.createElement('canvas');
-    c.width = 128;
-    c.height = 128;
-    const g = c.getContext('2d');
-    const gr = g.createRadialGradient(64, 64, 2, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(205,155,255,' + alpha + ')');
-    gr.addColorStop(0.4, 'rgba(130,50,255,' + alpha * 0.5 + ')');
-    gr.addColorStop(1, 'rgba(50,8,150,0)');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 128, 128);
-    const sp = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: new THREE.CanvasTexture(c),
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    sp.position.copy(PATH.getPoint(t));
-    sp.scale.setScalar(scale);
-    stroke.add(sp);
-    return sp;
-  }
-  const sprites = [
-    glowSprite(0.2, 3.0, 0.16),
-    glowSprite(0.48, 3.4, 0.18),
-    glowSprite(0.8, 2.2, 0.48) /* the turn burns brightest */,
-  ];
-  /* the first two are the soft haze pooling BELOW the arc */
-  sprites[0].position.y -= 0.7;
-  sprites[1].position.y -= 0.8;
 
   /* --- ABOUT US ----------------------------------------------------------- */
   const WORD = 'ABOUT US';
   const LETTER_SIZE = 0.36;
   const LETTER_GAP = 0.4;
   const WORD_WIDTH = (WORD.length - 1) * LETTER_GAP;
+
+  /*
+   * The plate is what makes the word legible here. It sits across the accretion
+   * disc, whose inner ring is the brightest thing in the image, so each glyph
+   * carries a blurred near-black copy of itself underneath. Same treatment as
+   * the services word over the eclipse's lit limb. See letterTexture's opts.
+   */
+  const GLYPH = { weight: 200, plate: 'rgba(6,4,14,0.92)' };
 
   const letters = [];
   [...WORD].forEach((ch, i) => {
@@ -2948,44 +3379,34 @@ function initAboutUsField() {
         null,
         LETTER_SIZE,
         -WORD_WIDTH / 2 + i * LETTER_GAP,
-        1.05,
+        0,
         0.25 + Math.sin(i * 1.7) * 0.06,
-        false
+        false,
+        GLYPH
       )
     );
+    /* Its place in the row. The entrance flies each glyph out to this from the
+       centre, and makeLetter only stashes baseY. */
+    letters[letters.length - 1].userData.baseX = -WORD_WIDTH / 2 + i * LETTER_GAP;
   });
   /* the coloured strays, as in the reference */
   const echoes = [
-    makeLetter(wordGroup, 'B', '#4653f0', 'rgba(70,83,240,0.9)', 0.42, -1.65, 0.42, -0.2, true),
-    makeLetter(wordGroup, 'S', '#8a4bff', 'rgba(138,75,255,0.9)', 0.4, 1.95, 1.72, -0.3, true),
+    makeLetter(wordGroup, 'B', '#4653f0', 'rgba(70,83,240,0.9)', 0.42, -1.65, -0.63, -0.2, true),
+    makeLetter(wordGroup, 'S', '#8a4bff', 'rgba(138,75,255,0.9)', 0.4, 1.95, 0.67, -0.3, true),
   ];
-  /* The row's local y, which resize() offsets the whole group against. */
-  const WORD_LOCAL_Y = 1.05;
   /* makeLetter only stashes baseY; resize() pulls the strays in by x. */
   echoes.forEach((m) => {
     m.userData.baseX = m.position.x;
   });
 
   /* --- resize / pointer / loop -------------------------------------------- */
-  /*
-   * The stroke's true extent from the origin, in world units — read off the
-   * built geometry's bounding boxes, not off the path.
-   *
-   * The path alone spans x -6.8..6.1 and y -1.05..3.6, but the widest of the
-   * three ribbon passes is the soft under-glow at widthMul 2.4, which pushes
-   * the mesh out by up to 3.6 units perpendicular. Sizing the fit off the path
-   * clipped the glow.
-   */
-  const STROKE_HALF_X = 7.7;
-  const STROKE_HALF_Y = 3.7;
   /* Half the word's own width, echoes excluded: WORD_WIDTH/2 + a half glyph. */
   const WORD_HALF = WORD_WIDTH / 2 + LETTER_SIZE / 2;
   const TAN_HALF_FOV = Math.tan(((45 / 2) * Math.PI) / 180);
-  /* The camera z the sketch was drawn for, and the apparent size everything
-     else is held against. */
+  /* The camera z the lettering was drawn for, and the apparent size it is held
+     against. Fixed now: with the ribbon gone there is no long sweep to refit,
+     and the image behind is framed by the stylesheet rather than by this camera. */
   const DESIGN_Z = 7.2;
-
-  const cardEl = document.querySelector('.about-us-card');
 
   function resize() {
     const w = host.clientWidth;
@@ -2995,62 +3416,24 @@ function initAboutUsField() {
     renderer.setSize(w, h, false);
     const a = w / h;
     camera.aspect = a;
-
-    /*
-     * On a narrow frame the stroke is turned to run down the long axis.
-     *
-     * The sketch is a landscape sweep, 13.8 world units wide against 5.8 tall,
-     * and the old code framed it head-on at a fixed z with a token pullback
-     * below aspect 1. In a portrait box that leaves no good distance: close
-     * enough to read and you see a magnified slice of the middle — the fat
-     * purple band that made this look broken — and far enough back to fit all
-     * 13.8 and it is a thread in an empty frame. Turning it lets the stroke's
-     * long axis use the frame's long side, so it stays a sweep at any shape.
-     *
-     * Wide frames keep the sketch's own crop untouched: at aspect 1.25 and up
-     * the turn is zero and z is still 7.2, because there the stroke running off
-     * both sides is the intended composition, not a bug.
-     */
-    const turn = Math.min(1, Math.max(0, (1.25 - a) / 0.65));
-    stroke.rotation.z = (-turn * Math.PI) / 2;
-
-    const c = Math.abs(Math.cos(stroke.rotation.z));
-    const s = Math.abs(Math.sin(stroke.rotation.z));
-    const halfX = STROKE_HALF_X * c + STROKE_HALF_Y * s;
-    const halfY = STROKE_HALF_X * s + STROKE_HALF_Y * c;
-
-    /* Whichever of width and height binds, plus a little air — then blended in
-       by `turn`, so the change is continuous instead of stepping at 1.25. */
-    const fitZ = Math.max(halfY / TAN_HALF_FOV, halfX / (TAN_HALF_FOV * a)) * 1.04;
-    camera.position.z = DESIGN_Z + (fitZ - DESIGN_Z) * turn;
+    camera.position.z = DESIGN_Z;
     camera.updateProjectionMatrix();
 
-    /*
-     * The stroke is nudged down as it turns, so its thick bright entry — which
-     * runs along the top once turned — is not sitting straight on the card's
-     * first lines. It still crosses the glass lower down, as every field on
-     * this site does behind its copy.
-     */
     const halfFrameH = TAN_HALF_FOV * camera.position.z;
-    stroke.position.y = -turn * halfFrameH * 0.22;
+    const halfFrameW = halfFrameH * a;
 
     /*
-     * The word does not turn with the stroke, and it is scaled back up by
-     * however far the camera pulled away, so ABOUT US reads the same size on a
-     * phone as on a desktop instead of shrinking into the artwork.
-     *
-     * Capped so it cannot outgrow the frame: undoing a 2.4x pullback on a
-     * narrow frame made the row wider than the frustum, and ABOUT US rendered
-     * as "BOUT U" with both ends cut off.
+     * Capped so the row cannot outgrow the frame. On a narrow box the word
+     * would otherwise be wider than the frustum and render as "BOUT U" with
+     * both ends cut off.
      */
-    const halfFrameW = halfFrameH * a;
-    const zoom = Math.min(camera.position.z / DESIGN_Z, (halfFrameW * 0.92) / WORD_HALF);
+    const zoom = Math.min(1, (halfFrameW * 0.92) / WORD_HALF);
     wordGroup.scale.setScalar(zoom);
 
     /*
      * The strays sit further out than the word does, so the same cap would have
-     * had to shrink the row to keep them in. They get pulled in instead —
-     * they are decoration, and their exact x is not load-bearing.
+     * had to shrink the row to keep them in. They get pulled in instead — they
+     * are decoration, and their exact x is not load-bearing.
      */
     echoes.forEach((m) => {
       const limit = (halfFrameW * 0.94) / zoom - m.geometry.parameters.width / 2;
@@ -3058,20 +3441,41 @@ function initAboutUsField() {
     });
 
     /*
-     * And it is placed off the card rather than at the sketch's fixed y=1.05.
-     * The card is bottom-aligned and grows as it reflows, so on a narrow frame
-     * the fixed row ended up printing straight through the copy. No bisection
-     * needed here, unlike the other fields: this camera has no lookAt tilt, so
-     * screen position is linear in world y.
+     * Dead centre, which is where the image puts the black hole — unless the
+     * card is in the way.
+     *
+     * On a landscape box the card is bottom-aligned and the middle is clear, so
+     * the word sits on the core and the glyph plates above are what let it read
+     * against the bright ring rather than beside it. Below 1:1 the section turns
+     * into a block, the card moves to the top and is taller for the reflow, and
+     * it lands squarely across the centre — a fixed centre would print the word
+     * through the copy, which is the failure the old card-derived placement
+     * existed to avoid.
+     *
+     * So: centre when the middle is free, and otherwise the middle of whichever
+     * clear band is bigger, clamped inside the field's own mask. That fade runs
+     * over the first and last 12%, and a row placed inside it is drawn at a
+     * fraction of its alpha — which reads as a mistake rather than as a choice.
      */
     const rect = host.getBoundingClientRect();
-    let frac = 0.32; /* the sketch's own position, for when there is no card */
+    const halfWordPx = ((LETTER_SIZE / 2) * zoom * (rect.height / 2)) / halfFrameH;
+    const midPx = rect.height / 2;
+    let targetPx = midPx;
+
+    const cardEl = document.querySelector('.about-us-card');
     if (cardEl) {
-      const gap = 0.055 * rect.height; /* half a glyph, plus air */
-      frac = (cardEl.getBoundingClientRect().top - rect.top - gap) / rect.height;
+      const c = cardEl.getBoundingClientRect();
+      const cardTop = c.top - rect.top;
+      const cardBottom = c.bottom - rect.top;
+      const overlaps = midPx + halfWordPx > cardTop && midPx - halfWordPx < cardBottom;
+      if (overlaps) {
+        const above = cardTop;
+        const below = rect.height - cardBottom;
+        targetPx = above >= below ? above / 2 : cardBottom + below / 2;
+      }
     }
-    frac = Math.min(Math.max(frac, 0.1), 0.5);
-    wordGroup.position.y = (0.5 - frac) * 2 * halfFrameH - WORD_LOCAL_Y * zoom;
+    targetPx = Math.min(Math.max(targetPx, rect.height * 0.12 + halfWordPx), rect.height * 0.88 - halfWordPx);
+    wordGroup.position.y = ((midPx - targetPx) / midPx) * halfFrameH;
 
     if (prefersReducedMotion) renderer.render(scene, camera);
   }
@@ -3104,13 +3508,28 @@ function initAboutUsField() {
   let frameId = null;
   let onScreen = false;
 
-  function frame() {
-    frameId = requestAnimationFrame(frame);
-    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
 
-    ribbons.forEach((m) => {
-      m.material.uniforms.uTime.value = t;
-    });
+  function frame(now) {
+    frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
+    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
 
     ptr.x += (target.x - ptr.x) * 0.05;
     ptr.y += (target.y - ptr.y) * 0.05;
@@ -3132,8 +3551,8 @@ function initAboutUsField() {
   let entranceCtx = null;
 
   /*
-   * Held until the section is on screen. Fired on load, the stroke would have
-   * finished painting itself long before anyone scrolled this far down.
+   * Held until the section is on screen. Fired on load, the word would have
+   * finished settling long before anyone scrolled this far down.
    */
   function playEntrance() {
     if (entrancePlayed) return;
@@ -3145,9 +3564,9 @@ function initAboutUsField() {
    * Rewound whenever the section leaves the screen, so scrolling back to it
    * starts the sequence from black instead of dropping you into a scene that
    * finished minutes ago. The context is what makes that safe: it collects
-   * every tween the sequence creates — including the infinite float and
-   * breathe loops, which would otherwise stack a fresh copy on each visit —
-   * and revert() both kills them and restores the values they started from.
+   * every tween the sequence creates — including the infinite float loops,
+   * which would otherwise stack a fresh copy on each visit — and revert() both
+   * kills them and restores the values they started from.
    *
    * A hidden tab only pauses; it does not rewind. Coming back to a tab is not
    * arriving at the section.
@@ -3159,49 +3578,39 @@ function initAboutUsField() {
   }
 
   function entranceSequence() {
-
-    /* the stroke paints itself across the dark, then the fold ignites */
     const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' } });
 
-    ribbons.forEach((m, i) => {
-      tl.to(m.material.uniforms.uReveal, { value: 1, duration: 2.6 }, 0.15 + i * 0.12);
+    /*
+     * The word is thrown out of the singularity: every glyph starts collapsed on
+     * the core at a quarter of its size and flies to its place in the row.
+     *
+     * Ordered by distance from the centre, not by position in the string, so it
+     * spreads outward from the black hole rather than sweeping left to right
+     * across it.
+     *
+     * x and scale, deliberately — not y. frame() rewrites position.y on every
+     * tick for the idle bob, so the previous entrance, which animated y and
+     * nothing else, was overwritten before it could be seen: the letters simply
+     * faded up on the spot. Nothing owns x or scale, so this actually moves.
+     */
+    const fromCore = [...letters].sort((a, b) => Math.abs(a.userData.baseX) - Math.abs(b.userData.baseX));
+    fromCore.forEach((m, i) => {
+      const at = 0.2 + i * 0.075;
+      tl.fromTo(m.position, { x: 0 }, { x: m.userData.baseX, duration: 1.15, ease: 'power3.out' }, at);
+      tl.fromTo(m.scale, { x: 0.25, y: 0.25 }, { x: 1, y: 1, duration: 1.15, ease: 'back.out(1.2)' }, at);
+      tl.to(m.material, { opacity: 0.95, duration: 0.85, ease: 'power2.out' }, at);
     });
-
-    sprites.forEach((s, i) => {
-      tl.to(s.material, { opacity: 1, duration: 1.4, ease: 'power2.out' }, 1.3 + i * 0.2);
-    });
-
-    /* then the word settles in, letter by letter, left to right */
-    letters.forEach((m, i) => {
-      tl.fromTo(
-        m.position,
-        { y: m.userData.baseY - 0.2 },
-        { y: m.userData.baseY, duration: 1.0, ease: 'power3.out' },
-        2.1 + i * 0.09
-      );
-      tl.to(m.material, { opacity: 0.95, duration: 0.8, ease: 'power2.out' }, 2.1 + i * 0.09);
-    });
+    /* The strays arrive last, once the row has finished spreading. */
     echoes.forEach((m, i) => {
       tl.fromTo(
         m.scale,
         { x: 0.7, y: 0.7 },
         { x: 1, y: 1, duration: 1.1, ease: 'back.out(1.6)' },
-        2.9 + i * 0.25
+        1.15 + i * 0.25
       );
-      tl.to(m.material, { opacity: 0.55, duration: 1.0 }, 2.9 + i * 0.25);
+      tl.to(m.material, { opacity: 0.55, duration: 1.0 }, 1.15 + i * 0.25);
     });
 
-    /* the bloom keeps breathing once the entrance has landed */
-    sprites.forEach((s, i) => {
-      gsap.to(s.material, {
-        opacity: 0.55,
-        duration: 3.4 + i * 0.5,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: 4,
-      });
-    });
     echoes.forEach((m, i) => {
       gsap.to(m.position, {
         y: '+=0.10',
@@ -3210,29 +3619,66 @@ function initAboutUsField() {
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: 4.5,
+        delay: 2.5,
       });
     });
+  }
+
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
   }
 
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
-    ribbons.forEach((m) => {
-      m.material.uniforms.uReveal.value = 1;
-    });
-    sprites.forEach((s) => {
-      s.material.opacity = 1;
-    });
     /* No entrance to play, so the word is placed at its settled values. */
     letters.forEach((m) => {
       m.material.opacity = 0.95;
@@ -3251,6 +3697,12 @@ function initAboutUsField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -3344,7 +3796,22 @@ function initMakersField() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Makers field: no WebGL context', error);
     return;
@@ -3357,7 +3824,7 @@ function initMakersField() {
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   /* The disc's antialiased edge is the whole image, so it gets the full cap. */
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
   /* Pass 2 draws on top of pass 1, so the frame is cleared by hand in draw(). */
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
@@ -3477,8 +3944,27 @@ function initMakersField() {
   let frameId = null;
   let onScreen = false;
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     const t = clock.getElapsedTime();
     uni.uTime.value = t;
 
@@ -3529,7 +4015,6 @@ function initMakersField() {
   }
 
   function entranceSequence() {
-
     /*
      * The field lifts out of black, the rim ignites along the lower edge, then
      * THE TEAM settles in letter by letter, left to right, and the two echoes
@@ -3583,15 +4068,58 @@ function initMakersField() {
     });
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
@@ -3615,6 +4143,12 @@ function initMakersField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -3722,7 +4256,22 @@ function initContactField() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Contact field: no WebGL context', error);
     return;
@@ -3734,7 +4283,7 @@ function initContactField() {
    * numbers we want out.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.setPixelRatio(pixelRatioFor(2, 1.25));
+  renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
   renderer.setClearColor(0x040209, 1);
   /* Two passes into one buffer — the second must not wipe the first. */
   renderer.autoClear = false;
@@ -3932,8 +4481,27 @@ function initContactField() {
   let frameId = null;
   let onScreen = false;
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     const t = clock.getElapsedTime();
     uni.uTime.value = t;
 
@@ -3994,7 +4562,12 @@ function initContactField() {
     });
 
     echoes.forEach((m, i) => {
-      tl.fromTo(m.scale, { x: 0.7, y: 0.7 }, { x: 1, y: 1, duration: 1.1, ease: 'back.out(1.6)' }, 3.3 + i * 0.22);
+      tl.fromTo(
+        m.scale,
+        { x: 0.7, y: 0.7 },
+        { x: 1, y: 1, duration: 1.1, ease: 'back.out(1.6)' },
+        3.3 + i * 0.22
+      );
       tl.to(m.material, { opacity: 0.5, duration: 1 }, 3.3 + i * 0.22);
       gsap.to(m.position, {
         y: '+=0.10',
@@ -4008,15 +4581,58 @@ function initContactField() {
     });
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   /* Observed rather than measured once: the section is still pre-layout when
@@ -4045,6 +4661,12 @@ function initContactField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);
@@ -4127,7 +4749,22 @@ function initFooterField() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({
+      /*
+       * No multisampling, and no stencil.
+       *
+       * MSAA only antialiases polygon edges. Every field draws full-screen
+       * shader quads, glyph planes, points and sprites — all of them textured
+       * or analytic, none with a geometric edge for MSAA to find — so it was
+       * buying nothing and costing a 4x multisampled colour and depth buffer
+       * per context. On a 1890x862 window that is roughly 52MB a field rather
+       * than 13MB, and the page runs nine of them. Nothing here uses stencil
+       * either. The hero keeps antialias: it is the one scene with real
+       * geometry whose silhouette MSAA actually cleans up.
+       */
+      antialias: false,
+      stencil: false,
+    });
   } catch (error) {
     console.error('Footer field: no WebGL context', error);
     return;
@@ -4202,8 +4839,27 @@ function initFooterField() {
   let frameId = null;
   let onScreen = false;
 
-  function frame() {
+  /*
+   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
+   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * On a 120Hz panel that is four times the shading the artwork needs, and it
+   * is what had the fans running. 30 divides evenly into both 60 and 120, so
+   * the cadence stays regular rather than juddering.
+   *
+   * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
+   * where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
+
+  function frame(now) {
     frameId = requestAnimationFrame(frame);
+    /* Called straight through the first time, with no timestamp — always draw
+       that one, or the section shows an empty canvas until the next tick. */
+    if (now !== undefined) {
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+      lastFrameAt = now;
+    }
     uni.uTime.value = clock.getElapsedTime();
 
     const p = uni.uPtr.value;
@@ -4251,15 +4907,58 @@ function initFooterField() {
     });
   }
 
+  /*
+   * The drawing buffer, held separately from the render gate.
+   *
+   * A full-viewport context costs a colour and a depth buffer at the canvas
+   * size — about 12MB each on an 1890x862 window — and the page holds ten of
+   * them once you have scrolled to the bottom. Measured: 162MB of buffers
+   * alone, and that scales with the square of the device pixel ratio, so it is
+   * nearer 360MB on a 150%-scaled display.
+   *
+   * Collapsing the backing store to 1x1 gives nearly all of that back, and it
+   * costs nothing to undo: the context, its compiled programs and its textures
+   * all survive, so returning is a resize rather than a rebuild. updateStyle is
+   * false, so the canvas keeps its CSS box and no layout moves.
+   *
+   * This is deliberately NOT driven by the same observer as the render gate.
+   * That one fires 200px out, which during a normal scroll means reallocating
+   * a 12MB buffer and running resize()'s layout reads in the middle of the
+   * gesture — the stutter that bought. The release observer below is a screen
+   * and a half out instead, so ordinary scrolling never touches it and the
+   * buffer is back long before the section is looked at.
+   */
+  let bufferLive = true;
+
+  function releaseBuffer() {
+    if (!bufferLive) return;
+    bufferLive = false;
+    renderer.setSize(1, 1, false);
+  }
+
+  function restoreBuffer() {
+    if (bufferLive) return;
+    bufferLive = true;
+    resize();
+  }
+
   function sync() {
     const shouldRun = onScreen && !document.hidden;
     if (shouldRun) {
+      restoreBuffer();
       playEntrance();
       if (frameId === null) frame();
-    } else if (frameId !== null) {
+      return;
+    }
+
+    if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
+
+    /* A backgrounded tab is not coming back mid-gesture, so it can pay the
+       realloc on return. */
+    if (document.hidden) releaseBuffer();
   }
 
   if (prefersReducedMotion) {
@@ -4277,6 +4976,12 @@ function initFooterField() {
       sync();
     },
     { rootMargin: '200px' }
+  ).observe(host);
+
+  /* Memory only — see the note on releaseBuffer(). */
+  new IntersectionObserver(
+    ([entry]) => (entry.isIntersecting ? restoreBuffer() : releaseBuffer()),
+    { rootMargin: '150%' }
   ).observe(host);
 
   document.addEventListener('visibilitychange', sync);

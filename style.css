@@ -6,7 +6,17 @@
   src: url('./moonwalk.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
-  font-display: swap;
+  /*
+   * block, not swap.
+   *
+   * swap paints the fallback immediately and restyles when Moonwalk lands, and
+   * the most visible casualty was the loader: "Loading…" appeared in Inter and
+   * then jumped to Moonwalk, mid-pulse, as the first thing anyone saw. block
+   * holds the text invisible instead of showing a face we do not want, so the
+   * word is only ever painted once. Paired with the preload in index.html, so
+   * the invisible period is a frame or two rather than the 3s the spec allows.
+   */
+  font-display: block;
 }
 
 /*
@@ -1393,18 +1403,15 @@ nav .nav-links {
   min-height: 100svh;
   display: flex;
   /*
-   * Bottom-aligned, not centred: the halo letters ENGINEERING CAPABILITIES
-   * across its upper half, so the deck and the call to action hang off the
-   * bottom padding to stay clear of it.
+   * Built around the centre. The word sits in the middle of the halo and the
+   * four cards stand off its sides, two left and two right, so the composition
+   * is symmetric about the section's centre point.
    *
-   * The bottom padding is the lever that separates the card from the word.
-   * initCapabilityField's rowLift() reads this layout and lifts the lettering to
-   * sit above the deck, but it is capped by the field's own top mask, so once
-   * that cap binds the only remaining room comes from pushing the deck down —
-   * which a smaller bottom pad does.
+   * The padding is symmetric for that reason: it makes the content box's centre
+   * the section's centre, which is where the field draws the halo.
    */
-  align-items: flex-end;
-  padding: 9rem 1.75rem 3rem 1.75rem;
+  align-items: stretch;
+  padding: 5rem 1.75rem;
 }
 
 /*
@@ -1532,8 +1539,17 @@ nav .nav-links {
   position: relative;
   z-index: 2;
   /* Near full-bleed — the cards get the width of the viewport, not a column. */
+  width: 100%;
   max-width: 2100px;
   margin: 0 auto;
+  /*
+   * Stretched over the whole content box so the deck can be centred in it while
+   * the call to action is pinned to the bottom. With the action in flow its
+   * height would push the deck's centre up by half of it, and the corridor
+   * between the cards would stop lining up with the halo.
+   */
+  display: grid;
+  place-content: center;
 }
 
 /*
@@ -1551,10 +1567,11 @@ nav .nav-links {
 .concepts-deck {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1.25rem;
-  width: min(1200px, 92vw);
-  margin: 0 auto 2rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: clamp(300px, 33vw, 620px);
+  row-gap: clamp(1.25rem, 3.5vh, 2.5rem);
+  width: min(1680px, 96vw);
+  margin: 0 auto;
 }
 
 /*
@@ -1633,7 +1650,15 @@ nav .nav-links {
     0 0 32px rgba(0, 0, 0, 0.75);
 }
 
+/*
+ * Out of flow, so the deck above stays centred on the halo. Anchored to
+ * .concepts-inner, which is stretched over the whole content box.
+ */
 .concepts-action {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1698,21 +1723,24 @@ nav .nav-links {
   background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
   padding: 9rem 1.75rem 5rem;
   /*
-   * Taller than the copy needs. The stroke runs a long way across and folds at
-   * the right, and initAboutUsField() pulls the camera back on portrait boxes —
-   * a short section would frame it as a thin sliver instead of an arc.
+   * Taller than the copy needs: the artwork behind is a wide disc and a short
+   * section would crop it to a band.
    */
   min-height: 100svh;
   display: flex;
-  /* the card hangs off the bottom padding; the word keeps the upper half */
+  /* the card hangs off the bottom padding; the word sits on the core above it */
   align-items: flex-end;
 }
 
 /*
- * Full-bleed trail field. Same vertical fade as every other scene section, or
- * the scene's black backdrop ends in a hard line against the page gradient.
- * Pointer-events stay off so the cards keep their hover — initAboutUsField()
- * reads the cursor from the section instead.
+ * Full-bleed field. The backdrop is an image now — the light-trail ribbon that
+ * used to be drawn into the canvas here is gone, and initAboutUsField() renders
+ * only ABOUT US, on a transparent canvas over this.
+ *
+ * Same vertical fade as every other scene section, or the black behind the
+ * artwork ends in a hard line against the page gradient. Pointer-events stay off
+ * so the card keeps its hover — initAboutUsField() reads the cursor from the
+ * section instead.
  */
 .about-us-field {
   position: absolute;
@@ -1720,8 +1748,34 @@ nav .nav-links {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  background-image: url('https://pub-075771db1781451a9dc2753312c06534.r2.dev/ChatGPT%20Image%20Aug%206%2C%202026%2C%2009_10_52%20AM-Photoroom.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  /*
+   * cover on a landscape box: the artwork is 1.8:1 against a section that is
+   * wider still, so this fills the frame and crops only the empty sky off the
+   * top and bottom. It is the wrong choice the moment the box is taller than it
+   * is wide — see the portrait rule below.
+   */
+  background-size: cover;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
+/*
+ * Portrait: contain, not cover. Covering a tall narrow box with a 1.8:1 image
+ * scales it to the height and crops the sides away — on a phone that leaves a
+ * column through the middle of the core and none of the disc, which is the part
+ * that reads as a black hole. Contained it sits as a band across the middle,
+ * which is small but whole.
+ *
+ * Keyed on the shape rather than a width breakpoint because that is the actual
+ * condition: a portrait tablet has the same problem as a phone.
+ */
+@media (max-aspect-ratio: 1 / 1) {
+  .about-us-field {
+    background-size: contain;
+  }
 }
 
 .about-us-field canvas {
@@ -2155,83 +2209,33 @@ nav .nav-links {
      gradient carries through instead of butting against a flat #000 band. */
   background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
   /*
-   * Top-weighted: the planet owns the upper half and the lettering lands under
-   * the copy, so the copy sits high rather than centred. It used to run 145vh
-   * with the copy in the middle — as a one-screen scene that leaves nothing
-   * for the word.
+   * One panel, centred, with the aurora behind it. The perspective is what
+   * gives the panel its tilt — initAboutField's frame loop writes rotateX and
+   * rotateY on it, and without a perspective on the containing block those
+   * rotations are flat and nothing appears to move.
+   *
+   * This was top-weighted with a 7rem head, back when the planet owned the
+   * upper half and its lettering landed under the copy. Both are gone.
    */
-  padding: 7rem 1.75rem 4rem;
+  padding: 4rem 1.5rem;
   min-height: 100svh;
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  place-items: center;
+  perspective: 1500px;
 }
 
 /*
- * Full-bleed raymarched field, behind the content. Same vertical fade as the
- * spotlight sections, or the scene ends in a hard line against the next one.
+ * Full-bleed aurora, behind the panel. Same vertical fade as the spotlight
+ * sections, or the scene ends in a hard line against the next one.
  */
 .about-field {
   position: absolute;
-  /*
-   * Full-bleed now. It used to start at 32% so the HTML heading above it could
-   * read on plain black; the planet letters that heading itself, across the
-   * lower fifth of its own frame, so the field wants the whole section — the
-   * planet needs the upper half and the word needs the bottom.
-   */
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  /* The scene reads the pointer, so it must receive the events. */
-  cursor: grab;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 10%,
-    #000 88%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 10%,
-    #000 88%,
-    transparent 100%
-  );
-}
-
-.about-field:active { cursor: grabbing; }
-
-/*
- * Black scrim over the planet. Its lit crescent peaks near-white, and the copy
- * sits straight on top of it, so without this the paragraphs wash out where the
- * bright limb passes underneath. Painted over the canvas rather than mixed into
- * the shader, so the sketch's own grade is left alone.
- *
- * Left flat rather than banded: unlike the other fields, this word is plated —
- * every glyph carries its own dark backing (see letterTexture's opts.plate) —
- * so the lettering does not need a lighter row to survive the wash.
- *
- * Inside .about-field, so it inherits the same top/bottom mask and never
- * shows as a hard-edged rectangle against the neighbouring sections.
- */
-.about-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
   pointer-events: none;
-  background:
-    /* vignette: sinks the corners into the section's black */
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
-    /* the scrim proper, heaviest through the band the copy occupies */
-    linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.45) 0%,
-      rgba(0, 0, 0, 0.8) 26%,
-      rgba(0, 0, 0, 0.83) 55%,
-      rgba(0, 0, 0, 0.8) 80%,
-      rgba(0, 0, 0, 0.45) 100%
-    );
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
 }
 
 .about-field canvas {
@@ -2244,114 +2248,245 @@ nav .nav-links {
 
 .about-inner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  display: grid;
+  place-items: center;
   width: 100%;
-  /* Sits over the canvas, but only the copy itself should swallow the
-     pointer — everywhere else the field keeps its parallax. */
-  pointer-events: none;
-  /*
-   * Near full-bleed, like .concepts-inner. The planet is a wide piece of
-   * artwork and the lettering under it runs 21 characters, so a 1400px column
-   * of copy in the middle of it read as a narrow strip pasted on top.
-   */
-  max-width: 1900px;
-  margin: 0 auto;
 }
 
 /*
- * No margin: both children are .drawn-in-webgl, so this box is 0px tall and
- * the old 6rem was 96px of nothing between the top padding and the copy — on a
- * one-screen scene that was the difference between fitting and not. The
- * reduced-motion block, where the heading comes back as real text, restores it.
+ * The panel takes the left column and the right one is left empty on purpose:
+ * initAboutField letters "ENGINEERING STUDIO / FOR SCALABLE / PRODUCTS" into
+ * that space in the field canvas behind, measuring the panel's right edge to
+ * find it. The empty column is what reserves the room.
+ *
+ * 1100px is the same threshold the field uses to decide whether to draw the
+ * rows at all; below it the panel re-centres and the tagline becomes real copy.
  */
-.about-header {
-  margin-bottom: 0;
+@media (min-width: 1100px) {
+  .about-inner {
+    max-width: 1380px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+  }
+
 }
 
-.about-title-top {
-  font-size: clamp(3rem, 5vw, 4.5rem);
+/*
+ * The tagline carries .drawn-in-webgl, so it is hidden while the field letters
+ * it and comes back as copy wherever the field does not — under the split
+ * below, and in the reduced-motion block, which un-hides that class already.
+ *
+ * Under the split there is no second column for the rows to occupy, so the line
+ * runs above the panel instead. It is worth reading, not just decoration.
+ */
+@media (max-width: 1099px) {
+  .about-tagline {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0 0 2rem;
+    padding: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    border: 0;
+    max-width: 22ch;
+    text-align: center;
+    font-size: clamp(1.5rem, 4.6vw, 2.4rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    color: rgba(240, 236, 250, 0.92);
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
+  }
+}
+
+/*
+ * The glass poster.
+ *
+ * The supplied sketch's recipe, kept intact: a 38%-black fill under a heavy
+ * backdrop blur that also desaturates and dims what shows through, four inset
+ * shadows for the edge highlight and two outer ones for the drop, and the
+ * curved-glass sheen on ::after.
+ *
+ * The one deviation is the box. The sketch pins it to aspect-ratio 3/4.35 with
+ * nothing inside; this one carries a heading, two paragraphs, the two delivery
+ * tracks and the call to action, so the height follows the copy and the section
+ * stays one screen tall.
+ *
+ * Parked at opacity 0 with a lift and a slight shrink — initAboutField's
+ * entrance brings it up, and its frame loop then owns `transform` for the tilt.
+ */
+.systems-panel {
+  --mx: 50%;
+  --my: 32%;
+  position: relative;
+  z-index: 2;
+  width: min(640px, 90vw);
+  max-height: 88svh;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(10, 8, 20, 0.38);
+  -webkit-backdrop-filter: blur(30px) saturate(1.15) brightness(0.9);
+  backdrop-filter: blur(30px) saturate(1.15) brightness(0.9);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 44px 120px rgba(0, 0, 0, 0.78),
+    0 12px 60px rgba(50, 32, 150, 0.12);
+  opacity: 0;
+  transform: translateY(56px) scale(0.97);
+  will-change: transform;
+}
+
+/* Narrower in the split layout so the tagline's column is worth having. Placed
+   after the base rule rather than up with .about-inner: same specificity, so
+   source order is what decides it, and up there the 640px cap simply won. */
+@media (min-width: 1100px) {
+  .systems-panel {
+    width: min(600px, 100%);
+  }
+}
+
+/* Without backdrop-filter the 38% fill is a window onto the aurora, and the
+   copy has nothing to sit on. */
+@supports not (backdrop-filter: blur(1px)) {
+  .systems-panel {
+    background: rgba(10, 9, 18, 0.9);
+  }
+}
+
+/* the LIQUID: a specular pool following the pointer inside the glass */
+.systems-panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    380px 300px at var(--mx) var(--my),
+    rgba(205, 195, 255, 0.12),
+    rgba(145, 125, 255, 0.04) 44%,
+    transparent 68%
+  );
+}
+
+/* curved-glass top sheen */
+.systems-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    164deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.025) 26%,
+    transparent 48%
+  );
+}
+
+/* the dark shade inside the glass: the panel sinks toward its base */
+.systems-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 90% at 50% -12%, transparent 42%, rgba(0, 0, 0, 0.34) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.05) 46%, rgba(0, 0, 0, 0.46) 100%);
+}
+
+/* Above ::before and ::after, both of which are absolutely positioned overlays. */
+.systems-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.85rem, 1.9vh, 1.25rem);
+  padding: clamp(1.75rem, 3.4vh, 2.5rem) clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.systems-body h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
   color: var(--text-primary);
 }
 
-/* A visual continuation of the heading above, so it is a <p>, not a second <h2>. */
-.about-title-bottom {
-  font-family: 'Moonwalk', 'Inter', sans-serif;
-  letter-spacing: 0.05em;
-  font-size: clamp(3rem, 5vw, 4.5rem);
-  line-height: 1.1;
+.systems-body > p {
+  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
+  line-height: 1.6;
   color: var(--text-secondary);
-  padding-left: 10%;
 }
 
-.about-grid {
-  display: grid;
-  /*
-   * 1.15fr, not 1fr: the second column is empty — it is where the old WebGL
-   * blob sat, and now shows the planet through — so an even split left the copy
-   * narrower than it needs to be at this container width.
-   */
-  grid-template-columns: 1.15fr 1fr;
-  gap: 6rem;
-  align-items: center;
-}
-
-/* The left column held the WebGL blob; with that gone the copy keeps its
-   half and the film shows through where the blob used to be. */
-.about-content {
-  grid-column: 2;
-  pointer-events: auto;
-}
-
-/* Process steps from the live site's Discovery / Sprint phases. */
 .about-process {
   list-style: none;
-  /* Tightened with the rest of the About copy so the scene holds one screen. */
-  margin: 1.25rem 0 1.5rem;
-  padding: 0;
-  display: grid;
-  gap: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.7rem, 1.6vh, 1.1rem);
+  padding-left: 1rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .about-process li {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.3rem;
-  padding-left: 1rem;
-  border-left: 1px solid var(--glass-border);
 }
 
 .about-process strong {
   font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--brand-soft);
 }
 
 .about-process span {
-  font-size: 0.98rem;
-  line-height: 1.6;
+  font-size: 0.95rem;
+  line-height: 1.55;
   color: var(--text-secondary);
-}
-
-@media (max-width: 768px) {
-  .about-content { grid-column: 1; }
-}
-
-.about-content h3 {
-  font-size: 2rem;
-  margin-bottom: 1.25rem;
 }
 
 /*
- * 1.5 line-height and 1.25rem gaps, down from 1.8 and 2rem. The copy has to
- * share one screen with the planet above it and the lettered heading below,
- * and the old spacing put it 96px over on a 800px-tall laptop.
+ * The aurora behind the glass is bright where its lights pass, so light text
+ * alone can lose its edge. A tight black halo keeps every line readable
+ * wherever the blobs drift to.
  */
-.about-content p {
-  font-size: 1.2rem;
-  line-height: 1.55;
-  margin-bottom: 1.25rem;
-  color: var(--text-secondary);
+.systems-body h2,
+.systems-body > p,
+.about-process strong,
+.about-process span {
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.95),
+    0 2px 12px rgba(0, 0, 0, 0.9),
+    0 0 32px rgba(0, 0, 0, 0.75);
+}
+
+/*
+ * The glow pooling on the floor beneath the panel. Behind .about-inner and
+ * outside the panel's own overflow, so it reads as light thrown onto the
+ * section rather than as part of the glass.
+ */
+.systems-floor {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  z-index: 1;
+  width: min(70vw, 620px);
+  height: 110px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    50% 100% at 50% 50%,
+    rgba(70, 45, 190, 0.3),
+    rgba(25, 35, 150, 0.13) 55%,
+    transparent 75%
+  );
+  filter: blur(26px);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Careers Page Styling */
@@ -2899,11 +3034,11 @@ footer {
 
 /* Tablet / small laptop */
 @media (max-width: 1100px) {
-  /* Four across stops fitting the halo well before the cards themselves run
-     out of room, so they go two up and the deck narrows with them. */
+  /* The corridor cannot hold the halo and two readable columns much below this,
+     so it closes to an ordinary gap and the deck narrows with it. */
   .concepts-deck {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: min(760px, 92vw);
+    column-gap: clamp(1.25rem, 6vw, 4rem);
+    width: min(860px, 94vw);
   }
 
   .nav-links a { padding-left: 0.7rem; padding-right: 0.7rem; }
@@ -2959,6 +3094,21 @@ footer {
   .testimonial-text { font-size: 0.9rem; line-height: 1.55; }
   .quote-icon { width: 26px; height: 26px; }
 
+  /*
+   * No room for a corridor on a phone, so the centred arrangement goes with it:
+   * the inner returns to flow, the action follows the deck instead of being
+   * pinned, and the section tops out under the nav again. Four cards plus the
+   * action do not fit one screen at this width in any case.
+   */
+  /*
+   * No room for a corridor on a phone, so the centred arrangement goes with it:
+   * the inner returns to flow, the action follows the deck instead of being
+   * pinned, and the section tops out under the nav again.
+   */
+  #concepts { align-items: flex-start; padding: calc(var(--nav-height) + 1.5rem) 1.25rem 3rem; }
+  .concepts-inner { display: block; }
+  .concepts-action { position: static; margin-top: 2rem; }
+
   .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2.5rem; }
 
   /*
@@ -2979,17 +3129,7 @@ footer {
   .tag { font-size: 0.68rem; padding: 0.2rem 0.6rem; }
 
   /* minmax(300px, …) still forces overflow on a 360px screen. */
-  /*
-   * The phone breakpoint drops #concepts to a block, so align-items is inert and
-   * the deck sits at the top of the section while the halo stays centred in it.
-   * The top margin is the room the word needs between the field's top mask and
-   * the card.
-   *
-   * 6rem, not 4: rowLift() cannot lift the band above 14% of the field height
-   * without the field's own mask fading it out, and at this breakpoint that cap
-   * lands the band bottom within a couple of pixels of a deck set 4rem down —
-   * close enough that the card's top edge clipped CAPABILITIES.
-   */
+  /* The panel is the only thing in this section, so it takes the width. */
   .concepts-deck {
     width: 100%;
     margin-top: 6rem;
@@ -3055,9 +3195,9 @@ footer {
      align-items has nothing useful to do once the deck is the only child. */
   #concepts { display: block; }
 
-  .about-title-bottom { padding-left: 0; }
-  .about-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-  .about-content p { font-size: 1.05rem; line-height: 1.7; margin-bottom: 1.25rem; }
+  /* The panel is the only thing in this section, so it takes the width. */
+  .systems-panel { width: 94vw; }
+  .systems-body > p { font-size: 0.95rem; }
 
   /* No room either side of the crater on a phone: the pair stacks and the
      dot sheet runs behind them, as every other field does here. */
@@ -3183,6 +3323,23 @@ footer {
    */
   .about-field { display: none; }
 
+  /* Un-hidden by the .drawn-in-webgl rule below; this only dresses it. */
+  .about-tagline {
+    margin: 0 0 2rem;
+    max-width: 22ch;
+    text-align: center;
+    font-size: 2rem;
+    line-height: 1.15;
+    text-transform: uppercase;
+    color: rgba(240, 236, 250, 0.92);
+  }
+
+  /* The panel re-centres: with no canvas there is nothing in the right column. */
+  .about-inner {
+    grid-template-columns: none;
+    justify-items: center;
+  }
+
   /*
    * The planet is not drawn here, so the heading it would have lettered has to
    * come back as real text — otherwise #about loses its heading entirely.
@@ -3197,9 +3354,10 @@ footer {
     white-space: normal;
   }
 
-  /* The heading is a real box again, so it wants its air back. */
-  .about-header {
-    margin-bottom: 3rem;
+  /* No entrance runs in this mode, so the panel is placed lit and level. */
+  .systems-panel {
+    opacity: 1;
+    transform: none;
   }
 
   /*
@@ -3225,12 +3383,7 @@ footer {
   /* No hero scene in this mode, so there is no bright model to read against. */
   .hole-scrim { display: none; }
 
-  /*
-   * Nothing needed for the capabilities deck any more. It used to have to be
-   * un-stacked here, because the cycle was the only thing that ever advanced
-   * past card one and a cycle that never runs would have left three of the four
-   * capabilities permanently invisible. All four are in flow by default now.
-   */
+  /* All four capabilities are in flow by default, so they just go one up. */
   .concepts-deck {
     grid-template-columns: 1fr;
     width: 100%;
