@@ -133,31 +133,40 @@ body.is-loading {
 html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--nav-height) + 26px);
-  /*
-   * Scrollytelling: everything below the hero is a one-screen scene, and the
-   * scroller rests on one at a time. See the snap-scene rule further down.
-   *
-   * mandatory, so a scroll always lands on a scene. proximity was tried first
-   * and is what made this feel stuck rather than smooth: a single wheel notch
-   * never crosses the proximity threshold, so it left the scroller parked
-   * between two scenes with a band of each showing, and only a hard fling
-   * actually moved a whole screen.
-   *
-   * Mandatory needs every stretch of the page to be *some* snap area or the
-   * scroller cannot rest there at all. Two get one explicitly:
-   *
-   *   .pin-spacer  the hero's 2200px of scrubbed zoom. It has no single
-   *                resting place — the point is to scroll *through* it — but
-   *                the spec lets the scroller rest anywhere inside a snap area
-   *                that is taller than the viewport, and at 2200px against
-   *                900px it is. Without this, scrolling into the zoom was
-   *                thrown straight out to #projects: scrollTo(1200) landed at
-   *                5700, which is what killed mandatory the first time.
-   *
-   *   footer       shorter than a screen and last on the page, so with no snap
-   *                point of its own the scroller would spring back to the
-   *                final scene and the footer could never be read.
-   */
+}
+
+/*
+ * Scrollytelling: everything below the hero is a one-screen scene, and the
+ * scroller rests on one at a time. See the snap-scene rule further down.
+ *
+ * mandatory, so a scroll always lands on a scene. proximity was tried first
+ * and is what made this feel stuck rather than smooth: a single wheel notch
+ * never crosses the proximity threshold, so it left the scroller parked
+ * between two scenes with a band of each showing, and only a hard fling
+ * actually moved a whole screen.
+ *
+ * Mandatory needs every stretch of the page to be *some* snap area or the
+ * scroller cannot rest there at all. Two get one explicitly:
+ *
+ *   .pin-spacer  the hero's 2200px of scrubbed zoom. It has no single
+ *                resting place — the point is to scroll *through* it — but
+ *                the spec lets the scroller rest anywhere inside a snap area
+ *                that is taller than the viewport, and at 2200px against
+ *                900px it is. Without this, scrolling into the zoom was
+ *                thrown straight out to #projects: scrollTo(1200) landed at
+ *                5700, which is what killed mandatory the first time.
+ *
+ *   footer       shorter than a screen and last on the page, so with no snap
+ *                point of its own the scroller would spring back to the
+ *                final scene and the footer could never be read.
+ *
+ * Scoped to .scrollytelling (set on index.html's <html>) because mandatory is
+ * only safe on a page built entirely out of snap areas. Careers shares this
+ * stylesheet and has no scenes, so its only snap area was the footer: every
+ * wheel notch anywhere on the page was snapped straight down to it and the
+ * card above could not be read at all.
+ */
+html.scrollytelling {
   scroll-snap-type: y mandatory;
 }
 
@@ -262,8 +271,8 @@ footer {
  * scroller to the top of the zoom, it simply makes the whole zoom a legal
  * place to rest.
  */
-.pin-spacer,
-footer {
+.scrollytelling .pin-spacer,
+.scrollytelling footer {
   scroll-snap-align: start;
   scroll-margin-top: calc(-1 * (var(--nav-height) + 26px));
 }
@@ -272,8 +281,14 @@ footer {
  * Navbar — frosted pill system
  * Logo left, .liquid-glass pill nav centred, hamburger right. The bar itself
  * stays transparent; only the pills are glass.
+ *
+ * `body > nav`, not a bare `nav`: the fullscreen menu's link list is also a
+ * <nav> (it is a navigation landmark, and should stay one). A bare selector
+ * handed it position:fixed/top:0/width:100%, which tore it out of the menu's
+ * centred column and pinned it to the top of the screen — leaving the CTA as
+ * the only item left to centre, so it landed on top of the last link.
  * ====================================================================== */
-nav {
+body > nav {
   position: fixed;
   top: 0;
   left: 0;
@@ -294,7 +309,7 @@ nav {
  * and a running animation out-ranks the transition above. initNavAutoHide()
  * retires it once it has played so the bar is free to slide away.
  */
-nav.nav-ready {
+body > nav.nav-ready {
   animation: none;
 }
 
@@ -304,18 +319,18 @@ nav.nav-ready {
  * getting out of the way is cheaper than giving it a background that would
  * cover the artwork behind it. Scrolling up brings it straight back.
  */
-nav.nav-hidden {
+body > nav.nav-hidden {
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
 }
 
 @media (min-width: 640px) {
-  nav { padding: 1.25rem 2rem; } /* sm:py-5 sm:px-8 */
+  body > nav { padding: 1.25rem 2rem; } /* sm:py-5 sm:px-8 */
 }
 
 @media (min-width: 1024px) {
-  nav { padding: 1.25rem 2.5rem; } /* lg:px-10 */
+  body > nav { padding: 1.25rem 2.5rem; } /* lg:px-10 */
 }
 
 @keyframes nav-fade-down {
