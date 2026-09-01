@@ -3414,34 +3414,116 @@ function setupServiceDeck() {
 }
 
 /* -------------------------------------------------------------------------
- * About Us background — the black hole, with ABOUT US lettered across it
+ * About Us background — the silk dune, with ABOUT US lettered across it
  *
- * The backdrop is an image now, set on .about-us-field in the stylesheet. The
- * light-trail ribbon that used to be drawn here — a CatmullRom sweep rendered
- * three times through TRAIL_FRAGMENT_SHADER, plus three canvas glow sprites —
- * is gone with it, along with the turn-and-refit logic that framed it on narrow
- * boxes.
+ * One luminous ridge divides the frame: violet floods below it, near-black navy
+ * above, and pale light rides the fold — hottest at the bend, pooling again over
+ * the bowl on the right, with a shimmer gliding along the crest forever. A
+ * second, dimmer fold grazes the upper-left corner for depth.
  *
- * What is left is the lettering pass, on a transparent canvas over the image:
- * ABOUT US in the same treatment as the other fields, thin tracked glyphs at
- * their own depths with two coloured strays, carried by the cursor parallax and
- * a slow drift so they read as part of the artwork rather than text pasted on
- * top of it.
+ * This replaces the black-hole image the section used to carry as a CSS
+ * background, which is why the field is opaque again and back to the two-pass
+ * arrangement every other scene section uses: the dune fills the frame from an
+ * orthographic quad, then the depth buffer is cleared and ABOUT US draws over it
+ * from the perspective camera that parallaxes off the cursor.
  *
  * The glyphs are decoration: the section's real heading is the visually-hidden
  * h2, which stays selectable, searchable and available to screen readers.
  * ---------------------------------------------------------------------- */
+const SILK_FRAGMENT_SHADER = `
+  precision highp float;
+  uniform vec2  uRes, uPtr;
+  uniform float uTime, uReveal, uDraw, uFields, uPool;
+
+  /* GLSL ES 1.00 has no tanh. Clamped before the exp, or the flanks overflow to
+     inf and the ridge comes back NaN — a black frame rather than a bad one. */
+  float tanhA(float x){
+    x = clamp(x, -6.0, 6.0);
+    float e = exp(2.0*x);
+    return (e - 1.0)/(e + 1.0);
+  }
+
+  /*
+   * The ridge: an S sweeping down from the upper left, through the centre,
+   * flattening into the bowl, rising again at the far right — and always,
+   * gently, rolling. Two slow sines of different periods, so the roll never
+   * repeats on any interval short enough to notice.
+   */
+  float W(float x, float t){
+    float w = -0.04 - 0.50*tanhA((x + 0.10)*1.35);
+    w += 0.26*pow(smoothstep(0.45, 1.7, x), 2.0);
+    w += 0.030*sin(x*1.5 + t*0.26) + 0.018*sin(x*2.7 - t*0.19);
+    return w;
+  }
+
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/min(uRes.x,uRes.y)*2.0;
+    uv += uPtr * 0.020;
+
+    /*
+     * The ridge is written against a frame reaching about 1.75 uv units either
+     * side of centre. Taken literally it would run off the end of a desktop
+     * window and stop short of a phone's edges: uv is normalised by the SHORT
+     * side, so a 375x812 portrait box only reaches 1.0 across and the sweep
+     * would end before the bowl and the right-hand rise — half the shape, and
+     * the half the pool of light sits in. Rescaling x spans the S across
+     * whatever frame it is given, and everything downstream is solved in that
+     * same space, so the pool, the shimmer and the second fold travel with it.
+     */
+    uv.x *= 1.75 / (uRes.x / min(uRes.x, uRes.y));
+
+    float t = uTime;
+    float x = uv.x;
+    float d = uv.y - W(x, t);
+
+    /* the two silk fields, either side of the fold */
+    float aa = smoothstep(-0.004, 0.004, d);
+    vec3 colAbove = mix(vec3(0.052,0.046,0.170), vec3(0.008,0.008,0.032),
+                        smoothstep(-0.15, 1.25, d + x*0.28));
+    vec3 colBelow = mix(vec3(0.300,0.165,0.880), vec3(0.085,0.050,0.340),
+                        smoothstep(0.00, 1.45, -d - x*0.22));
+    vec3 col = mix(colBelow, colAbove, aa) * uFields;
+    col += vec3(0.004, 0.003, 0.010);
+
+    /* the crest draws itself in from the left */
+    float edge = -1.9 + uDraw*3.9;
+    float drawM = 1.0 - smoothstep(edge - 0.25, edge, x);
+
+    /* Light riding the fold: a razor line and a soft wrap around it, hottest at
+       the bend, glowing again over the bowl, with a shimmer gliding along the
+       ridge forever. */
+    float crest = exp(-pow(d*26.0, 2.0)) + 0.45*exp(-pow(d*9.0, 2.0));
+    float along = 0.16
+      + 1.05*exp(-pow((x + 0.10)/0.42, 2.0))
+      + 0.70*exp(-pow((x - 0.70)/0.48, 2.0));
+    along += 0.35*exp(-pow((x - (-1.6 + fract(t*0.055)*3.4))/0.30, 2.0));
+
+    vec3 crestCol = mix(vec3(0.60,0.44,1.00), vec3(0.97,0.93,1.00),
+                        clamp(along*0.7, 0.0, 1.0));
+    col += crestCol * crest * along * drawM;
+
+    /* the pool of light settling into the bowl */
+    float pool = exp(-pow(length((uv - vec2(0.62,-0.44))*vec2(1.0,1.45)), 2.0)*2.2);
+    col += vec3(0.55,0.43,1.00) * pool * 0.48 * uPool * (1.0 - aa*0.55);
+
+    /* the second, dimmer fold grazing the top-left corner */
+    float d2 = uv.y - (W(x - 0.55, t) + 0.92);
+    float m2 = smoothstep(0.25, -0.65, x) * smoothstep(0.05, 0.65, uv.y);
+    col += vec3(0.36,0.25,0.86) * exp(-pow(d2*20.0, 2.0)) * 0.30 * m2 * uDraw;
+    col += vec3(0.16,0.11,0.44) * exp(-max(-d2, 0.0)*5.0) * 0.18 * m2 * uFields;
+
+    col *= 1.0 - 0.26*pow(length(uv*vec2(0.58,0.60)), 2.4);
+    col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
+    gl_FragColor = vec4(col * uReveal, 1.0);
+  }
+`;
+
 function initAboutUsField() {
   const host = document.querySelector('#about-us-field');
   if (!host) return;
 
   let renderer;
   try {
-    /*
-     * alpha, and cleared to nothing. The canvas is a transparent sheet over the
-     * background image now, where it used to be an opaque black frame with the
-     * ribbon drawn into it.
-     */
     renderer = new THREE.WebGLRenderer({
       /*
        * No multisampling, and no stencil.
@@ -3457,20 +3539,47 @@ function initAboutUsField() {
        */
       antialias: false,
       stencil: false,
-      alpha: true,
     });
   } catch (error) {
     console.error('About Us field: no WebGL context', error);
     return;
   }
 
-  /* Same r128 grade as the other fields: the glyph textures are baked at the
-     values we want and an sRGB transfer on the way out would lift them. */
+  /* Same r128 grade as the other fields: the shader hand-rolls its crest, its
+     two silk ramps and a 1/255 dither, and the glyph textures are baked at the
+     values we want. An sRGB transfer on the way out would lift both. */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
-  renderer.setClearColor(0x000000, 0);
+  /* Two passes share the one renderer, so the clear is driven by hand. */
+  renderer.autoClear = false;
   host.appendChild(renderer.domElement);
 
+  /* --- pass 1: the silk dune ---------------------------------------------- */
+  const bgScene = new THREE.Scene();
+  const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  const uni = {
+    uRes: { value: new THREE.Vector2(1, 1) },
+    uTime: { value: 0 },
+    uPtr: { value: new THREE.Vector2(0, 0) },
+    uReveal: { value: 0 },
+    uDraw: { value: 0 } /* the crest draws along its length */,
+    uFields: { value: 0 } /* the two colour fields flood in   */,
+    uPool: { value: 0 } /* the glow pools into the bowl     */,
+  };
+
+  bgScene.add(
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: uni,
+        vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
+        fragmentShader: SILK_FRAGMENT_SHADER,
+      })
+    )
+  );
+
+  /* --- pass 2: ABOUT US ---------------------------------------------------- */
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 60);
   camera.position.set(0, 0, 7.2);
@@ -3481,17 +3590,17 @@ function initAboutUsField() {
   const wordGroup = new THREE.Group();
   world.add(wordGroup);
 
-  /* --- ABOUT US ----------------------------------------------------------- */
   const WORD = 'ABOUT US';
   const LETTER_SIZE = 0.36;
   const LETTER_GAP = 0.4;
   const WORD_WIDTH = (WORD.length - 1) * LETTER_GAP;
 
   /*
-   * The plate is what makes the word legible here. It sits across the accretion
-   * disc, whose inner ring is the brightest thing in the image, so each glyph
-   * carries a blurred near-black copy of itself underneath. Same treatment as
-   * the services word over the eclipse's lit limb. See letterTexture's opts.
+   * The plate is what makes the word legible here. The row is centred, and the
+   * crest passes through it a little left of centre — that fold is the brightest
+   * thing in the frame, near white where it bends — so each glyph carries a
+   * blurred near-black copy of itself underneath. Same treatment as the services
+   * word over the warp's hero flares. See letterTexture's opts.
    */
   const GLYPH = { weight: 200, plate: 'rgba(6,4,14,0.92)' };
 
@@ -3541,6 +3650,7 @@ function initAboutUsField() {
     if (!w || !h) return;
 
     renderer.setSize(w, h, false);
+    uni.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
     const a = w / h;
     camera.aspect = a;
     camera.position.z = DESIGN_Z;
@@ -3568,16 +3678,16 @@ function initAboutUsField() {
     });
 
     /*
-     * Dead centre, which is where the image puts the black hole — unless the
-     * card is in the way.
+     * Dead centre, which is where the dune puts its bend — unless the card is
+     * in the way.
      *
      * On a landscape box the card is bottom-aligned and the middle is clear, so
-     * the word sits on the core and the glyph plates above are what let it read
-     * against the bright ring rather than beside it. Below 1:1 the section turns
-     * into a block, the card moves to the top and is taller for the reflow, and
-     * it lands squarely across the centre — a fixed centre would print the word
-     * through the copy, which is the failure the old card-derived placement
-     * existed to avoid.
+     * the word sits across the fold and the glyph plates are what let it read
+     * against the crest rather than beside it. Below 1:1 the section turns into
+     * a block, the card moves to the top and is taller for the reflow, and it
+     * lands squarely across the centre — a fixed centre would print the word
+     * through the copy, which is the failure the card-derived placement exists
+     * to avoid.
      *
      * So: centre when the middle is free, and otherwise the middle of whichever
      * clear band is bigger, clamped inside the field's own mask. That fade runs
@@ -3604,7 +3714,7 @@ function initAboutUsField() {
     targetPx = Math.min(Math.max(targetPx, rect.height * 0.12 + halfWordPx), rect.height * 0.88 - halfWordPx);
     wordGroup.position.y = ((midPx - targetPx) / midPx) * halfFrameH;
 
-    if (prefersReducedMotion) renderer.render(scene, camera);
+    if (prefersReducedMotion) draw();
   }
   /* Observed rather than measured once: the section is still pre-layout when
      this runs, exactly as the other fields were. */
@@ -3636,11 +3746,11 @@ function initAboutUsField() {
   let onScreen = false;
 
   /*
-   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
-   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
-   * On a 120Hz panel that is four times the shading the artwork needs, and it
-   * is what had the fans running. 30 divides evenly into both 60 and 120, so
-   * the cadence stays regular rather than juddering.
+   * Half rate. These are ambient drifts — a rolling ridge, a shimmer gliding
+   * along the crest, a slow parallax — redrawn as a full-viewport fragment
+   * shader every refresh. On a 120Hz panel that is four times the shading the
+   * artwork needs, and it is what had the fans running. 30 divides evenly into
+   * both 60 and 120, so the cadence stays regular rather than juddering.
    *
    * The hero is deliberately not capped: it carries the scroll-scrubbed motion,
    * where a dropped frame reads as a stutter.
@@ -3657,9 +3767,11 @@ function initAboutUsField() {
       lastFrameAt = now;
     }
     const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
+    uni.uTime.value = t;
 
     ptr.x += (target.x - ptr.x) * 0.05;
     ptr.y += (target.y - ptr.y) * 0.05;
+    uni.uPtr.value.set(ptr.x, ptr.y);
 
     world.rotation.y = ptr.x * 0.14;
     world.rotation.x = -ptr.y * 0.09;
@@ -3671,6 +3783,15 @@ function initAboutUsField() {
       });
     }
 
+    draw();
+  }
+
+  /* The dune fills the frame from the orthographic quad, then the depth buffer
+     is cleared so the lettering draws over it from its own camera. */
+  function draw() {
+    renderer.clear();
+    renderer.render(bgScene, bgCam);
+    renderer.clearDepth();
     renderer.render(scene, camera);
   }
 
@@ -3705,24 +3826,33 @@ function initAboutUsField() {
   }
 
   function entranceSequence() {
+    /*
+     * Out of black the crest draws itself along the ridge from the left, the
+     * violet and navy fields flood in on either side of it, the glow pools into
+     * the bowl — and only then does the word gather.
+     */
     const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' } });
+    tl.to(uni.uReveal, { value: 1, duration: 0.7 }, 0)
+      .to(uni.uDraw, { value: 1, duration: 2.2 }, 0.3)
+      .to(uni.uFields, { value: 1, duration: 2.0 }, 1.1)
+      .to(uni.uPool, { value: 1, duration: 1.8, ease: 'power2.out' }, 2.0);
 
     /*
-     * The word is thrown out of the singularity: every glyph starts collapsed on
-     * the core at a quarter of its size and flies to its place in the row.
+     * The word gathers out of the bend: every glyph starts collapsed at the
+     * centre at a quarter of its size and flies to its place in the row.
      *
      * Ordered by distance from the centre, not by position in the string, so it
-     * spreads outward from the black hole rather than sweeping left to right
-     * across it.
+     * spreads outward from the fold rather than sweeping left to right across
+     * it.
      *
      * x and scale, deliberately — not y. frame() rewrites position.y on every
-     * tick for the idle bob, so the previous entrance, which animated y and
-     * nothing else, was overwritten before it could be seen: the letters simply
-     * faded up on the spot. Nothing owns x or scale, so this actually moves.
+     * tick for the idle bob, so an entrance that animated y and nothing else was
+     * overwritten before it could be seen: the letters simply faded up on the
+     * spot. Nothing owns x or scale, so this actually moves.
      */
     const fromCore = [...letters].sort((a, b) => Math.abs(a.userData.baseX) - Math.abs(b.userData.baseX));
     fromCore.forEach((m, i) => {
-      const at = 0.2 + i * 0.075;
+      const at = 2.5 + i * 0.075;
       tl.fromTo(m.position, { x: 0 }, { x: m.userData.baseX, duration: 1.15, ease: 'power3.out' }, at);
       tl.fromTo(m.scale, { x: 0.25, y: 0.25 }, { x: 1, y: 1, duration: 1.15, ease: 'back.out(1.2)' }, at);
       tl.to(m.material, { opacity: 0.95, duration: 0.85, ease: 'power2.out' }, at);
@@ -3733,9 +3863,9 @@ function initAboutUsField() {
         m.scale,
         { x: 0.7, y: 0.7 },
         { x: 1, y: 1, duration: 1.1, ease: 'back.out(1.6)' },
-        1.15 + i * 0.25
+        3.45 + i * 0.25
       );
-      tl.to(m.material, { opacity: 0.55, duration: 1.0 }, 1.15 + i * 0.25);
+      tl.to(m.material, { opacity: 0.55, duration: 1.0 }, 3.45 + i * 0.25);
     });
 
     echoes.forEach((m, i) => {
@@ -3746,8 +3876,21 @@ function initAboutUsField() {
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut',
-        delay: 2.5,
+        delay: 4.8,
       });
+    });
+
+    /*
+     * And the pool keeps breathing. Started after the ramp has landed on 1, and
+     * yoyo returns it there, so the two tweens on uPool never fight over it.
+     */
+    gsap.to(uni.uPool, {
+      value: 0.82,
+      duration: 4.6,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut',
+      delay: 3.8,
     });
   }
 
@@ -3806,14 +3949,19 @@ function initAboutUsField() {
   }
 
   if (prefersReducedMotion) {
-    /* No entrance to play, so the word is placed at its settled values. */
+    /* No entrance to play, so the dune and the word are placed at their settled
+       values and the frame is drawn once. */
+    uni.uReveal.value = 1;
+    uni.uDraw.value = 1;
+    uni.uFields.value = 1;
+    uni.uPool.value = 1;
     letters.forEach((m) => {
       m.material.opacity = 0.95;
     });
     echoes.forEach((m) => {
       m.material.opacity = 0.55;
     });
-    renderer.render(scene, camera);
+    draw();
     return;
   }
 

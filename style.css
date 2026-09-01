@@ -1692,8 +1692,8 @@ nav .nav-links {
 /* =========================================================================
  * About Us
  *
- * The card surfaces come from .liquid-glass; the geometry is here, and the
- * light-trail ribbon sits behind it all in .about-us-field.
+ * The card surfaces come from .liquid-glass; the geometry is here, and the silk
+ * dune sits behind it all in .about-us-field.
  * ====================================================================== */
 #about-us {
   position: relative;
@@ -1709,24 +1709,25 @@ nav .nav-links {
   background: linear-gradient(180deg, transparent 0%, #000000 10%, #000000 90%, transparent 100%);
   padding: 9rem 1.75rem 5rem;
   /*
-   * Taller than the copy needs: the artwork behind is a wide disc and a short
-   * section would crop it to a band.
+   * Taller than the copy needs: the artwork behind is one long sweeping fold and
+   * a short section would crop it to a band.
    */
   min-height: 100svh;
   display: flex;
-  /* the card hangs off the bottom padding; the word sits on the core above it */
+  /* the card hangs off the bottom padding; the word sits across the fold above */
   align-items: flex-end;
 }
 
 /*
- * Full-bleed field. The backdrop is an image now — the light-trail ribbon that
- * used to be drawn into the canvas here is gone, and initAboutUsField() renders
- * only ABOUT US, on a transparent canvas over this.
+ * Full-bleed field. initAboutUsField() draws the whole thing — the silk dune and
+ * ABOUT US over it — so there is no CSS backdrop here any more; the black-hole
+ * image this used to carry is gone with it, and with it the cover/contain pair
+ * that framed a fixed-aspect bitmap. The shader spans its ridge across whatever
+ * box it is given instead.
  *
- * Same vertical fade as every other scene section, or the black behind the
- * artwork ends in a hard line against the page gradient. Pointer-events stay off
- * so the card keeps its hover — initAboutUsField() reads the cursor from the
- * section instead.
+ * Same vertical fade as every other scene section, or the artwork ends in a hard
+ * line against the page gradient. Pointer-events stay off so the card keeps its
+ * hover — initAboutUsField() reads the cursor from the section instead.
  */
 .about-us-field {
   position: absolute;
@@ -1734,34 +1735,8 @@ nav .nav-links {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background-image: url('https://pub-075771db1781451a9dc2753312c06534.r2.dev/ChatGPT%20Image%20Aug%206%2C%202026%2C%2009_10_52%20AM-Photoroom.png');
-  background-repeat: no-repeat;
-  background-position: center;
-  /*
-   * cover on a landscape box: the artwork is 1.8:1 against a section that is
-   * wider still, so this fills the frame and crops only the empty sky off the
-   * top and bottom. It is the wrong choice the moment the box is taller than it
-   * is wide — see the portrait rule below.
-   */
-  background-size: cover;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-}
-
-/*
- * Portrait: contain, not cover. Covering a tall narrow box with a 1.8:1 image
- * scales it to the height and crops the sides away — on a phone that leaves a
- * column through the middle of the core and none of the disc, which is the part
- * that reads as a black hole. Contained it sits as a band across the middle,
- * which is small but whole.
- *
- * Keyed on the shape rather than a width breakpoint because that is the actual
- * condition: a portrait tablet has the same problem as a phone.
- */
-@media (max-aspect-ratio: 1 / 1) {
-  .about-us-field {
-    background-size: contain;
-  }
 }
 
 .about-us-field canvas {
@@ -1773,21 +1748,27 @@ nav .nav-links {
 }
 
 /*
- * Black scrim over the trail — the heavier .about-field grade rather than the
- * lighter .capability-field one, because this stroke is genuinely brighter.
- * The three ribbon passes are additive and their peak terms sum to roughly 5x
- * white before the framebuffer clamps, so the core lines are flat #fff, not a
- * tint. At 0.83 that clamped white lands on rgb(43) — enough for the secondary
- * copy to clear 4.5:1 both bare and through a .liquid-glass card, which only
- * lifts the surface it sits on by 5% of white.
+ * Black scrim, banded by height — same idea as .makers-field::after and
+ * .projects-field::after: the scrim sits over the canvas, so a flat wash would
+ * dim ABOUT US along with the artwork. The word and the card occupy different
+ * rows — the glyphs fall around 40%..48% of the height, the card in 66%..91% —
+ * so the top stays light and the weight goes under the card.
  *
- * Banded by height, though, for the same reason as .makers-field::after and
- * .projects-field::after: the scrim is over the canvas, so a flat 0.83 dims
- * ABOUT US along with the stroke. The word and the card occupy different rows —
- * the glyphs and their echoes fall in roughly 18%..47% of the height, the card
- * in 54%..89% — so the wash is light through the lettering and keeps the proven
- * 0.83 only under the card. The word can afford it: the row spans x -1.4..1.4,
- * where the stroke is down at its dip, so there is no hot core behind it.
+ * Much lighter under the card than the ribbon this replaced needed, and the
+ * shader is why. That ribbon summed three additive passes to roughly 5x white
+ * and its core lines clamped to flat #fff, so it took 0.83 to bring them down.
+ * The dune's crest is the only comparably bright thing here, and on a landscape
+ * box it never reaches the card: the ridge is still up around uv y +0.02..+0.45
+ * across the card's own span, well above its top edge, so everything behind the
+ * copy is the violet field. Sampled off the shader at 1425x860, the brightest
+ * pixel in the card's box comes out rgb(36,22,102) once this 0.55 is applied,
+ * which holds the secondary copy at 7.2:1 — bare, and through a .liquid-glass
+ * card, which lifts the surface it sits on by only 5% of white.
+ *
+ * Which matters, because 0.83 would have taken the pool of light with it: that
+ * glow sits around 73% of the height, squarely inside the heavy band, and it is
+ * the payoff the whole entrance builds to. The mobile override further down
+ * moves this weight, because there the card does too.
  */
 .about-us-field::after {
   content: '';
@@ -1800,12 +1781,12 @@ nav .nav-links {
     radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.45) 0%,
-      rgba(0, 0, 0, 0.34) 20%,
-      rgba(0, 0, 0, 0.34) 48%,
-      rgba(0, 0, 0, 0.83) 57%,
-      rgba(0, 0, 0, 0.83) 90%,
-      rgba(0, 0, 0, 0.45) 100%
+      rgba(0, 0, 0, 0.42) 0%,
+      rgba(0, 0, 0, 0.3) 20%,
+      rgba(0, 0, 0, 0.3) 48%,
+      rgba(0, 0, 0, 0.55) 57%,
+      rgba(0, 0, 0, 0.55) 90%,
+      rgba(0, 0, 0, 0.42) 100%
     );
 }
 
@@ -3254,6 +3235,36 @@ footer {
     bottom: auto;
   }
 
+  /*
+   * The About Us scrim's weight follows the card, and the card has moved.
+   *
+   * #about-us goes to block flow here, so the copy leaves the bottom of the
+   * frame for 25%..53% of it — and the dune's crest sweeps through exactly that
+   * band. Measured against the shader at 375x812: under the desktop banding the
+   * brightest pixel behind the paragraph is the crest's clamped white at
+   * rgb(179), which is 1.01:1 against the secondary copy. Illegible, and the
+   * artwork's own subject is what does it.
+   *
+   * Moving the 0.8 up to cover 18%..58% puts that same pixel at rgb(51) and the
+   * copy back to 6:1. The word and the pool of light both sit lower — the row
+   * lands around 72%..82%, where the worst case is rgb(55,34,150) at 5.5:1 —
+   * so the bottom of the frame keeps the light band and the artwork still
+   * arrives at its payoff.
+   */
+  .about-us-field::after {
+    background:
+      radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
+      linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.45) 0%,
+        rgba(0, 0, 0, 0.8) 18%,
+        rgba(0, 0, 0, 0.8) 58%,
+        rgba(0, 0, 0, 0.3) 66%,
+        rgba(0, 0, 0, 0.3) 90%,
+        rgba(0, 0, 0, 0.45) 100%
+      );
+  }
+
   /* The panel is the only thing in this section, so it takes the width. */
   .systems-panel { width: 94vw; }
   .systems-body > p { font-size: 0.95rem; }
@@ -3280,18 +3291,6 @@ footer {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 5%, #000 92%, transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0%, #000 5%, #000 92%, transparent 100%);
   }
-
-  /*
-   * The black hole drops below the card instead of sitting behind it.
-   *
-   * #about-us goes to block flow here, which puts the card across the middle of
-   * the frame — exactly where `background-position: center` parks the core, so
-   * the glow came up through the paragraph. initAboutUsField() already moves
-   * the ABOUT US row to the clear band under the card; this sends the artwork
-   * down to join it rather than leaving the two halves of the composition on
-   * opposite sides of the copy.
-   */
-  .about-us-field { background-position: center 76%; }
 
   .cta-card { max-width: none; padding: 1.9rem 1.5rem; border-radius: 20px; gap: 1.1rem; }
 
