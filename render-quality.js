@@ -12,8 +12,14 @@
  * Lives in its own module so the home page and the Careers page cannot drift
  * apart on the policy — both import this one implementation.
  * ====================================================================== */
-const SMALL_SCREEN_QUERY = window.matchMedia('(max-width: 767.98px)');
+/*
+ * Exported, because resolution is not the only thing a phone wants turned
+ * down: the services field also compiles a smaller comet swarm at this width.
+ * Same reasoning as above — one query, so the two decisions cannot drift onto
+ * different breakpoints.
+ */
+export const SMALL_SCREEN = window.matchMedia('(max-width: 767.98px)');
 
 export function pixelRatioFor(desktopCap, mobileCap) {
-  return Math.min(window.devicePixelRatio, SMALL_SCREEN_QUERY.matches ? mobileCap : desktopCap);
+  return Math.min(window.devicePixelRatio, SMALL_SCREEN.matches ? mobileCap : desktopCap);
 }

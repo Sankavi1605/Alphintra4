@@ -5,11 +5,13 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-import { pixelRatioFor } from './render-quality.js';
+import { pixelRatioFor, SMALL_SCREEN } from './render-quality.js';
 // Canvas-texture glyph rows, shared by the Makers and Featured Work fields.
-import { makeLetter, fitScale } from './webgl-letters.js';
+import { makeLetter, fitScale, fitMargin } from './webgl-letters.js';
 // The hero's purple-horizon background; also used on the Careers page.
 import { initHorizonField } from './horizon-field.js';
+// One gesture, one scene. Replaces the CSS scroll-snap this page used to use.
+import { initSectionScroll } from './section-scroll.js';
 
 // Nav, FAQ, contact form and the other shared page behaviour.
 import './ui.js';
@@ -25,6 +27,9 @@ gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
 
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Scene-to-scene stepping. Bails out on its own under reduced motion. */
+initSectionScroll();
 
 /* -------------------------------------------------------------------------
  * Loader
@@ -2626,99 +2631,162 @@ function initCapabilityField() {
 }
 
 /* -------------------------------------------------------------------------
- * Services background — the eclipse
+ * Services background — the warp burst
  *
- * The supplied sketch, ported from three r128 to r185. Two torus-faced orbs
- * kissing at a white-hot point: silver above lit from below, violet below lit
- * from above. Light crawls around each limb outward from the contact, and each
- * face carries a soft inner ring. Two passes share one renderer, so
- * `renderer.autoClear` is off and the clear is driven by hand.
+ * The supplied sketch, ported from three r128 to r185. Comets streaming
+ * outward from a vortex: each an analytic curved trail with a bright head and
+ * a tapering tail, respawning at the centre and flying out forever. A handful
+ * of hero comets flare wide and carry a luminous head halo; bokeh sparks drift
+ * between them. Two passes share one renderer, so `renderer.autoClear` is off
+ * and the clear is driven by hand.
+ *
+ * The sketch drove its own clock at a fixed rate. Here the rate is a plain JS
+ * object the entrance ramps with GSAP, and initServicesField accumulates it
+ * into uWarpT by frame delta — so the stream spools up from stillness on
+ * arrival and cannot jump when a throttled or backgrounded frame lands late.
  * ---------------------------------------------------------------------- */
-const ECLIPSE_FRAGMENT_SHADER = `
+
+/*
+ * How many comets each layer draws.
+ *
+ * The sketch ran 60 trail evaluations a pixel, every one of them a handful of
+ * exp and pow calls, as a full-viewport fragment shader. That is affordable on
+ * its own; this page runs nine WebGL fields, so the counts are injected as
+ * defines and halved on phones rather than baked into the source. Desktop keeps
+ * a near-full swarm, and the 30fps cap the other fields use applies here too.
+ */
+const WARP_LAYERS_DESKTOP = { FAR: 8, SWARM: 22, LINERS: 8, HEROES: 5, SPARKS: 9 };
+const WARP_LAYERS_MOBILE = { FAR: 4, SWARM: 11, LINERS: 4, HEROES: 3, SPARKS: 5 };
+
+const WARP_FRAGMENT_SHADER = `
   precision highp float;
-  uniform vec2  uRes, uPtr;
-  uniform float uTime, uReveal, uCore, uSweep, uRing;
+  uniform vec2  uRes, uPtr, uCentre;
+  uniform float uWarpT, uTime, uReveal, uHero, uReach;
 
-  vec3 orb(vec2 uv, vec2 C, float R, float side, vec3 tint){
-    /* side = +1: lit from below (the top orb)
-       side = -1: lit from above (the bottom orb) */
-    vec2 q = (uv - C)/R;
-    float r = length(q);
-    if(r > 1.6) return vec3(0.0);
-    float th = atan(q.y, q.x);
+  const float TAU = 6.28318530718;
 
-    /* the light crawls around the limb away from the kiss */
-    float contact = side > 0.0 ? -1.5707963 : 1.5707963;
-    float ad = abs(atan(sin(th - contact), cos(th - contact)));
-    float m = 1.0 - smoothstep(uSweep*3.35 - 0.22, uSweep*3.35 + 0.06, ad);
+  float hash(float n){ return fract(sin(n*127.1)*43758.5453); }
+  float angDiff(float a, float b){ return atan(sin(a-b), cos(a-b)); }
 
-    float inside = 1.0 - smoothstep(0.99, 1.015, r);
-    float nz = sqrt(max(1.0 - r*r, 0.0));
-    vec3  n  = vec3(q, nz);
-    vec3  L  = normalize(vec3(0.0, -side, 0.55));
-    float diff = pow(max(dot(n, L), 0.0), 2.4);
+  /*
+   * One comet: an analytic curved trail radiating from the vortex. Returns the
+   * trail plus its bloom, and for the heroes a luminous head halo on top.
+   *
+   * Everything is solved in "progress" space: s is how far along its journey
+   * this pixel sits, prog is where the comet's head has got to, and the trail
+   * exists only over the tail behind it. So the whole swarm is one closed-form
+   * evaluation per pixel with no particles to simulate and nothing to store.
+   */
+  vec3 comet(vec2 p, float thPix, float rPix, float k, float t,
+             float widthMul, float ampMul, float tailMul, float haloAmp, float pxUV){
+    float a0    = hash(k*1.7) * TAU + t*0.004*(hash(k*8.1)-0.5);
+    float speed = 0.050 + 0.075*hash(k*2.3);
+    float bend  = (hash(k*3.1) - 0.5) * 0.9;
+    float tail  = (0.20 + 0.22*hash(k*4.7)) * tailMul;
+    float prog  = fract(hash(k*5.3) + t*speed);
 
-    /* faint body — the orb barely emerges from black */
-    vec3 col = tint * diff * 0.22 * inside;
+    /* palette by lot: blue / violet / purple / pink / white */
+    float c = hash(k*6.9);
+    vec3 tint = c < 0.28 ? vec3(0.25,0.45,1.00)
+              : c < 0.52 ? vec3(0.55,0.35,1.00)
+              : c < 0.74 ? vec3(0.72,0.42,1.00)
+              : c < 0.90 ? vec3(1.00,0.56,0.70)
+                         : vec3(0.92,0.90,1.00);
 
-    /* the outer limb: bright toward the kiss, white-hot at it */
-    float rim  = exp(-pow((r - 1.0)*24.0, 2.0));
-    float rimW = pow(max(-side*sin(th), 0.0), 1.7);
-    col += tint * rim * (0.10 + 1.45*rimW) * 1.0;
-    col += vec3(1.0,0.99,1.0) * rim * pow(rimW, 3.2) * 0.95;
+    vec3 acc = vec3(0.0);
+    float lifeFade = 1.0 - smoothstep(0.80, 0.99, prog);
 
-    /* soft glow bleeding just outside the lit limb */
-    float e = max(r - 1.0, 0.0);
-    col += tint * exp(-e*10.0) * rimW * 0.35 * step(1.0, r);
+    /* the trail */
+    float s = pow(clamp(rPix/uReach, 0.0, 1.0), 1.0/1.35);
+    if(s <= prog && s >= prog - tail){
+      float along = (s - (prog - tail)) / tail;
+      float aHere = a0 + bend * s;
+      float dAng  = angDiff(thPix, aHere);
+      float lat   = abs(dAng) * max(rPix, 0.05);
 
-    /* the inner ring — the torus hole, shimmering faintly,
-       lit on its kiss-facing arc */
-    float rr = 0.55 + 0.012*sin(uTime*0.6 + th*2.0);
-    float ring = exp(-pow((r - rr)*15.0, 2.0));
-    col += tint * ring * (0.08 + 0.30*rimW + 0.10*diff) * uRing;
+      /* Never thinner than a pixel and a half, or a trail crossing the frame
+         breaks into a dotted line as the derivative outruns the sample grid. */
+      float wCore = max(0.0042*widthMul, pxUV*1.6);
+      float core = exp(-pow(lat/wCore, 2.0));
+      float glowW= exp(-pow(lat/(wCore*3.4), 2.0)) * 0.30;
 
-    return col * m;
+      float body = pow(along, 2.3);
+      float head = exp(-pow((s - prog)/0.030, 2.0)) * 1.6;
+
+      vec3 trailTint = mix(tint, vec3(1.0,0.98,1.0), pow(along, 5.0)*0.55);
+      float born = smoothstep(0.028, 0.095, s);
+      acc += trailTint * (body + head) * (core + glowW) * born * lifeFade * ampMul;
+    }
+
+    /* The head halo. Gated on a literal 0.0 for every layer but the heroes, so
+       the compiler drops this whole block from their programs. */
+    if(haloAmp > 0.001){
+      float rHead = uReach * pow(prog, 1.35);
+      float aHead = a0 + bend * prog;
+      vec2  hp = rHead * vec2(cos(aHead), sin(aHead));
+      float hd = dot(p - hp, p - hp);
+      float bornH = smoothstep(0.06, 0.16, prog);
+      acc += mix(tint, vec3(1.0), 0.45)
+             * (exp(-hd*900.0)*1.1 + exp(-hd*160.0)*0.30)
+             * haloAmp * bornH * lifeFade;
+    }
+    return acc;
   }
 
   void main(){
     vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/min(uRes.x,uRes.y)*2.0;
-    uv += uPtr * 0.022;
+    float pxUV = 2.0 / min(uRes.x, uRes.y);
 
-    vec3 col = vec3(0.004, 0.004, 0.007);
+    /* resize() parks the vanishing point; the pointer only nudges it. */
+    vec2 C = uCentre + uPtr*0.035;
+    vec2 p = uv - C;
+    float rPix  = length(p);
+    float thPix = atan(p.y, p.x);
 
-    vec3 silver = vec3(0.82, 0.85, 0.92);
-    vec3 violet = vec3(0.55, 0.36, 0.98);
+    vec3 col = vec3(0.004, 0.004, 0.008);
 
-    float breathe = 1.0 + 0.006*sin(uTime*0.5);
+    /* far layer: faint thin streaks, for depth */
+    for(int i=0;i<FAR;i++){
+      col += comet(p, thPix, rPix, float(i)+301.0, uWarpT*1.15, 0.62, 0.24, 1.0, 0.0, pxUV);
+    }
+    /* the swarm */
+    for(int i=0;i<SWARM;i++){
+      col += comet(p, thPix, rPix, float(i)+1.0, uWarpT, 1.0, 0.85, 1.0, 0.0, pxUV);
+    }
+    /* the liners: ultra-long thin lines spanning the frame */
+    for(int i=0;i<LINERS;i++){
+      col += comet(p, thPix, rPix, float(i)*3.3+201.0, uWarpT*0.62, 0.72, 0.42, 3.6, 0.0, pxUV);
+    }
+    /* the heroes: wide, brilliant, with luminous head halos */
+    for(int i=0;i<HEROES;i++){
+      float k = float(i)*7.77 + 101.0;
+      col += comet(p, thPix, rPix, k, uWarpT*0.8, 3.4, 2.0, 1.0, 0.85*uHero, pxUV) * (0.35 + 0.65*uHero);
+    }
+
+    /* bokeh sparks drifting outward slowly */
+    for(int i=0;i<SPARKS;i++){
+      float k = float(i)+61.0;
+      float a = hash(k*1.3)*TAU;
+      float rr = 0.15 + fract(hash(k*2.9) + uWarpT*0.018) * 1.1;
+      vec2 sp = rr*vec2(cos(a), sin(a));
+      float tw = 0.55 + 0.45*sin(uTime*(1.0+hash(k)*2.0) + k);
+      col += vec3(0.85,0.72,0.95) * exp(-dot(p-sp,p-sp)*9000.0) * tw * 0.55;
+    }
+
+    /* the vortex: tiny faint rings at the vanishing point */
+    col += vec3(0.35,0.30,0.75) * exp(-pow((rPix-0.022)*220.0,2.0)) * 0.35;
+    col += vec3(0.30,0.24,0.65) * exp(-pow((rPix-0.042)*180.0,2.0)) * 0.22;
+    col += vec3(0.45,0.40,0.95) * exp(-rPix*rPix*160.0) * 0.35;
 
     /*
-     * The eclipse reads off its own scaled copy of uv, not uv itself. Dividing
-     * here magnifies the pair on screen: at 1.28 their outer limbs reach 1.09 of
-     * the frame's short half-axis, up from 0.85 unscaled, so the far edges now
-     * run past the top and bottom of the frame. That is the dim end of each orb
-     * — the rim term is 0.10 + 1.45*rimW, and rimW peaks at the kiss — while the
-     * bright arcs and the inner rings, which sit between 0.27 and 0.86, all stay
-     * in view and simply read larger.
-     *
-     * (No backticks in here: this whole shader is a template literal.)
-     *
-     * The vignette and the bottom scrim further down keep the unscaled uv, so
-     * the band held clear for the heading does not move with the orbs, and
-     * AI AND AUTOMATION is a separate perspective pass this cannot reach.
+     * Quiet band across the bottom, where the heading lives. Kept on the
+     * unscaled uv, like the eclipse this replaced: the row is placed against
+     * the frame, so the band it needs must not move with the vortex.
+     * Heavier than the eclipse's 0.20 because a comet is a hard bright edge
+     * rather than a soft limb, and the glyph plates alone do not cover it.
      */
-    vec2 ec = uv / 1.28;
-
-    col += orb(ec, vec2(0.0,  0.435*breathe), 0.415, +1.0, silver);
-    col += orb(ec, vec2(0.0, -0.435*breathe), 0.415, -1.0, violet);
-
-    /* the kiss: a white-violet star where the limbs meet */
-    float cd = length((ec - vec2(0.0, 0.0)) * vec2(1.0, 1.9));
-    vec3 kiss = mix(violet, vec3(1.0,0.99,1.0), 0.62);
-    col += kiss * (exp(-cd*24.0)*1.25 + exp(-cd*7.5)*0.32) * uCore;
-
-    /* quiet scrim over the bottom band, where the heading lives */
-    col *= 1.0 - 0.20*smoothstep(0.42, 0.95, -uv.y);
-    col *= 1.0 - 0.26*pow(length(uv*vec2(0.55,0.55)), 2.4);
+    col *= 1.0 - 0.30*smoothstep(0.42, 0.95, -uv.y);
+    col *= 1.0 - 0.28*pow(length(uv*vec2(0.60,0.55)), 2.4);
     col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
     gl_FragColor = vec4(col * uReveal, 1.0);
   }
@@ -2752,16 +2820,16 @@ function initServicesField() {
   }
 
   /*
-   * Same r128 grade as the other fields: the shader hand-rolls its rim, halo
-   * and kiss terms and adds a 1/255 dither, and an sRGB transfer on the way out
-   * would crush the three into one flat bloom.
+   * Same r128 grade as the other fields: the shader hand-rolls its trail, bloom
+   * and halo terms and adds a 1/255 dither, and an sRGB transfer on the way out
+   * would crush the three into one flat glare.
    */
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   renderer.setPixelRatio(pixelRatioFor(FIELD_PIXEL_CAP, 1.25));
   renderer.autoClear = false;
   host.appendChild(renderer.domElement);
 
-  /* --- pass 1: the eclipse ------------------------------------------------- */
+  /* --- pass 1: the warp burst --------------------------------------------- */
   const bgScene = new THREE.Scene();
   const bgCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
@@ -2770,18 +2838,27 @@ function initServicesField() {
     uTime: { value: 0 },
     uPtr: { value: new THREE.Vector2(0, 0) },
     uReveal: { value: 0 },
-    uCore: { value: 0 } /* the kiss-point bloom            */,
-    uSweep: { value: 0 } /* light crawling around the limbs */,
-    uRing: { value: 0 } /* the inner rings                 */,
+    uWarpT: { value: 0 } /* the warp clock; the loop drives it   */,
+    uHero: { value: 0 } /* the big flare comets bloom in        */,
+    uCentre: { value: new THREE.Vector2(0, 0) } /* the vanishing point */,
+    uReach: { value: 2.4 } /* how far a trail flies before it dies */,
   };
+
+  /*
+   * The rate the warp clock advances at. A plain object rather than a uniform
+   * because GSAP ramps it and the loop integrates it — see the note on the
+   * shader, and playEntrance below.
+   */
+  const warp = { speed: 0 };
 
   bgScene.add(
     new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.ShaderMaterial({
         uniforms: uni,
+        defines: SMALL_SCREEN.matches ? WARP_LAYERS_MOBILE : WARP_LAYERS_DESKTOP,
         vertexShader: 'void main(){ gl_Position = vec4(position,1.0); }',
-        fragmentShader: ECLIPSE_FRAGMENT_SHADER,
+        fragmentShader: WARP_FRAGMENT_SHADER,
       })
     )
   );
@@ -2883,6 +2960,39 @@ function initServicesField() {
     txCam.updateProjectionMatrix();
 
     /*
+     * Where the vortex sits, in the shader's own uv — which spans plus or minus
+     * the aspect across and plus or minus one down.
+     *
+     * The sketch parked it just off centre, which it could: it had nothing in
+     * frame but the word. Here .services-inner gives the copy the left column
+     * and leaves the right one to the artwork, so the vanishing point follows
+     * the aspect out to the right — the dense end of the stream, the rings and
+     * the hero halos all clear the card, and the card only ever sees thin
+     * outbound streaks. Capped, or an ultrawide window would push it into the
+     * bezel; barely offset at all on a portrait phone, where there is no second
+     * column to aim at.
+     */
+    const aspect = w / h;
+    uni.uCentre.value.set(aspect > 1 ? Math.min(0.3 * aspect, 0.62) : 0, aspect > 1 ? 0.18 : 0.1);
+
+    /*
+     * And how far a trail flies before it fades. The sketch hard-coded 1.55,
+     * which stops short of the corners on anything wider than about 4:3 — fine
+     * for a frame that was all artwork, but here it would leave the far side of
+     * a desktop window empty. Solved against the actual corner instead, so the
+     * stream always spans the whole field however it is shaped.
+     *
+     * Measured off the SHORT side, which is what the shader normalises uv by —
+     * not off the aspect. Getting that wrong is only invisible in landscape,
+     * where the short side is the height and the two agree: on a 375x812 phone
+     * the frame is 2.16 uv units tall, an aspect-derived reach came out at 1.10,
+     * and every trail died less than halfway up. The section rendered as a black
+     * box with a small blob of comets behind the card.
+     */
+    const short = Math.min(w, h);
+    uni.uReach.value = Math.hypot(w / short, h / short) + uni.uCentre.value.length();
+
+    /*
      * The sketch's own term, capped by fitScale. Its 0.52 floor has the same
      * flaw as the other sketches': at 0.52 this 17-glyph row still spans 1.08
      * world units either side of centre, and a portrait frustum is nowhere near
@@ -2974,8 +3084,8 @@ function initServicesField() {
   }
 
   /*
-   * Half rate. These are ambient drifts — orbiting lights, a breathing ring, a
-   * slow parallax — redrawn as a full-viewport fragment shader every refresh.
+   * Half rate. These are ambient drifts — a streaming swarm, twinkling sparks,
+   * a slow parallax — redrawn as a full-viewport fragment shader every refresh.
    * On a 120Hz panel that is four times the shading the artwork needs, and it
    * is what had the fans running. 30 divides evenly into both 60 and 120, so
    * the cadence stays regular rather than juddering.
@@ -2985,6 +3095,14 @@ function initServicesField() {
    */
   const FRAME_INTERVAL_MS = 1000 / 30;
   let lastFrameAt = 0;
+  /*
+   * The warp clock's own integrator, held against the elapsed time rather than
+   * asking the clock for a delta: getElapsedTime() consumes one itself, so
+   * calling both would hand this a delta of nearly zero and the stream would
+   * never advance. Clamped, or a frame landing late after a stall would
+   * teleport the whole swarm.
+   */
+  let lastT = 0;
 
   function frame(now) {
     frameId = requestAnimationFrame(frame);
@@ -2996,6 +3114,8 @@ function initServicesField() {
     }
     const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
     uni.uTime.value = t;
+    uni.uWarpT.value += Math.min(t - lastT, 0.05) * warp.speed;
+    lastT = t;
 
     const p = uni.uPtr.value;
     p.x += (target.x - p.x) * 0.045;
@@ -3019,8 +3139,8 @@ function initServicesField() {
 
   /*
    * Held until the section is on screen. The sequence runs about six seconds —
-   * fired on load, the kiss would have ignited and the limbs finished lighting
-   * long before anyone scrolled down to it.
+   * fired on load, the warp would have spooled up to cruise and the heroes
+   * finished flaring long before anyone scrolled down to it.
    */
   function playEntrance() {
     if (entrancePlayed) return;
@@ -3046,15 +3166,14 @@ function initServicesField() {
 
   function entranceSequence() {
     /*
-     * The sequence: out of pure black the kiss ignites, light crawls around
-     * both limbs away from it, the inner rings surface, then the heading
-     * settles in beneath, letter by letter.
+     * The sequence: out of pure black the vortex glints, the warp spools up
+     * from stillness to cruise as the comets start pouring out of it, the hero
+     * flares bloom, then the heading settles in beneath, letter by letter.
      */
     const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' } });
     tl.to(uni.uReveal, { value: 1, duration: 0.9 }, 0)
-      .fromTo(uni.uCore, { value: 0 }, { value: 1, duration: 1.1, ease: 'back.out(2.0)' }, 0.4)
-      .to(uni.uSweep, { value: 1, duration: 2.4 }, 0.9)
-      .to(uni.uRing, { value: 1, duration: 1.6, ease: 'power2.out' }, 2.2);
+      .to(warp, { speed: 1, duration: 2.6, ease: 'power2.in' }, 0.3)
+      .to(uni.uHero, { value: 1, duration: 1.8, ease: 'power2.out' }, 1.6);
 
     letters.forEach((m, i) => {
       tl.fromTo(
@@ -3085,14 +3204,18 @@ function initServicesField() {
       });
     });
 
-    /* the kiss keeps breathing */
-    gsap.to(uni.uCore, {
-      value: 0.82,
-      duration: 3.8,
+    /*
+     * Cruise breathes: the stream surges gently, forever. Started after the ramp
+     * has landed on 1, and yoyo returns it there, so the two tweens on
+     * warp.speed never fight over it.
+     */
+    gsap.to(warp, {
+      speed: 0.78,
+      duration: 5,
       repeat: -1,
       yoyo: true,
       ease: 'sine.inOut',
-      delay: 5,
+      delay: 4.5,
     });
   }
 
@@ -3151,11 +3274,15 @@ function initServicesField() {
   }
 
   if (prefersReducedMotion) {
-    /* No entrance to play, so every stage is placed at its settled value. */
+    /*
+     * No entrance to play, so every stage is placed at its settled value — and
+     * the warp clock is parked at a frame mid-flight rather than at 0, where
+     * every comet still sits on the vanishing point and the field would render
+     * as an empty vortex.
+     */
     uni.uReveal.value = 1;
-    uni.uCore.value = 1;
-    uni.uSweep.value = 1;
-    uni.uRing.value = 1;
+    uni.uHero.value = 1;
+    uni.uWarpT.value = 7;
     letters.forEach((m) => {
       m.material.opacity = 0.95;
     });
@@ -3427,7 +3554,7 @@ function initAboutUsField() {
      * would otherwise be wider than the frustum and render as "BOUT U" with
      * both ends cut off.
      */
-    const zoom = Math.min(1, (halfFrameW * 0.92) / WORD_HALF);
+    const zoom = Math.min(1, (halfFrameW * fitMargin(a)) / WORD_HALF);
     wordGroup.scale.setScalar(zoom);
 
     /*
@@ -4452,12 +4579,28 @@ function initContactField() {
      * had to shrink the word to keep them in frame. They get pulled in
      * instead — they are decoration, and their exact x is not load-bearing.
      */
-    const halfFrameW = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z * a;
+    const halfFrameH = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
+    const halfFrameW = halfFrameH * a;
     const limitAt = halfFrameW / txScene.scale.x;
     echoes.forEach((m) => {
       const limit = limitAt * 0.94 - m.geometry.parameters.width / 2;
       m.position.x = Math.sign(m.userData.baseX) * Math.min(Math.abs(m.userData.baseX), limit);
     });
+
+    /*
+     * Vertical placement. On a landscape box the two cards stand either side of
+     * the crater and the middle of the frame is clear, so the row stays on the
+     * crater's axis where the sketch put it.
+     *
+     * Below 768px there is no room for that: the pair stacks full width and
+     * fills the screen, so the centre is solid card and the row was printing
+     * straight through the copy, where neither could be read. The stylesheet
+     * opens a band above the cards at that width — the same room .about-us-card
+     * makes for its own word — and this lifts the row into it. 0.76 of the half
+     * frame puts the row's centre at about 12% of the height, clear of the
+     * cards and inside the field's mask, which is pulled back to 5% to match.
+     */
+    txScene.position.y = a < 1 ? halfFrameH * 0.76 : 0;
 
     if (prefersReducedMotion) draw();
   }

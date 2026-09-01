@@ -137,38 +137,25 @@ html {
 
 /*
  * Scrollytelling: everything below the hero is a one-screen scene, and the
- * scroller rests on one at a time. See the snap-scene rule further down.
+ * scroller rests on one at a time.
  *
- * mandatory, so a scroll always lands on a scene. proximity was tried first
- * and is what made this feel stuck rather than smooth: a single wheel notch
- * never crosses the proximity threshold, so it left the scroller parked
- * between two scenes with a band of each showing, and only a hard fling
- * actually moved a whole screen.
+ * There is no scroll-snap here any more, deliberately. Both CSS modes failed
+ * this page in the same place — a gesture's SIZE decided where it landed:
  *
- * Mandatory needs every stretch of the page to be *some* snap area or the
- * scroller cannot rest there at all. Two get one explicitly:
+ *   proximity  a wheel notch never crossed the threshold, so it left the
+ *              scroller parked between two scenes with a band of each showing.
  *
- *   .pin-spacer  the hero's 2200px of scrubbed zoom. It has no single
- *                resting place — the point is to scroll *through* it — but
- *                the spec lets the scroller rest anywhere inside a snap area
- *                that is taller than the viewport, and at 2200px against
- *                900px it is. Without this, scrolling into the zoom was
- *                thrown straight out to #projects: scrollTo(1200) landed at
- *                5700, which is what killed mandatory the first time.
+ *   mandatory  worse, because it re-snaps to the nearest point: a notch moved
+ *              ~100px against a 700px pitch, the browser decided the section
+ *              you started in was still the closest, and put you back. One,
+ *              two and three notches all left scrollY unchanged; only an
+ *              eight-notch fling moved a section. That is the "it takes two or
+ *              three swipes" bug.
  *
- *   footer       shorter than a screen and last on the page, so with no snap
- *                point of its own the scroller would spring back to the
- *                final scene and the footer could never be read.
- *
- * Scoped to .scrollytelling (set on index.html's <html>) because mandatory is
- * only safe on a page built entirely out of snap areas. Careers shares this
- * stylesheet and has no scenes, so its only snap area was the footer: every
- * wheel notch anywhere on the page was snapped straight down to it and the
- * card above could not be read at all.
+ * section-scroll.js drives it instead, off the gesture's direction. See the
+ * header there. The scenes keep min-height:100svh below, since being a screen
+ * tall is a layout fact rather than a snapping one.
  */
-html.scrollytelling {
-  scroll-snap-type: y mandatory;
-}
 
 body {
   font-family: 'Inter', sans-serif;
@@ -234,14 +221,14 @@ footer {
  * Scrollytelling — one scene per screen
  *
  * From #projects down, each section is a full screen with its own WebGL scene,
- * and the scroller stops on every one of them: scroll-snap-stop keeps a fling
- * from skipping a scene, so they arrive in order however hard you throw the
- * wheel. Each scene also replays its entrance from black on arrival — that
- * half lives in main.js, in the field initialisers' resetEntrance().
+ * and the scroller stops on every one of them — section-scroll.js reads this
+ * same list and steps between their tops. Each scene also replays its entrance
+ * from black on arrival; that half lives in main.js, in the field
+ * initialisers' resetEntrance().
  *
  * svh, not vh: on a phone vh is the *largest* viewport, so 100vh scenes are
- * taller than the screen until the address bar retracts, and every snap would
- * leave a strip of the next scene showing.
+ * taller than the screen until the address bar retracts, which would leave a
+ * strip of the next scene showing at every stop.
  * ====================================================================== */
 #projects,
 #concepts,
@@ -252,28 +239,12 @@ footer {
 #contact,
 #faq {
   min-height: 100svh;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
   /*
    * html sets scroll-padding-top so anchor links clear the fixed nav. These
    * scenes are full-bleed with the nav floating over them, so they want to
-   * land flush against the top of the screen instead — otherwise every snap
+   * land flush against the top of the screen instead — otherwise every jump
    * sits a nav-height low and shows a band of the scene above.
    */
-  scroll-margin-top: calc(-1 * (var(--nav-height) + 26px));
-}
-
-/*
- * The two non-scene snap areas mandatory needs — see the note on html.
- *
- * .pin-spacer is ScrollTrigger's wrapper around the pinned hero, created at
- * runtime; it is taller than the viewport, so `start` here does not force the
- * scroller to the top of the zoom, it simply makes the whole zoom a legal
- * place to rest.
- */
-.scrollytelling .pin-spacer,
-.scrollytelling footer {
-  scroll-snap-align: start;
   scroll-margin-top: calc(-1 * (var(--nav-height) + 26px));
 }
 
@@ -1899,8 +1870,9 @@ nav .nav-links {
   align-items: center;
 }
 
-/* Full-bleed: the orbs are circles, and cropping one to the content box would
-   read as a gradient rather than a sphere. */
+/* Full-bleed: the comets radiate from a single point out past every edge, and
+   cropping the stream to the content box would read as a framed picture of it
+   rather than as the section flying through it. */
 .services-field {
   position: absolute;
   inset: 0;
@@ -1920,13 +1892,43 @@ nav .nav-links {
 }
 
 /*
+ * Scrim over the stream. The eclipse this replaced needed none — it was two
+ * barely-lit orbs on black — but a comet is a hard bright edge, and the heroes
+ * carry a near-white head halo the size of the card's heading. Unscrimmed, one
+ * of them parked on "AI & Intelligent Systems" and took the contrast with it.
+ *
+ * Banded by *width* rather than height, unlike the other fields: what has to
+ * stay dark here is a column, not a row. .services-inner gives the copy the
+ * left column and the artwork the right, so the wash is heaviest across the
+ * card and clears completely before the vanishing point — the vortex, the
+ * halos and the brightest stretch of every trail all keep their full value.
+ *
+ * Inside .services-field, so it inherits the same top/bottom mask and can
+ * never show as a hard-edged rectangle against the neighbouring sections.
+ */
+.services-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.76) 0%,
+    rgba(0, 0, 0, 0.72) 38%,
+    rgba(0, 0, 0, 0.24) 66%,
+    rgba(0, 0, 0, 0) 84%
+  );
+}
+
+/*
  * Two columns, and the second is empty on purpose.
  *
- * The eclipse concentrates almost all of its light at the kiss, which the
- * shader puts at the dead centre of the frame. A centred card sits straight on
- * top of it and the section reads as a black box with a card on it. So the copy
- * takes the left column and the right one is left to the artwork — the same
- * split #about uses for the planet.
+ * The warp concentrates its light at the vanishing point, which resize() parks
+ * out in the right half. A centred card sits straight on top of it and the
+ * section reads as a black box with a card on it. So the copy takes the left
+ * column and the right one is left to the artwork — the same split #about uses
+ * for the planet.
  */
 .services-inner {
   position: relative;
@@ -3183,6 +3185,26 @@ footer {
   .services-hint { padding-left: 0; margin-top: 1.1rem; font-size: 0.66rem; }
 
   /*
+   * The scrim turns through 90 degrees here, because the thing it is protecting
+   * has: the card is full width at this breakpoint, so there is no clear column
+   * left to aim the stream at and a left-heavy wash would leave two thirds of
+   * the copy exposed. Banded by height instead, like .capability-field and
+   * .makers-field — heavy through the card, easing off over the bottom band so
+   * AI AND AUTOMATION and the crater it sits in are not crushed with it.
+   */
+  .services-field::after {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.3) 0%,
+      rgba(0, 0, 0, 0.34) 15%,
+      rgba(0, 0, 0, 0.72) 23%,
+      rgba(0, 0, 0, 0.72) 77%,
+      rgba(0, 0, 0, 0.38) 87%,
+      rgba(0, 0, 0, 0.32) 100%
+    );
+  }
+
+  /*
    * The block layout makes #about-us's align-items inert, so the card sits at
    * the top of the section while the trail's ABOUT US lettering stays centred in
    * the field — and lands underneath the card. The top margin is the room the
@@ -3210,6 +3232,28 @@ footer {
      align-items has nothing useful to do once the deck is the only child. */
   #concepts { display: block; }
 
+  /*
+   * Scene fields: one screen tall, parked at the top of the section.
+   *
+   * Every field is inset:0 over a section that is taller than the screen on a
+   * phone — #concepts stacks four cards and runs to about 1.6 viewports — so
+   * the WebGL host measured 375x1332 and each scene was composed for a 0.28
+   * aspect box when only 812px of it is ever on screen. The halo came out
+   * sized for a frame nobody sees: its centre a third of a screen below the
+   * fold, buried behind cards 02 and 03, with its left and right arcs cut off.
+   *
+   * Sizing the host to the viewport puts the scene back inside the frame the
+   * reader is looking at, and hands the lettering a portrait box that
+   * fitScale() can actually solve. `bottom: auto` releases the inset's stretch
+   * so the height takes effect.
+   */
+  .capability-field,
+  .about-us-field,
+  .contact-field {
+    height: 100svh;
+    bottom: auto;
+  }
+
   /* The panel is the only thing in this section, so it takes the width. */
   .systems-panel { width: 94vw; }
   .systems-body > p { font-size: 0.95rem; }
@@ -3219,6 +3263,35 @@ footer {
   .contact-inner { flex-direction: column; align-items: stretch; gap: 1.25rem; }
   .contact-card { flex: 0 0 auto; width: 100%; padding: 1.6rem 1.4rem; border-radius: 18px; }
   .contact-card h3 { font-size: 1.2rem; }
+
+  /*
+   * Room above the stacked pair for DELIVER TRACKS, the same trade
+   * .about-us-card makes for its own word. Stacked full-width cards leave no
+   * clear band anywhere else in the frame, so the row had nowhere to go but
+   * through the copy — initContactField() lifts it up here to match.
+   *
+   * The mask is pulled back from 14% to 5% for the same reason: the row now
+   * sits at about 12% of the height, and the old fade drew it at a fraction of
+   * its alpha, which is most of why it could not be read.
+   */
+  #contact { padding: 3.5rem 1.25rem 3rem; }
+  .contact-inner { margin-top: 6.5rem; }
+  .contact-field {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 5%, #000 92%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 5%, #000 92%, transparent 100%);
+  }
+
+  /*
+   * The black hole drops below the card instead of sitting behind it.
+   *
+   * #about-us goes to block flow here, which puts the card across the middle of
+   * the frame — exactly where `background-position: center` parks the core, so
+   * the glow came up through the paragraph. initAboutUsField() already moves
+   * the ABOUT US row to the clear band under the card; this sends the artwork
+   * down to join it rather than leaving the two halves of the composition on
+   * opposite sides of the copy.
+   */
+  .about-us-field { background-position: center 76%; }
 
   .cta-card { max-width: none; padding: 1.9rem 1.5rem; border-radius: 20px; gap: 1.1rem; }
 
