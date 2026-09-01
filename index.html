@@ -456,6 +456,87 @@
     </section>
 
     <!--
+      Engineering Disciplines: the full breakdown, as a fanned deck.
+
+      #concepts states the four headline capabilities and #services opens one of
+      them up. This is the eight disciplines underneath them, which is how the
+      work is actually split internally — so it earns its place rather than
+      restating either. Copy is verbatim from alphintra.com.
+
+      The deck itself is card-stack.js. No WebGL here: the section carries a
+      CSS-only wash so it still reads as part of the scene run (see the note on
+      the joins in the stylesheet) without a tenth GL context.
+    -->
+    <section id="disciplines" aria-labelledby="disciplines-heading">
+      <div class="disciplines-inner">
+        <h2 id="disciplines-heading">Engineering Disciplines</h2>
+        <p class="disciplines-lede">Eight practices, one delivery model. Drag the deck, or use the arrow keys.</p>
+
+        <div class="card-stack" id="disciplines-stack">
+          <!--
+            tabindex on the stage, not the cards: the arrow keys step the deck,
+            and a reader who has tabbed to it should get that without first
+            having to find the one card that happens to be active.
+          -->
+          <div class="card-stack-stage" tabindex="0" role="group"
+               aria-roledescription="carousel" aria-label="Engineering disciplines"
+               aria-live="polite">
+            <article class="stack-card" aria-roledescription="slide" aria-label="1 of 8">
+              <span class="stack-card-num" aria-hidden="true">01</span>
+              <h3 class="stack-card-title">AI &amp; Intelligent Systems</h3>
+              <p class="stack-card-body">We design AI-powered systems that integrate directly into business workflows — LLM integrations, RAG architectures and automation pipelines.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="2 of 8">
+              <span class="stack-card-num" aria-hidden="true">02</span>
+              <h3 class="stack-card-title">AI Ops &amp; Integrations</h3>
+              <p class="stack-card-body">Productionising AI with backend services, retrieval pipelines and monitoring across workflows.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="3 of 8">
+              <span class="stack-card-num" aria-hidden="true">03</span>
+              <h3 class="stack-card-title">High-Performance Web &amp; Mobile</h3>
+              <p class="stack-card-body">We build fast, SEO-optimised web platforms and cross-platform mobile applications, with product UX engineered for conversion and retention.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="4 of 8">
+              <span class="stack-card-num" aria-hidden="true">04</span>
+              <h3 class="stack-card-title">Enterprise Backend Foundations</h3>
+              <p class="stack-card-body">Microservices architectures and CI/CD pipelines built for performance and reliability.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="5 of 8">
+              <span class="stack-card-num" aria-hidden="true">05</span>
+              <h3 class="stack-card-title">Cloud Infrastructure &amp; Data Operations</h3>
+              <p class="stack-card-body">Secure cloud environments, data layers, ERP and CRM implementation, and tool integrations.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="6 of 8">
+              <span class="stack-card-num" aria-hidden="true">06</span>
+              <h3 class="stack-card-title">Delivery, Security &amp; Scale</h3>
+              <p class="stack-card-body">Stable releases with security baselines, observability and long-term maintainability — from MVP to growth-stage platform.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="7 of 8">
+              <span class="stack-card-num" aria-hidden="true">07</span>
+              <h3 class="stack-card-title">Immersive UI/UX Systems</h3>
+              <p class="stack-card-body">User-centred design with high design-to-code fidelity and consistent interface systems.</p>
+            </article>
+
+            <article class="stack-card" aria-roledescription="slide" aria-label="8 of 8">
+              <span class="stack-card-num" aria-hidden="true">08</span>
+              <h3 class="stack-card-title">Interactive 3D Experience Engineering</h3>
+              <p class="stack-card-body">Motion and interaction engineered for clarity, speed and engagement.</p>
+            </article>
+          </div>
+
+          <!-- card-stack.js fills this from the card titles. -->
+          <div class="card-stack-dots" role="tablist" aria-label="Choose a discipline"></div>
+        </div>
+      </div>
+    </section>
+
+    <!--
       Built by Makers: the team, stated as a claim rather than a card. This
       used to be the third About Us card ("Engineers at the core") — same
       sentence, so it has been lifted out rather than repeated 200px apart.

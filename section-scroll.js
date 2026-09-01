@@ -32,6 +32,7 @@ const SECTION_IDS = [
   'concepts',
   'about-us',
   'services',
+  'disciplines',
   'makers',
   'about',
   'contact',

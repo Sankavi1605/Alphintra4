@@ -12,6 +12,8 @@ import { makeLetter, fitScale, fitMargin } from './webgl-letters.js';
 import { initHorizonField } from './horizon-field.js';
 // One gesture, one scene. Replaces the CSS scroll-snap this page used to use.
 import { initSectionScroll } from './section-scroll.js';
+// The fanned discipline deck in #disciplines. GSAP only — no WebGL.
+import { initCardStack } from './card-stack.js';
 
 // Nav, FAQ, contact form and the other shared page behaviour.
 import './ui.js';
@@ -120,6 +122,46 @@ const FIELD_PIXEL_CAP = 1.5;
 const HERO_PIXEL_CAP = 1.5;
 
 /* -------------------------------------------------------------------------
+ * The shared playhead
+ *
+ * Every field ran on its own THREE.Clock, started whenever that field happened
+ * to mount — so the eight scenes had eight unrelated timebases. The artwork
+ * above a join and the artwork below it sat at unrelated points in their own
+ * loops, drifting at unrelated phases, and crossing the join meant crossing
+ * between two animations that had nothing to do with each other. Shortening the
+ * mask ramps (see the note on the scrollytelling block in the stylesheet) made
+ * them touch; it could not make them agree.
+ *
+ * So the page's scroll offset is added to every one of those clocks. It is the
+ * same number for all of them at any instant, and that is the whole mechanism:
+ * the scene being left and the scene being arrived at wind forward by exactly
+ * the same amount over the same 620ms, so their motion matches across the
+ * boundary instead of merely abutting it.
+ *
+ * It also makes position the playhead. Standing still, each scene drifts on its
+ * own clock as before; travelling, all eight wind on together, and scrolling
+ * back winds them back — the state of the backgrounds is a function of where the
+ * reader is, not of when the field happened to be built.
+ *
+ * Deliberately additive rather than a replacement: a scene has to keep breathing
+ * while the reader stands still and reads the card in front of it.
+ * ---------------------------------------------------------------------- */
+
+/*
+ * Seconds of animation per screen scrolled.
+ *
+ * At 3, one section step — 620ms — winds every scene on by three seconds, which
+ * is plainly visible as travel without the scenes reading as fast-forwarded once
+ * the reader stops. Their ambient loops run on periods of ten seconds and up, so
+ * this is a fraction of a cycle per section rather than a spin through several.
+ */
+const SCROLL_SECONDS_PER_SCREEN = 3;
+
+function sharedPhase() {
+  return (window.scrollY / (window.innerHeight || 1)) * SCROLL_SECONDS_PER_SCREEN;
+}
+
+/* -------------------------------------------------------------------------
  * Field mounting
  *
  * Nine fields, nine WebGLRenderers, nine live GL contexts. Building them all at
@@ -192,6 +234,10 @@ if (prefersReducedMotion) {
   queueMicrotask(setupProjectsCarousel);
   queueMicrotask(setupWorkGlass);
   queueMicrotask(setupServiceDeck);
+  /* Same reasoning as the three above — it is GSAP and DOM, so it neither waits
+     on the GLTF nor holds a GL context, and its own ResizeObserver picks up the
+     stage's real width once the loader has released the layout. */
+  queueMicrotask(() => initCardStack('#disciplines-stack'));
   /* Last, so the queued mounts measure a page that is already wired. */
   hideLoader();
 } else {
@@ -218,6 +264,10 @@ if (prefersReducedMotion) {
   queueMicrotask(setupProjectsCarousel);
   queueMicrotask(setupWorkGlass);
   queueMicrotask(setupServiceDeck);
+  /* Same reasoning as the three above — it is GSAP and DOM, so it neither waits
+     on the GLTF nor holds a GL context, and its own ResizeObserver picks up the
+     stage's real width once the loader has released the layout. */
+  queueMicrotask(() => initCardStack('#disciplines-stack'));
 }
 
 function initHeroScene() {
@@ -1287,7 +1337,7 @@ function initProjectsField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    const t = clock.getElapsedTime();
+    const t = clock.getElapsedTime() + sharedPhase();
     uni.uTime.value = t;
 
     const p = uni.uPtr.value;
@@ -1888,7 +1938,7 @@ function initAboutField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    if (!prefersReducedMotion) uni.uTime.value = clock.getElapsedTime();
+    if (!prefersReducedMotion) uni.uTime.value = clock.getElapsedTime() + sharedPhase();
 
     ptr.x += (target.x - ptr.x) * 0.06;
     ptr.y += (target.y - ptr.y) * 0.06;
@@ -2319,8 +2369,10 @@ function initCapabilityField() {
    *
    * The fallback is what this did before: put the band's bottom a margin above
    * the deck's top edge, clamped so it cannot climb into the field's own top
-   * mask, which fades in over the first 12% and would draw the word at a quarter
-   * alpha — worse than not drawing it, because it reads as a mistake.
+   * mask, which would draw the word at a fraction of its alpha — worse than not
+   * drawing it, because it reads as a mistake. That ramp is only the first 4%
+   * now: it was widened to 12% to fade the artwork out before the section's
+   * edge, and it is short again so the halo meets the scene above instead.
    */
   const CORRIDOR_MARGIN_PX = 28;
   const DECK_GAP_PX = 56;
@@ -2352,7 +2404,8 @@ function initCapabilityField() {
     const wantBottom = ((halfPx - (deckTopPx - DECK_GAP_PX)) / halfPx) * halfHeight;
     const lift = wantBottom / scale + BAND_HALF;
 
-    const maskFloorPx = fieldRect.height * 0.14;
+    /* The 4% ramp, plus a little headroom so the row does not sit in its tail. */
+    const maskFloorPx = fieldRect.height * 0.06;
     const maxLift = (((halfPx - maskFloorPx) / halfPx) * halfHeight) / scale - BAND_HALF;
     return Math.max(0, Math.min(lift, maxLift));
   }
@@ -2433,7 +2486,7 @@ function initCapabilityField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
+    const t = prefersReducedMotion ? 0 : clock.getElapsedTime() + sharedPhase();
     uni.uTime.value = t;
 
     const p = uni.uPtr.value;
@@ -2943,9 +2996,11 @@ function initServicesField() {
        */
       f = (hintEl.getBoundingClientRect().bottom - fieldRect.top + 58) / fieldRect.height;
     }
-    /* 0.92, not 1: past that the row runs into the field's own bottom mask,
-       which fades from 90% and would draw the word at half alpha. */
-    return Math.min(Math.max(f, 0.6), 0.92);
+    /* Not 1: past this the row runs into the field's own bottom mask and would
+       be drawn at half alpha. That ramp starts at 96% now rather than 90% —
+       shortened so the warp reaches the section's edge and meets the scene
+       below — so the row has a little more room than it used to. */
+    return Math.min(Math.max(f, 0.6), 0.95);
   }
 
   /* --- resize / pointer / loop -------------------------------------------- */
@@ -3103,6 +3158,16 @@ function initServicesField() {
    * teleport the whole swarm.
    */
   let lastT = 0;
+  /*
+   * Both ways now, and this is why: t carries the shared playhead, so it is no
+   * longer monotonic — scrolling back up hands this a negative delta. Winding
+   * the stream back is right, and it is what makes the warp agree with the
+   * scenes either side of it. But the delta is proportional to how fast the
+   * reader moved, and a fast flick upward would otherwise hand it several
+   * seconds in one frame and teleport the swarm backwards — the same failure the
+   * upper clamp exists to stop, in the other direction.
+   */
+  const MAX_STEP = 0.05;
 
   function frame(now) {
     frameId = requestAnimationFrame(frame);
@@ -3112,9 +3177,9 @@ function initServicesField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
+    const t = prefersReducedMotion ? 0 : clock.getElapsedTime() + sharedPhase();
     uni.uTime.value = t;
-    uni.uWarpT.value += Math.min(t - lastT, 0.05) * warp.speed;
+    uni.uWarpT.value += Math.max(Math.min(t - lastT, MAX_STEP), -MAX_STEP) * warp.speed;
     lastT = t;
 
     const p = uni.uPtr.value;
@@ -3690,9 +3755,11 @@ function initAboutUsField() {
      * to avoid.
      *
      * So: centre when the middle is free, and otherwise the middle of whichever
-     * clear band is bigger, clamped inside the field's own mask. That fade runs
-     * over the first and last 12%, and a row placed inside it is drawn at a
-     * fraction of its alpha — which reads as a mistake rather than as a choice.
+     * clear band is bigger, clamped inside the field's own mask. A row placed
+     * inside that fade is drawn at a fraction of its alpha, which reads as a
+     * mistake rather than as a choice. The fade is only the outer 4% now — it
+     * was 12%, and was shortened so the dune reaches the section's edges and
+     * meets the scenes above and below rather than dissolving into black.
      */
     const rect = host.getBoundingClientRect();
     const halfWordPx = ((LETTER_SIZE / 2) * zoom * (rect.height / 2)) / halfFrameH;
@@ -3711,7 +3778,7 @@ function initAboutUsField() {
         targetPx = above >= below ? above / 2 : cardBottom + below / 2;
       }
     }
-    targetPx = Math.min(Math.max(targetPx, rect.height * 0.12 + halfWordPx), rect.height * 0.88 - halfWordPx);
+    targetPx = Math.min(Math.max(targetPx, rect.height * 0.05 + halfWordPx), rect.height * 0.95 - halfWordPx);
     wordGroup.position.y = ((midPx - targetPx) / midPx) * halfFrameH;
 
     if (prefersReducedMotion) draw();
@@ -3766,7 +3833,7 @@ function initAboutUsField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    const t = prefersReducedMotion ? 0 : clock.getElapsedTime();
+    const t = prefersReducedMotion ? 0 : clock.getElapsedTime() + sharedPhase();
     uni.uTime.value = t;
 
     ptr.x += (target.x - ptr.x) * 0.05;
@@ -4240,7 +4307,7 @@ function initMakersField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    const t = clock.getElapsedTime();
+    const t = clock.getElapsedTime() + sharedPhase();
     uni.uTime.value = t;
 
     const p = uni.uPtr.value;
@@ -4793,7 +4860,7 @@ function initContactField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    const t = clock.getElapsedTime();
+    const t = clock.getElapsedTime() + sharedPhase();
     uni.uTime.value = t;
 
     ptr.x += (target.x - ptr.x) * 0.05;
@@ -5151,7 +5218,7 @@ function initFooterField() {
       if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
       lastFrameAt = now;
     }
-    uni.uTime.value = clock.getElapsedTime();
+    uni.uTime.value = clock.getElapsedTime() + sharedPhase();
 
     const p = uni.uPtr.value;
     p.x += (target.x - p.x) * 0.05;

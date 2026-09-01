@@ -1,0 +1,373 @@
+/* =========================================================================
+ * Card stack — the fanned deck
+ *
+ * A port of a React/framer-motion component into this site's own stack. The
+ * geometry is the reference's, verbatim in its numbers: a fan of cards laid out
+ * by signed offset from the active one, each stepped sideways by the card's
+ * unoverlapped width, rotated by an equal share of the total spread, pushed back
+ * in z by its distance, and tilted forward unless it is the active card, which
+ * instead lifts and scales up.
+ *
+ * Three things are deliberately not ports:
+ *
+ *   the transform  The reference animates x/y/rotate/scale through framer and
+ *                  then applies translateZ by hand on a child wrapper, because
+ *                  it could not drive z through the same animation. GSAP writes
+ *                  the whole matrix, so z is just another property and the extra
+ *                  wrapper element is gone.
+ *
+ *   the springs    framer's spring(stiffness 280, damping 28) settles in a bit
+ *                  under 400ms with a touch of overshoot. There is no spring
+ *                  solver here, so that is matched with a duration and
+ *                  back.out — close enough that the difference is not visible
+ *                  side by side, and it keeps GSAP as the only dependency.
+ *
+ *   the culling    The reference returns null for cards outside the fan, which
+ *                  takes them out of the DOM and, with them, out of the
+ *                  accessibility tree — eight real paragraphs of copy that a
+ *                  screen reader would never see. They stay in the document here
+ *                  and are faded out instead, which is also what .project-slide
+ *                  does in the carousel above.
+ * ====================================================================== */
+import gsap from 'gsap';
+
+/* --- the reference's geometry -------------------------------------------- */
+const MAX_VISIBLE = 7; /* cards in the fan, active included; odd reads best  */
+const OVERLAP = 0.48; /* 0..0.8 — higher stacks them tighter                */
+const SPREAD_DEG = 48; /* total fan angle across the visible cards          */
+const PERSPECTIVE_PX = 1100;
+const DEPTH_PX = 140; /* z pushed back per step out from the active card    */
+const TILT_X_DEG = 12; /* inactive cards lean back                          */
+const ACTIVE_LIFT_PX = 22;
+const ACTIVE_SCALE = 1.03;
+const INACTIVE_SCALE = 0.94;
+const ARC_DROP_PX = 10; /* each step out also drops slightly, for the arc   */
+
+/* --- motion -------------------------------------------------------------- */
+const SETTLE = 0.42; /* seconds; framer's spring lands at about this        */
+const EASE = 'back.out(1.1)';
+
+/*
+ * 4.2s, not the demo's 2s.
+ *
+ * These cards carry a title and two lines of real copy, and the services deck
+ * further up this page had the same problem stated in its own comment: a card
+ * that takes eight seconds to read cannot also leave on its own. Two seconds is
+ * a showreel timing for cards that are only photographs. This is slow enough to
+ * finish a card and still short enough to read as motion rather than as a thing
+ * that has stopped.
+ */
+const INTERVAL_MS = 4200;
+
+/* --- sizing -------------------------------------------------------------- */
+const CARD_MAX_W = 520;
+const CARD_RATIO = 320 / 520; /* the reference's 520x320 */
+
+/*
+ * Card size against the stage, in two bands.
+ *
+ * The reference hard-codes 520x320, and keeping that 0.615 ratio on a phone does
+ * not work. Measured at a 375px viewport, where the stage comes out 335px wide:
+ * a card is then 288px across, and the wordiest of the eight — "Cloud
+ * Infrastructure & Data Operations" — needs 221px of height to lay its title and
+ * body out at that width. The reference's ratio would have given it 177px, so
+ * the copy would have run out of the top of its own panel. Every card in a fan
+ * has to be the same size, so the tallest requirement sets the ratio for all
+ * eight.
+ *
+ * A narrow stage therefore gets a much squarer card, and a little more of the
+ * width. Some of the fan is given up for it — the neighbours show less of their
+ * edges — but a card whose copy does not fit is not a trade worth making.
+ *
+ * 0.98 gives that 288px card 282px of height against the 182px it needs once the
+ * phone type scale in the stylesheet applies. The headroom is deliberate twice
+ * over: this copy comes from alphintra.com and will not stay this length
+ * forever, and the requirement grows as the stage narrows — at a 267px stage the
+ * card is 230 wide and needs 202, which 0.92 cleared by only 10px.
+ */
+const NARROW_STAGE_PX = 560;
+const WIDE = { fraction: 0.74, ratio: CARD_RATIO };
+const NARROW = { fraction: 0.86, ratio: 0.98 };
+
+function wrapIndex(n, len) {
+  if (len <= 0) return 0;
+  return ((n % len) + len) % len;
+}
+
+/**
+ * The shortest signed distance from `active` to `i` around the ring.
+ *
+ * Straight subtraction would put the last card six steps from the first in an
+ * eight-card deck, so it would fall outside the fan and the wrap would read as
+ * the deck jumping back to the start rather than continuing round.
+ */
+function signedOffset(i, active, len) {
+  const raw = i - active;
+  if (len <= 1) return raw;
+  const alt = raw > 0 ? raw - len : raw + len;
+  return Math.abs(alt) < Math.abs(raw) ? alt : raw;
+}
+
+export function initCardStack(rootSelector) {
+  const root = document.querySelector(rootSelector);
+  if (!root) return;
+
+  const stage = root.querySelector('.card-stack-stage');
+  const cards = [...root.querySelectorAll('.stack-card')];
+  if (!stage || !cards.length) return;
+
+  const len = cards.length;
+  const maxOffset = Math.max(0, Math.floor(MAX_VISIBLE / 2));
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  let active = 0;
+  let cardWidth = CARD_MAX_W;
+  let cardHeight = CARD_MAX_W * CARD_RATIO;
+
+  stage.style.perspective = `${PERSPECTIVE_PX}px`;
+
+  /* --- dots ---------------------------------------------------------------
+   * Built here rather than written into the markup: eight buttons whose labels
+   * have to stay in step with eight card titles are eight chances for the two to
+   * drift, and the titles are already in the document.
+   */
+  const dotsWrap = root.querySelector('.card-stack-dots');
+  const dots = cards.map((card, i) => {
+    const title = card.querySelector('.stack-card-title');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'card-stack-dot';
+    b.setAttribute('aria-label', `Show ${title ? title.textContent.trim() : `card ${i + 1}`}`);
+    b.addEventListener('click', () => go(i, true));
+    if (dotsWrap) dotsWrap.appendChild(b);
+    return b;
+  });
+
+  /* --- layout ------------------------------------------------------------- */
+  /**
+   * Size the cards and the stage to the container.
+   *
+   * Returns whether anything actually changed, because the observer below has to
+   * be able to do nothing: this writes the stage's own height, so an observer
+   * watching the stage would be woken by its own last write. That is a
+   * ResizeObserver loop, and it hung the renderer — a scroll over the section
+   * timed the tab out with no error logged, because the loop never yields.
+   *
+   * Two things fix it, and both are kept: the observer watches the root, whose
+   * height nothing here sets, and this is idempotent so a spurious wake-up is
+   * free rather than another eight GSAP writes.
+   */
+  function measure() {
+    const stageW = root.clientWidth || stage.clientWidth || CARD_MAX_W;
+    const band = stageW < NARROW_STAGE_PX ? NARROW : WIDE;
+    const w = Math.round(Math.min(CARD_MAX_W, stageW * band.fraction));
+    const h = Math.round(w * band.ratio);
+    if (w === cardWidth && h === cardHeight) return false;
+
+    cardWidth = w;
+    cardHeight = h;
+    cards.forEach((c) => {
+      c.style.width = `${cardWidth}px`;
+      c.style.height = `${cardHeight}px`;
+    });
+    /* The stage has to hold the tallest thing in it: the active card, lifted. */
+    stage.style.height = `${cardHeight + ACTIVE_LIFT_PX + 72}px`;
+    return true;
+  }
+
+  /**
+   * Place every card against the current active index.
+   *
+   * `instant` skips the tween — used for the first paint and under reduced
+   * motion, where a settle would be the animation the setting asks us not to
+   * play.
+   */
+  function place(instant) {
+    /* The step, in px and degrees, from the card's own measured width. */
+    const spacing = Math.max(10, Math.round(cardWidth * (1 - OVERLAP)));
+    const stepDeg = maxOffset > 0 ? SPREAD_DEG / maxOffset : 0;
+
+    cards.forEach((card, i) => {
+      const off = signedOffset(i, active, len);
+      const abs = Math.abs(off);
+      const inFan = abs <= maxOffset;
+      const isActive = off === 0;
+
+      const to = {
+        xPercent: -50,
+        x: off * spacing,
+        y: abs * ARC_DROP_PX + (isActive ? -ACTIVE_LIFT_PX : 0),
+        z: -abs * DEPTH_PX,
+        rotationZ: off * stepDeg,
+        rotationX: isActive ? 0 : TILT_X_DEG,
+        scale: isActive ? ACTIVE_SCALE : INACTIVE_SCALE,
+        /*
+         * Faded rather than removed — see the note on culling at the top. The
+         * ones just outside the fan keep a little alpha so a step in reveals a
+         * card that was already on its way rather than one that popped in.
+         */
+        opacity: inFan ? 1 : 0,
+        duration: instant ? 0 : SETTLE,
+        ease: EASE,
+        overwrite: 'auto',
+      };
+
+      gsap.to(card, to);
+
+      /* zIndex is not animated: a card must not pass through its neighbours on
+         the way to its new depth. Set outright, so the order flips at once. */
+      card.style.zIndex = String(100 - abs);
+      card.classList.toggle('is-active', isActive);
+      card.classList.toggle('is-outside', !inFan);
+      /* Only the active card is draggable, so only it advertises the grab. */
+      card.setAttribute('aria-current', isActive ? 'true' : 'false');
+      /* Nothing behind the active card should be reachable by tab or by click
+         through its own body — the click handler on it still selects it. */
+      card.inert = !isActive;
+    });
+
+    dots.forEach((d, i) => {
+      const on = i === active;
+      d.classList.toggle('is-on', on);
+      d.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  /* --- navigation --------------------------------------------------------- */
+  /* Set when the reader acts, so autoplay stops fighting a deliberate choice. */
+  let touched = false;
+
+  function go(index, byHand) {
+    if (byHand) touched = true;
+    active = wrapIndex(index, len);
+    place(false);
+  }
+
+  const prev = (byHand) => go(active - 1, byHand);
+  const next = (byHand) => go(active + 1, byHand);
+
+  stage.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      prev(true);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      next(true);
+    }
+  });
+
+  cards.forEach((card, i) => {
+    card.addEventListener('click', () => {
+      /* A click on the active card is the end of a drag, not a selection. */
+      if (i !== active) go(i, true);
+    });
+  });
+
+  /* --- drag on the active card -------------------------------------------
+   * Pointer events, not GSAP Draggable: Draggable is a paid plugin and this
+   * needs one axis, a threshold and a velocity — about twenty lines.
+   *
+   * The card is not moved by the drag. The reference lets framer drag it with
+   * dragConstraints pinned to 0 so it springs back; here the travel only decides
+   * which way to step, which keeps the fan's transform in one place instead of
+   * having the drag and the layout both writing it.
+   */
+  let dragId = null;
+  let dragStartX = 0;
+  let dragStartT = 0;
+
+  stage.addEventListener('pointerdown', (e) => {
+    const card = e.target.closest('.stack-card');
+    if (!card || !card.classList.contains('is-active')) return;
+    dragId = e.pointerId;
+    dragStartX = e.clientX;
+    dragStartT = performance.now();
+    card.setPointerCapture?.(e.pointerId);
+  });
+
+  stage.addEventListener('pointerup', (e) => {
+    if (dragId !== e.pointerId) return;
+    dragId = null;
+
+    const travel = e.clientX - dragStartX;
+    const seconds = Math.max(0.001, (performance.now() - dragStartT) / 1000);
+    const velocity = travel / seconds; /* px per second */
+    /* The reference's threshold, and its 650px/s flick. */
+    const threshold = Math.min(160, cardWidth * 0.22);
+
+    if (travel > threshold || velocity > 650) prev(true);
+    else if (travel < -threshold || velocity < -650) next(true);
+  });
+
+  stage.addEventListener('pointercancel', () => {
+    dragId = null;
+  });
+
+  /* --- autoplay ----------------------------------------------------------
+   * Held off unless the deck is on screen and the tab is in front, and dropped
+   * for good the first time the reader steps it themselves. Reduced motion
+   * never starts it: an unattended change of state every four seconds is the
+   * clearest possible case of what that setting is asking about.
+   */
+  let timer = null;
+  let onScreen = false;
+  let hovering = false;
+
+  function syncAutoplay() {
+    const shouldRun = onScreen && !document.hidden && !hovering && !touched && !reduced.matches;
+    if (shouldRun && timer === null) {
+      timer = window.setInterval(() => next(false), INTERVAL_MS);
+    } else if (!shouldRun && timer !== null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  root.addEventListener('pointerenter', () => {
+    hovering = true;
+    syncAutoplay();
+  });
+  root.addEventListener('pointerleave', () => {
+    hovering = false;
+    syncAutoplay();
+  });
+  /* Focus counts as attention too, or the deck steps out from under a keyboard
+     reader part-way through a card. */
+  root.addEventListener('focusin', () => {
+    hovering = true;
+    syncAutoplay();
+  });
+  root.addEventListener('focusout', () => {
+    hovering = false;
+    syncAutoplay();
+  });
+
+  new IntersectionObserver(
+    ([entry]) => {
+      onScreen = entry.isIntersecting;
+      syncAutoplay();
+    },
+    { threshold: 0.35 }
+  ).observe(root);
+
+  document.addEventListener('visibilitychange', syncAutoplay);
+
+  /* --- boot --------------------------------------------------------------- */
+  measure();
+  place(true);
+  /*
+   * Observed, not measured once: this section is laid out behind the loader, and
+   * the stage's width is not final until that has come down.
+   *
+   * On the root, not the stage — see measure(). Re-placing only when the card
+   * size actually changed, for the same reason.
+   */
+  new ResizeObserver(() => {
+    if (measure()) place(true);
+  }).observe(root);
+
+  reduced.addEventListener?.('change', () => {
+    place(true);
+    syncAutoplay();
+  });
+}
