@@ -984,6 +984,31 @@ nav .nav-links {
 }
 
 /*
+ * Room for the holographic tilt to lean into.
+ *
+ * overflow: hidden above clips at the PADDING box, so padding is what buys the
+ * clearance — and because the card is width: 100% of the content box it narrows
+ * by the same amount rather than growing into it. Measured against all four
+ * corner cases of holographic-card.js's ceilings, the worst overhang is 15px to
+ * the side and 4px down; these sit well clear of that, so the card's border and
+ * its rounded corners never land on the clip edge. Verified at 0px clipping on
+ * all four sides with the cursor driven into each corner.
+ *
+ * Gated on a fine pointer to match the effect it exists for. The tilt is never
+ * armed for touch — holographic-card.js drops events by pointerType — so on a
+ * phone this would be 48px of width surrendered for clearance nothing uses, and
+ * a phone is exactly where the quote can least afford it: .hole-stage is down
+ * to 1rem of side padding there and .cards-container has already been given
+ * overflow-y: auto because the text only just fits.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .cards-container {
+    padding-inline: 1.5rem;
+    padding-bottom: 0.75rem;
+  }
+}
+
+/*
  * 0.94, not 0.85. The card lands over the world model's lit face, and at 0.85
  * enough of that near-white came through the fill to raise the card to a mid
  * grey — which cost the text most of its contrast even though the text itself
@@ -1004,13 +1029,139 @@ nav .nav-links {
   gap: 1.2rem;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
   width: 100%;
-  transition: all 0.3s ease;
+  /* Positioned and clipped so the two holographic layers can sit inset over
+     the fill and still stop at the rounded corners. */
+  position: relative;
+  overflow: hidden;
+  /*
+   * Named properties, not `all`.
+   *
+   * `all 0.3s ease` used to be enough, but holographic-card.js now writes a
+   * fresh transform on every animation frame, and under `all` each of those
+   * writes starts its own 300ms transition — so the card chases the cursor
+   * three hundred milliseconds behind it and the tilt reads as rubber. Listing
+   * the properties lets the slow, decorative ones keep their ease while the
+   * transform is handled separately below.
+   */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease,
+    transform 0.45s ease-out;
+}
+
+/*
+ * While the cursor is on the card, the transform has NO transition: the rAF
+ * loop is already producing a value per frame, and easing each one only adds
+ * lag. Dropping the class on the way out restores the 0.45s above, which is
+ * what eases the card back to level rather than snapping it.
+ */
+.testimonial-card.is-holo-active {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  /* Promoted only while it is actually moving. A permanent layer on a card that
+     lives behind the hero's ten WebGL contexts is rent for nothing. */
+  will-change: transform;
 }
 
 .testimonial-card:hover {
-  transform: translateY(-4px);
   border-color: rgba(255, 255, 255, 0.3);
   box-shadow: 0 25px 60px rgba(138, 43, 226, 0.3);
+}
+
+/*
+ * The lift, for pointers this effect does not run on.
+ *
+ * holographic-card.js restates the lift inside its own transform, because an
+ * inline transform overrides this rule outright. That leaves touch — where the
+ * tilt is deliberately never armed — needing the plain hover lift it always
+ * had, so it is scoped to the coarse pointers that still want it.
+ */
+@media (hover: hover) and (pointer: coarse) {
+  .testimonial-card:hover {
+    transform: translateY(-4px);
+  }
+}
+
+/* =========================================================================
+ * The holographic layers
+ *
+ * Two of them, because they answer to the cursor differently: the sheen is a
+ * hard-edged band that SWEEPS (a background-position shift across an
+ * oversized gradient), and the glow is a soft pool that simply sits under the
+ * cursor. One layer cannot do both.
+ *
+ * Recoloured off the page's own tokens rather than the usual holographic
+ * rainbow. A spectrum sheen would be the one saturated, multi-hue thing on a
+ * site that is otherwise --brand violet (#8a2be2) against near-black, and it
+ * read as a sticker stuck on the card. These stay inside the violet family and
+ * lean only as far as the cool blue at the sweep's trailing edge, which is
+ * what sells it as a shifting surface rather than as a colour.
+ *
+ * Both are driven by --holo-x / --holo-y, set by the module as percentages.
+ * The fallbacks are the card's centre, so before the first pointer event — and
+ * for the whole life of the page on touch — the layers sit neutral.
+ * ====================================================================== */
+.holo-sheen,
+.holo-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* The card's own listeners do the tracking; these must never eat a move. */
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.holo-sheen {
+  background: linear-gradient(
+    115deg,
+    transparent 18%,
+    rgba(216, 180, 254, 0.16) 34%,
+    rgba(167, 139, 250, 0.26) 44%,
+    rgba(138, 43, 226, 0.3) 50%,
+    rgba(129, 140, 248, 0.22) 57%,
+    rgba(96, 165, 250, 0.12) 66%,
+    transparent 82%
+  );
+  /* Oversized so a 0–100% background-position has somewhere to travel; at
+     100% the band would otherwise be pinned and never move. */
+  background-size: 260% 260%;
+  background-position: var(--holo-x, 50%) var(--holo-y, 50%);
+  /* screen, so the band adds light to the near-black fill instead of greying
+     it. Multiply or normal blending over rgba(12,6,18,.94) just muddies. */
+  mix-blend-mode: screen;
+}
+
+.holo-glow {
+  background: radial-gradient(
+    340px circle at var(--holo-x, 50%) var(--holo-y, 50%),
+    rgba(216, 180, 254, 0.2),
+    rgba(138, 43, 226, 0.11) 42%,
+    transparent 70%
+  );
+}
+
+.testimonial-card.is-holo-active .holo-sheen {
+  opacity: 1;
+}
+
+.testimonial-card.is-holo-active .holo-glow {
+  opacity: 1;
+}
+
+/*
+ * The quote has to stay on top of both layers.
+ *
+ * The layers are positioned with z-index: 0, and a positioned element paints
+ * above non-positioned in-flow content whatever the source order — so without
+ * this the sheen covers the text it is meant to be lighting. Applied to the
+ * card's existing children rather than by wrapping them in a .holo-content
+ * div, which would have meant restructuring a <figure> whose shape is the
+ * accessible one.
+ */
+.testimonial-card > .quote-icon,
+.testimonial-card > .testimonial-text,
+.testimonial-card > .testimonial-author {
+  position: relative;
+  z-index: 1;
 }
 
 .quote-icon {

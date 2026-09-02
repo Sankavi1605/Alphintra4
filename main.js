@@ -14,6 +14,9 @@ import { initHorizonField } from './horizon-field.js';
 import { initSectionScroll } from './section-scroll.js';
 // The fanned discipline deck in #disciplines. GSAP only — no WebGL.
 import { initCardStack } from './card-stack.js';
+// The cursor-tracked tilt and sheen on the hero's testimonial card. Also
+// GSAP-free: pointer events and CSS custom properties, nothing else.
+import { initHolographicCard } from './holographic-card.js';
 
 // Nav, FAQ, contact form and the other shared page behaviour.
 import './ui.js';
@@ -238,6 +241,10 @@ if (prefersReducedMotion) {
      on the GLTF nor holds a GL context, and its own ResizeObserver picks up the
      stage's real width once the loader has released the layout. */
   queueMicrotask(() => initCardStack('#disciplines-stack'));
+  /* Pointer listeners on one card: no GL context, no GSAP timeline, nothing to
+     measure. It only ever responds once the hero's zoom has set
+     .cards-container's pointer-events to auto, so binding early costs nothing. */
+  queueMicrotask(() => initHolographicCard('.testimonial-card'));
   /* Last, so the queued mounts measure a page that is already wired. */
   hideLoader();
 } else {
@@ -268,6 +275,10 @@ if (prefersReducedMotion) {
      on the GLTF nor holds a GL context, and its own ResizeObserver picks up the
      stage's real width once the loader has released the layout. */
   queueMicrotask(() => initCardStack('#disciplines-stack'));
+  /* Pointer listeners on one card: no GL context, no GSAP timeline, nothing to
+     measure. It only ever responds once the hero's zoom has set
+     .cards-container's pointer-events to auto, so binding early costs nothing. */
+  queueMicrotask(() => initHolographicCard('.testimonial-card'));
 }
 
 function initHeroScene() {
