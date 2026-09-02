@@ -17,6 +17,8 @@ import { initCardStack } from './card-stack.js';
 // The cursor-tracked tilt and sheen on the hero's testimonial card. Also
 // GSAP-free: pointer events and CSS custom properties, nothing else.
 import { initHolographicCard } from './holographic-card.js';
+// The pointer-driven light on the loader's logo outline. No WebGL, no GSAP.
+import { initLoaderFlare } from './loader-flare.js';
 
 // Nav, FAQ, contact form and the other shared page behaviour.
 import './ui.js';
@@ -71,10 +73,41 @@ function drainMounts() {
   });
 }
 
+/*
+ * Armed at module scope, not inside a boot branch.
+ *
+ * The overlay is already on screen by the time this runs — a module script is
+ * deferred, so the markup is parsed — and it is the one piece of UI that is
+ * guaranteed to be visible right now. Waiting for the GLTF branches below
+ * would hand the light to the pointer at roughly the moment the loader stops
+ * existing.
+ */
+initLoaderFlare();
+
+/*
+ * An extra beat on the loader before it goes.
+ *
+ * Once the models resolve this used to fire immediately, and on a warm cache
+ * that is fast enough that none of the mark registers — the overlay is up for
+ * a few hundred milliseconds and reads as a flicker rather than as anything
+ * deliberate. Two seconds is long enough to take it in, and long enough for a
+ * pointer to actually reach it.
+ *
+ * The wait holds the whole of releaseLoader, not just the fade: the overlay
+ * covers the page, so dropping the scroll lock and refreshing ScrollTrigger
+ * underneath it would let the reader scroll a page they cannot see.
+ */
+const LOADER_HOLD_MS = 2000;
+
 function hideLoader() {
   if (loaderHidden) return;
+  /* Latched here rather than after the wait, so the 8s ceiling and the model
+     callbacks racing each other cannot queue two holds. */
   loaderHidden = true;
+  setTimeout(releaseLoader, LOADER_HOLD_MS);
+}
 
+function releaseLoader() {
   // Give the scrollbar back, and re-assert the top in case the browser
   // restored a position before the inline script could opt out of that.
   document.body.classList.remove('is-loading');

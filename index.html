@@ -37,6 +37,19 @@
       font-display short enough not to be seen.
     -->
     <link rel="preload" href="./moonwalk.ttf" as="font" type="font/ttf" crossorigin>
+    <!--
+      Same reasoning as the font above. The loader masks its logo out of this
+      file, and a CSS mask-image is not discovered until the stylesheet has
+      parsed — too late for the first thing painted. Preloaded it starts
+      alongside the CSS instead.
+
+      This is the outline build of the mark, not favicon.svg: the same artwork
+      traced to stroked vector paths by scripts/trace-logo.py. The two cannot be
+      one file because the favicon has to stay a filled silhouette to read at
+      16px in a tab strip. At 1.8KB of paths against the favicon's 14KB of
+      base64 raster, it is also the cheaper of the two to preload.
+    -->
+    <link rel="preload" href="./logo-outline.svg" as="image" type="image/svg+xml">
     <link rel="stylesheet" href="./style.css">
 
     <script type="application/ld+json">
@@ -78,19 +91,48 @@
        * Failsafe for the scroll lock below. hideLoader() normally clears it,
        * but if main.js never runs at all — blocked, failed to parse, offline —
        * nothing else would, and the page could not be scrolled. Deliberately
-       * longer than main.js's own 8s ceiling so it only ever fires as a
-       * last resort. document.body does not exist yet inside <head>.
+       * longer than main.js's own worst case so it only ever fires as a last
+       * resort. document.body does not exist yet inside <head>.
+       *
+       * 12s, not 10s: main.js's ceiling calls hideLoader() at 8s and that now
+       * holds the overlay a further 2s before releasing the lock, so its worst
+       * case is 10s. At 10s this would have fired simultaneously and stopped
+       * being a last resort at all.
        */
       setTimeout(function () {
         if (document.body) document.body.classList.remove('is-loading');
-      }, 10000);
+      }, 12000);
     </script>
   </head>
   <!-- is-loading locks scrolling until the models are ready; main.js clears it. -->
   <body class="is-loading">
-    <!-- Loader Overlay (removed by main.js; hidden outright when JS is off) -->
+    <!--
+      Loader Overlay (removed by main.js; hidden outright when JS is off)
+
+      The mark is the real logo as an outline, masked out of ./logo-outline.svg
+      with a metallic ramp running through the stroke. Deliberately a LOCAL
+      asset: the nav's version of this artwork lives on R2, and the whole point
+      of this overlay is to be the first thing painted, so waiting on a
+      cross-origin image would leave it blank for exactly the period it exists
+      to cover.
+
+      The chrome shading in the hero comes from a .glb the loader is waiting on,
+      so it cannot be the source here. The outline carries the shape and the
+      gradient does the metal.
+
+      Everything visible here is aria-hidden and the announcement is carried by
+      the visually-hidden text instead. "Loading…" used to be both at once; with
+      the word gone from the design, this region is still role="status" and
+      still has to say something.
+    -->
     <div id="loader-overlay" role="status" aria-live="polite">
-      <p class="loader-text">Loading…</p>
+      <div class="loader-flare" aria-hidden="true">
+        <span class="loader-mark"></span>
+      </div>
+      <div class="loader-dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="visually-hidden">Loading</p>
     </div>
     <noscript>
       <style>

@@ -1,0 +1,174 @@
+"""Trace the Alphintra mark into clean vector polygons for the loader outline.
+
+Regenerates public/logo-outline.svg from the artwork embedded in
+public/favicon.svg. Run from the repo root:
+
+    python scripts/trace-logo.py
+
+Why this exists: the loader masks its logo out of a stroked SVG, and the mark is
+only available as a raster. Deriving the outline at runtime with an feMorphology
+erode produced visibly ragged lines — a rectangular kernel displaces a diagonal
+edge in both axes at once, so diagonal strokes came out a different width from
+vertical ones and the corners were chewed. It was also eroding a 120x114 bitmap
+that then got scaled to ~200px on screen, magnifying every stair-step. Tracing
+to real paths once, here, gives a stroke that is exactly uniform at any size.
+
+The alpha is upscaled 4x before thresholding so its antialiasing yields
+sub-pixel edge positions, then Douglas-Peucker collapses the stair-steps back to
+the straight segments the mark is actually made of.
+
+Needs pillow, numpy and scipy. Nothing at runtime depends on this script or on
+those packages: it writes a file that is committed.
+"""
+import base64
+import io
+import re
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage
+
+UP = 4          # upscale before thresholding, so antialiasing gives sub-pixel edges
+EPS = 0.55      # Douglas-Peucker tolerance, in ORIGINAL pixels
+MIN_AREA = 16   # drop specks — there is a literal 1px one in the source alpha
+
+# favicon.svg places this same artwork at x=4 y=7 w=120 h=114 inside a 128 box.
+# Matching it means the outline and the filled favicon are interchangeable.
+ORIGIN_X, ORIGIN_Y = 4.0, 7.0
+STROKE_W = 2.0
+
+SOURCE = 'public/favicon.svg'
+TARGET = 'public/logo-outline.svg'
+
+
+def load_alpha():
+    src = io.open(SOURCE, encoding='utf-8').read()
+    b64 = re.search(r'base64,([A-Za-z0-9+/=]+)', src).group(1)
+    img = Image.open(io.BytesIO(base64.b64decode(b64))).convert('RGBA')
+    return img.split()[3]
+
+
+def trace_boundary(mask):
+    """Moore-neighbour boundary following. Returns closed pixel loops.
+
+    A region containing a hole yields two loops — its outer edge and the hole's
+    — which is what we want, since every loop is going to be stroked.
+    """
+    h, w = mask.shape
+    pad = np.zeros((h + 2, w + 2), bool)
+    pad[1:-1, 1:-1] = mask
+    nbrs = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1)]
+    seen = set()
+    loops = []
+    for y in range(1, h + 1):
+        for x in range(1, w + 1):
+            if not pad[y, x] or (y, x) in seen or pad[y, x - 1]:
+                continue
+            loop = []
+            cur = (y, x)
+            d = 6
+            guard = 0
+            while guard < 4 * pad.size:
+                guard += 1
+                loop.append(cur)
+                seen.add(cur)
+                found = False
+                for k in range(8):
+                    di = (d + 6 + k) % 8
+                    ny, nx = cur[0] + nbrs[di][0], cur[1] + nbrs[di][1]
+                    if pad[ny, nx]:
+                        cur = (ny, nx)
+                        d = di
+                        found = True
+                        break
+                if not found or (len(loop) > 2 and cur == loop[0]):
+                    break
+            if len(loop) >= 8:
+                loops.append([(px - 1, py - 1) for py, px in loop])
+    return loops
+
+
+def rdp(pts, eps):
+    """Douglas-Peucker on a polyline."""
+    if len(pts) < 3:
+        return pts
+    a = np.array(pts[0], float)
+    b = np.array(pts[-1], float)
+    ab = b - a
+    n = float(np.hypot(*ab))
+    P = np.array(pts, float)
+    if n == 0:
+        d = np.hypot(*(P - a).T)
+    else:
+        # 2D cross product written out; np.cross on 2-vectors is deprecated.
+        rel = P - a
+        d = np.abs(ab[0] * rel[:, 1] - ab[1] * rel[:, 0]) / n
+    i = int(np.argmax(d))
+    if d[i] > eps:
+        return rdp(pts[:i + 1], eps)[:-1] + rdp(pts[i:], eps)
+    return [pts[0], pts[-1]]
+
+
+def contours():
+    alpha = load_alpha()
+    w0, h0 = alpha.size
+    big = np.array(alpha.resize((w0 * UP, h0 * UP), Image.BICUBIC)) > 128
+    label, count = ndimage.label(big)
+    out = []
+    for i in range(1, count + 1):
+        region = label == i
+        if region.sum() < MIN_AREA * UP * UP:
+            continue
+        for loop in trace_boundary(region):
+            pts = [(x / UP, y / UP) for x, y in loop]
+            simp = rdp(pts, EPS)
+            if len(simp) >= 3:
+                out.append(simp)
+    return (w0, h0), out
+
+
+def emit():
+    (w0, h0), cs = contours()
+    subpaths = [
+        'M' + ' L'.join(f'{x + ORIGIN_X:.2f},{y + ORIGIN_Y:.2f}' for x, y in pts) + ' Z'
+        for pts in cs
+    ]
+    body = '\n    '.join(f'<path d="{d}"/>' for d in subpaths)
+    verts = sum(len(p) for p in cs)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>Alphintra mark, outline</title>
+  <!--
+    GENERATED by scripts/trace-logo.py — do not hand-edit. Re-run that script if
+    the logo changes.
+
+    The Alphintra mark as a clean vector outline, for the loader's masked logo.
+    Real paths, stroked, so the line is exactly uniform in width at any size.
+
+    This replaced an feMorphology erode of the artwork's alpha, which produced
+    visibly ragged lines: a rectangular kernel displaces a diagonal edge in both
+    axes at once, so diagonal strokes came out a different width from vertical
+    ones and the corners were chewed. That version also carried the full 14KB
+    base64 raster; this one is paths, and a fraction of the size.
+
+    Traced from the same alpha, upscaled 4x first so its antialiasing gives
+    sub-pixel edge positions, then simplified with Douglas-Peucker at {EPS}px.
+    The mark is geometric, so it reduces to {verts} vertices across {len(cs)}
+    closed loops. A 1px speck in the source alpha, disconnected from the mark,
+    is dropped.
+
+    Same box as favicon.svg — x=4 y=7 w=120 h=114 in a 128 viewBox — so the
+    outline and the filled favicon are interchangeable at the same dimensions.
+  -->
+  <g fill="none" stroke="#ffffff" stroke-width="{STROKE_W}"
+     stroke-linejoin="miter" stroke-miterlimit="8" stroke-linecap="square">
+    {body}
+  </g>
+</svg>
+"""
+    io.open(TARGET, 'w', encoding='utf-8', newline='\n').write(svg)
+    return TARGET, len(svg), verts, len(cs)
+
+
+if __name__ == '__main__':
+    path, size, verts, loops = emit()
+    print(f'wrote {path}: {size} bytes, {verts} vertices across {loops} loops')
