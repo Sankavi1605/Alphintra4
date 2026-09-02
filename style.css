@@ -2138,25 +2138,25 @@ nav .nav-links {
      single baseline and the arc drop reads as depth rather than as misalignment. */
   transform-style: preserve-3d;
   /*
-   * Not painted until it is nearly on screen.
+   * No content-visibility here, and no paint containment.
    *
-   * Seven 3D-transformed cards, each with a blurred shadow, on a page that also
-   * carries ten WebGL contexts and a pinned hero. None of that paint is worth
-   * anything while the section is a screen or more below the fold, and this
-   * section is the seventh of nine — most of the time it is nowhere near.
+   * It was `content-visibility: auto` to save painting seven 3D cards while the
+   * section sits below the fold. Two things are wrong with that, and the first
+   * one shipped: it declines to paint the subtree, so while the layout said the
+   * stage was 400px tall — its contain-intrinsic-size — the fan itself was
+   * simply absent, leaving a gap between the lede and the dots.
    *
-   * content-visibility, not visibility or display: skipped content stays in the
-   * accessibility tree and findable by the browser's own find-in-page, which
-   * eight paragraphs of real copy need to be. The stage's height is written
-   * inline by card-stack.js, so the box is already known and nothing reflows
-   * when it comes back — contain-intrinsic-size is only the fallback for the
-   * first frame, before that inline height is set.
+   * The second is structural and would have bitten even once painting resumed:
+   * content-visibility implies paint containment, which clips to the padding
+   * box. This fan deliberately spreads WIDER than its stage — the outermost
+   * cards sit about 135px past each edge — so containment crops exactly the
+   * part that makes it read as a fan.
    */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
 }
 
-/* The stage takes the arrow keys, so it needs a focus ring of its own. */
+/* The stage is tabbable — it is the deck's one stop in the tab order, and the
+   thing a keyboard reader lands on — so it needs a focus ring of its own. The
+   arrow keys themselves are handled at the window and do not require it. */
 .card-stack-stage:focus-visible {
   outline: 2px solid var(--brand-soft);
   outline-offset: 6px;

@@ -121,8 +121,21 @@ export function initCardStack(rootSelector) {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   let active = 0;
-  let cardWidth = CARD_MAX_W;
-  let cardHeight = CARD_MAX_W * CARD_RATIO;
+  /*
+   * Deliberately -1, not the design size.
+   *
+   * These are compared against what measure() computes, to skip redundant work.
+   * Seeding them with CARD_MAX_W and its ratio seeded them with exactly the
+   * answer measure() arrives at on any viewport wide enough to use the full
+   * card — so the comparison matched on the very first call, measure() returned
+   * "nothing changed", and the one layout that was not optional never happened.
+   * The stage got no height and the cards got no width, so each card sized
+   * itself from its own text and the fan never appeared at all.
+   *
+   * A value no measurement can produce cannot collide with one.
+   */
+  let cardWidth = -1;
+  let cardHeight = -1;
 
   stage.style.perspective = `${PERSPECTIVE_PX}px`;
 
@@ -240,21 +253,77 @@ export function initCardStack(rootSelector) {
   function go(index, byHand) {
     if (byHand) touched = true;
     active = wrapIndex(index, len);
-    place(false);
+    /* Instant under reduced motion: a step still has to work there — the arrow
+       keys and the dots are the only way through the deck once autoplay is off —
+       but it arrives rather than travelling. */
+    place(reduced.matches);
   }
 
   const prev = (byHand) => go(active - 1, byHand);
   const next = (byHand) => go(active + 1, byHand);
 
-  stage.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      prev(true);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      next(true);
-    }
-  });
+  /**
+   * Is enough of the deck on screen to be what the reader means?
+   *
+   * A quarter of its height, or its middle inside the viewport — the second
+   * clause covers a deck taller than the window, where no fraction of it can be
+   * large and it is still plainly the thing being looked at.
+   */
+  function deckInView() {
+    const r = root.getBoundingClientRect();
+    if (r.height <= 0) return false;
+    const shown = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+    if (shown >= r.height * 0.25) return true;
+    const mid = r.top + r.height / 2;
+    return mid > 0 && mid < window.innerHeight;
+  }
+
+  /*
+   * Arrow keys, bound to the window rather than to the stage.
+   *
+   * On the stage they only fired when the stage had focus, which meant the
+   * section's own instruction — "use the arrow keys" — was a lie unless the
+   * reader happened to have clicked or tabbed onto the deck first. Nothing on
+   * the page suggests doing that.
+   *
+   * Worth recording how this got shipped: the test dispatched a KeyboardEvent
+   * directly at the stage, which is the element holding the listener, so it
+   * bypassed the focus requirement altogether and passed. A real keypress goes
+   * to document.activeElement, which is the body. The test could not have failed
+   * for the reason the feature was broken.
+   *
+   * Bound at the window, three things have to be checked that the stage got for
+   * free:
+   */
+  function onKey(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    /* 1. Shortcuts. Ctrl/Alt/Meta arrow combinations belong to the browser and
+          the OS — word-wise caret moves, history, desktop switching. */
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+    /* 2. Typing. An arrow key inside the contact form's fields is a caret move,
+          and stealing it would make those inputs unusable. */
+    const el = document.activeElement;
+    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+    /* 3. Attention. The deck is one of ten sections and the page is 10,000px
+          tall, so it may only step while it is actually being looked at — and
+          not at all behind the fullscreen mobile menu.
+
+          Measured here rather than read off the IntersectionObserver that gates
+          autoplay. That observer is the right tool for a timer, which can afford
+          to start late, and the wrong one for a keypress: its callbacks are
+          delivered at frame time, so any lag leaves the arrow keys silently
+          dead, and its fixed 0.35 threshold makes them dead again whenever the
+          deck happens to be a third on screen. One rect read per keypress
+          answers the question at the moment it is actually being asked. */
+    if (document.body.classList.contains('no-scroll')) return;
+    if (!deckInView()) return;
+
+    /* Only now, so an arrow key still does its normal thing everywhere else. */
+    e.preventDefault();
+    if (e.key === 'ArrowLeft') prev(true);
+    else next(true);
+  }
+  window.addEventListener('keydown', onKey);
 
   cards.forEach((card, i) => {
     card.addEventListener('click', () => {
