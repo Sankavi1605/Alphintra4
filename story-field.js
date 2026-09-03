@@ -516,10 +516,11 @@ export function initStoryField() {
     /*
      * 0.16, not the sketch's 0.075.
      *
-     * section-scroll.js moves the page a whole section per gesture over 620ms,
-     * so p arrives as a ramp rather than as the continuous drip a free scroll
-     * gives. At 0.075 the scene was still catching up well after the page had
-     * stopped, which reads as the background lagging the content it belongs to.
+     * section-scroll.js moves the page a whole section per gesture, so p arrives
+     * as a ramp rather than as the continuous drip a free scroll gives. At 0.075
+     * the scene was still catching up well after the page had stopped, which
+     * reads as the background lagging the content it belongs to. 0.16 settles in
+     * about 100ms, so it stays under the step itself at any step duration.
      */
     smoothP += (raw - smoothP) * (reduced.matches ? 1 : 0.16);
     uni.uP.value = smoothP;

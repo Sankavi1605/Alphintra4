@@ -39,7 +39,24 @@ const SECTION_IDS = [
   'faq',
 ];
 
-const DURATION = 620; // ms for one step
+/*
+ * 1000ms, not the 620 this shipped with.
+ *
+ * A step is a whole viewport, so the duration is the only thing setting how
+ * fast the page moves. Measured on a 698px viewport, 620ms with the cubic that
+ * used to be below peaked at 3377px/s — an easeInOutCubic has to reach three
+ * times the average speed, not the two it is easy to assume, because its
+ * derivative at the midpoint is 12 * 0.25. That is fast enough that the scenes
+ * behind it read as snapping past rather than travelling.
+ *
+ * With 1000ms and the sine curve the peak is 1096px/s: a third of what it was,
+ * and only 1.57x the average rather than 3x.
+ *
+ * It is a ceiling on how fast the page can be read, so it is not free: nine
+ * stops at 1000ms is nine seconds to cross the page against six and a half. The
+ * scenes are the content here, and none of them can be taken in at 3377px/s.
+ */
+const DURATION = 1000; // ms for one step
 const WHEEL_MIN = 4; // deltaY below this is noise, not intent
 const TOUCH_MIN = 44; // px of finger travel that counts as a swipe
 const SETTLE_MS = 90; // quiet time after a step before the next is accepted
@@ -172,9 +189,17 @@ export function initSectionScroll() {
     const started = performance.now();
     const tick = (now) => {
       const p = Math.min(1, (now - started) / DURATION);
-      /* easeInOutCubic — leaves and arrives at rest, so a step reads as one
-         move rather than as a jump that then settles. */
-      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      /*
+       * easeInOutSine, where this used to run easeInOutCubic.
+       *
+       * Both leave and arrive at rest, which is what makes a step read as one
+       * move rather than a jump that then settles. The difference is the middle:
+       * a cubic in-out has to reach 3x the average speed to cover the distance
+       * in time, a sine in-out only pi/2 — about 1.57x. Same start, same stop,
+       * noticeably less rush through the part of the step the reader is actually
+       * watching, which is what "steady" means here.
+       */
+      const e = -(Math.cos(Math.PI * p) - 1) / 2;
 
       /* `instant`, explicitly: html carries scroll-behavior:smooth for anchor
          links, and a bare scrollTo would inherit it and animate every one of

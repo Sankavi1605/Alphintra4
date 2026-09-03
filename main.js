@@ -279,7 +279,10 @@ if (prefersReducedMotion) {
   /* Same reasoning as the three above — it is GSAP and DOM, so it neither waits
      on the GLTF nor holds a GL context, and its own ResizeObserver picks up the
      stage's real width once the loader has released the layout. */
-  queueMicrotask(() => initCardStack('#disciplines-stack'));
+  /* The heading and lede are raised by the deck's own entrance, so the whole
+     section arrives as one move. See the note on OPEN_FROM in card-stack.js. */
+  queueMicrotask(() =>
+    initCardStack('#disciplines-stack', ['#disciplines-heading', '.disciplines-lede']));
   /* Pointer listeners on one card: no GL context, no GSAP timeline, nothing to
      measure. It only ever responds once the hero's zoom has set
      .cards-container's pointer-events to auto, so binding early costs nothing. */
@@ -313,7 +316,10 @@ if (prefersReducedMotion) {
   /* Same reasoning as the three above — it is GSAP and DOM, so it neither waits
      on the GLTF nor holds a GL context, and its own ResizeObserver picks up the
      stage's real width once the loader has released the layout. */
-  queueMicrotask(() => initCardStack('#disciplines-stack'));
+  /* The heading and lede are raised by the deck's own entrance, so the whole
+     section arrives as one move. See the note on OPEN_FROM in card-stack.js. */
+  queueMicrotask(() =>
+    initCardStack('#disciplines-stack', ['#disciplines-heading', '.disciplines-lede']));
   /* Pointer listeners on one card: no GL context, no GSAP timeline, nothing to
      measure. It only ever responds once the hero's zoom has set
      .cards-container's pointer-events to auto, so binding early costs nothing. */

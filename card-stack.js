@@ -48,6 +48,40 @@ const SETTLE = 0.42; /* seconds; framer's spring lands at about this        */
 const EASE = 'back.out(1.1)';
 
 /*
+ * --- the entrance --------------------------------------------------------
+ *
+ * #disciplines is the only scene on this page with no WebGL field of its own,
+ * so nothing in it used to move until the reader touched it: place(true) laid
+ * the deck out in its final position behind the loader, and arriving at the
+ * section revealed a finished picture. These open the fan instead.
+ *
+ * No back.out here. The overshoot is right for a step — it is what stands in
+ * for framer's spring — and wrong for eight cards arriving at once, where eight
+ * simultaneous bounces read as a wobble rather than as a settle.
+ *
+ * The stagger is keyed on distance from the active card, not on DOM order, so
+ * the deck opens from its middle outward. Three steps out at 0.075 puts the
+ * outermost pair 225ms behind the centre, and the whole thing is done in a
+ * little over a second.
+ */
+const OPEN_SETTLE = 0.85;
+const OPEN_EASE = 'power3.out';
+const OPEN_STAGGER = 0.075;
+const OPEN_INTRO_SETTLE = 0.7;
+
+/* Where the cards come from: a collapsed stack at the centre, pushed back and
+   leaning away, with no fan angle at all. */
+const OPEN_FROM = {
+  x: 0,
+  y: 0,
+  z: -DEPTH_PX * 2.2,
+  rotationZ: 0,
+  rotationX: 26,
+  scale: 0.86,
+  opacity: 0,
+};
+
+/*
  * 4.2s, not the demo's 2s.
  *
  * These cards carry a title and two lines of real copy, and the services deck
@@ -108,13 +142,22 @@ function signedOffset(i, active, len) {
   return Math.abs(alt) < Math.abs(raw) ? alt : raw;
 }
 
-export function initCardStack(rootSelector) {
+/**
+ * @param rootSelector   the .card-stack element
+ * @param introSelectors elements to raise just before the fan opens — the
+ *                       section's heading and lede. Passed in rather than
+ *                       looked up here: they are this page's markup, outside
+ *                       the deck, and the deck should not have to know them.
+ */
+export function initCardStack(rootSelector, introSelectors = []) {
   const root = document.querySelector(rootSelector);
   if (!root) return;
 
   const stage = root.querySelector('.card-stack-stage');
   const cards = [...root.querySelectorAll('.stack-card')];
   if (!stage || !cards.length) return;
+
+  const intro = introSelectors.map((s) => document.querySelector(s)).filter(Boolean);
 
   const len = cards.length;
   const maxOffset = Math.max(0, Math.floor(MAX_VISIBLE / 2));
@@ -194,8 +237,14 @@ export function initCardStack(rootSelector) {
    * `instant` skips the tween — used for the first paint and under reduced
    * motion, where a settle would be the animation the setting asks us not to
    * play.
+   *
+   * `opening` is the section's entrance: the same target geometry, but slower,
+   * without the back.out overshoot, and delayed by each card's distance from
+   * the active one so the fan unfolds from the middle outward. It is a flag on
+   * this function rather than a second layout pass so the geometry stays
+   * written in exactly one place.
    */
-  function place(instant) {
+  function place(instant, opening) {
     /* The step, in px and degrees, from the card's own measured width. */
     const spacing = Math.max(10, Math.round(cardWidth * (1 - OVERLAP)));
     const stepDeg = maxOffset > 0 ? SPREAD_DEG / maxOffset : 0;
@@ -220,10 +269,12 @@ export function initCardStack(rootSelector) {
          * card that was already on its way rather than one that popped in.
          */
         opacity: inFan ? 1 : 0,
-        duration: instant ? 0 : SETTLE,
-        ease: EASE,
+        duration: instant ? 0 : opening ? OPEN_SETTLE : SETTLE,
+        ease: opening ? OPEN_EASE : EASE,
         overwrite: 'auto',
       };
+
+      if (opening) to.delay = abs * OPEN_STAGGER;
 
       gsap.to(card, to);
 
@@ -244,6 +295,70 @@ export function initCardStack(rootSelector) {
       d.classList.toggle('is-on', on);
       d.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+  }
+
+  /* --- the entrance, in two phases ---------------------------------------
+   *
+   * Arming and playing are separate because the from-state has to be applied
+   * while the section is still off screen. Doing both at once, at the moment
+   * the deck becomes visible, would put the heading and the cards to opacity 0
+   * in a frame the reader is already looking at — a flash of the finished
+   * picture, then the entrance. So the collapsed state is set a screen early
+   * and only the tween waits for arrival.
+   *
+   * It matters more here than it would elsewhere: section-scroll.js moves a
+   * whole viewport per gesture, so the section does not creep into view, it
+   * lands.
+   */
+  let armed = false;
+  let entered = false;
+  let armTimer = null;
+
+  function armIntro() {
+    if (armed || entered || reduced.matches) return;
+    armed = true;
+    if (intro.length) gsap.set(intro, { opacity: 0, y: 28 });
+    gsap.set(cards, OPEN_FROM);
+
+    /*
+     * The floor, and the reason this is not just an observer.
+     *
+     * Arming hides the whole section, and only playIntro() brings it back. So
+     * anything that stops arrival from ever being *reported* leaves it hidden
+     * for good — and there is a real case: an observer coalesces, so a nav jump
+     * from the hero straight to #contact can traverse this section and deliver
+     * one callback for the state at the end of the jump, by which time the deck
+     * is off screen again and was never seen at 35%.
+     *
+     * Six seconds is far longer than the ~1s step it takes to arrive, so a
+     * reader who is on their way still gets the real entrance. Anyone who is
+     * not gets the deck instead of a blank, which is the only outcome here that
+     * would be a bug rather than a missed flourish.
+     */
+    armTimer = window.setTimeout(playIntro, 6000);
+  }
+
+  function playIntro() {
+    if (entered) return;
+    entered = true;
+    clearTimeout(armTimer);
+    /* Reduced motion keeps the deck as place(true) left it: laid out, still. */
+    if (reduced.matches) return;
+    /* Deep-linked straight to this section, so arming never got its screen of
+       warning. Same frame, so there is nothing to flash. */
+    if (!armed) armIntro();
+
+    if (intro.length) {
+      gsap.to(intro, {
+        opacity: 1,
+        y: 0,
+        duration: OPEN_INTRO_SETTLE,
+        ease: 'power2.out',
+        stagger: 0.12,
+        overwrite: 'auto',
+      });
+    }
+    place(false, true);
   }
 
   /* --- navigation --------------------------------------------------------- */
@@ -383,7 +498,11 @@ export function initCardStack(rootSelector) {
   let hovering = false;
 
   function syncAutoplay() {
-    const shouldRun = onScreen && !document.hidden && !hovering && !touched && !reduced.matches;
+    /* `entered` too, so the timer cannot start stepping a deck that is still
+       unfolding. The first tick is 4.2s out and the fan is open in about 1.1,
+       so this is belt and braces rather than a fix. */
+    const shouldRun =
+      entered && onScreen && !document.hidden && !hovering && !touched && !reduced.matches;
     if (shouldRun && timer === null) {
       timer = window.setInterval(() => next(false), INTERVAL_MS);
     } else if (!shouldRun && timer !== null) {
@@ -411,9 +530,28 @@ export function initCardStack(rootSelector) {
     syncAutoplay();
   });
 
+  /*
+   * Arm a screen early. A positive bottom margin extends the root's box down
+   * past the fold, so this fires while the deck is still below it — which is
+   * the whole point: the collapsed state gets applied somewhere the reader
+   * cannot see it happen.
+   */
+  const armObserver = new IntersectionObserver(
+    ([entry]) => {
+      if (!entry.isIntersecting) return;
+      armIntro();
+      armObserver.disconnect();
+    },
+    { rootMargin: '0px 0px 60% 0px' }
+  );
+  armObserver.observe(root);
+
   new IntersectionObserver(
     ([entry]) => {
       onScreen = entry.isIntersecting;
+      /* Arrival: 35% of the deck is enough to mean the section is being looked
+         at, and it is the threshold autoplay already trusts for that. */
+      if (onScreen) playIntro();
       syncAutoplay();
     },
     { threshold: 0.35 }
