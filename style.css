@@ -2764,27 +2764,6 @@ nav .nav-links {
 }
 
 /*
- * The tagline, as real copy at every width.
- *
- * It used to carry .drawn-in-webgl and be lettered into the old about field's
- * canvas, with a reserved second column beside the panel to hold the rows. The
- * shared .team-field's middle beat is the aurora behind the panel and is
- * wordless by design, so that column is gone and the line runs above the panel
- * — which is what it already did under the 1099px split and in reduced motion.
- */
-.about-tagline {
-  margin: 0 0 2rem;
-  max-width: 22ch;
-  text-align: center;
-  font-size: clamp(1.5rem, 4.6vw, 2.4rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  text-transform: uppercase;
-  color: rgba(240, 236, 250, 0.92);
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
-}
-
-/*
  * The glass poster.
  *
  * The supplied sketch's recipe, kept intact: a 38%-black fill under a heavy
@@ -3789,8 +3768,7 @@ footer {
    * .team-field is NOT hidden here. THE TEAM and DELIVER TRACKS are drawn in
    * that canvas, so dropping it would leave two sections headless; it renders
    * one settled frame and never animates, which is what this query asks for.
-   * The tagline between them is real copy at every width now, so it needs
-   * nothing from this block.
+   * #about between them carries its heading on the panel, so it needs nothing.
    */
 
   /* No entrance runs in this mode, so the panel is placed lit and level. */

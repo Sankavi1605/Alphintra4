@@ -33,11 +33,11 @@ import { makeLetter, fitScale } from './webgl-letters.js';
  *
  * WHAT THIS DROPPED FROM THE THREE IT REPLACED
  *
- * - The About tagline is no longer lettered in WebGL. The middle beat of this
- *   story is the aurora behind a glass card and is deliberately wordless, so
- *   "Engineering studio for scalable products" is now real copy at every width
- *   rather than glyph planes — which is what it already was under the 1099px
- *   split and in reduced motion.
+ * - The About tagline. It used to be lettered in WebGL by the field this
+ *   replaced, and the middle beat of this story is the aurora behind a glass
+ *   card and is deliberately wordless — so it became real copy in the markup,
+ *   and has since been dropped from the section altogether. #about carries its
+ *   heading on the panel, which is what labels the section.
  * - The contact field's grab cursor. That host sat inside its section and could
  *   take pointer events; a fixed canvas spanning three sections cannot without
  *   swallowing every click on all three, so the parallax reads the pointer off
@@ -419,7 +419,7 @@ export function initTeamField() {
   /* --- the two headings -------------------------------------------------- */
   /*
    * Two, not three. The middle beat is the aurora behind a glass card and is
-   * wordless by design, so #about's tagline is real copy in the markup instead.
+   * wordless by design; #about's heading lives on the panel itself.
    */
   const txScene = new THREE.Scene();
   const txCam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
