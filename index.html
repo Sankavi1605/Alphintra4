@@ -342,15 +342,25 @@
       </div>
     </section>
 
+    <!--
+      The story field: one canvas behind #concepts, #about-us and #services.
+
+      These three sections used to carry a WebGL field each — a halo of rings,
+      a silk wave, a warp of comets — that began and ended at their own edges.
+      They are now one continuous shot: the ring collapses to a point, the
+      point falls and splashes into the wave, the wave drains back to a point,
+      and that point opens into the vortex the comets pour from. The scroll is
+      the playhead, so the change always happens mid-section rather than on a
+      seam. See story-field.js.
+
+      Fixed and behind everything: each section's own content sits at z-index 1
+      or 2 and paints over it. The lettering it draws is canvas texture, so the
+      real headings remain the visually-hidden h2s in each section below.
+    -->
+    <div class="story-field" id="story-field" aria-hidden="true"></div>
+
     <!-- Concepts / Engineering Tracks Section -->
     <section id="concepts" aria-labelledby="concepts-heading">
-      <!--
-        The halo: three orbiting rings with ENGINEERING CAPABILITIES lettered
-        inside them. The word is canvas texture, so the real heading is the
-        visually-hidden h2 below.
-      -->
-      <div class="capability-field" id="capability-field" aria-hidden="true"></div>
-
       <div class="concepts-inner">
         <h2 id="concepts-heading" class="visually-hidden">Engineering Capabilities</h2>
 
@@ -398,14 +408,6 @@
       repeated here — they already run in the #about block below.
     -->
     <section id="about-us" aria-labelledby="about-us-heading">
-      <!--
-        The backdrop is an image, set on .about-us-field in the stylesheet; the
-        light-trail ribbon that used to be drawn here in WebGL is gone. ABOUT US
-        is still lettered over it in canvas texture, so the real heading is the
-        visually-hidden h2 below.
-      -->
-      <div class="about-us-field" id="about-us-field" aria-hidden="true"></div>
-
       <div class="about-us-inner">
         <h2 id="about-us-heading" class="visually-hidden">About Us</h2>
 
@@ -423,14 +425,6 @@
       arrows either side of the card.
     -->
     <section id="services" aria-labelledby="services-heading">
-      <!--
-        The warp burst: comets streaming out of a vortex, each a curved trail
-        with a bright head and a tapering tail, with AI AND AUTOMATION lettered
-        across the quiet band beneath them. The word is canvas texture, so the
-        real heading is the visually-hidden h2 below.
-      -->
-      <div class="services-field" id="services-field" aria-hidden="true"></div>
-
       <div class="services-inner">
         <h2 id="services-heading" class="visually-hidden">AI and Automation</h2>
 
@@ -583,14 +577,22 @@
       used to be the third About Us card ("Engineers at the core") — same
       sentence, so it has been lifted out rather than repeated 200px apart.
     -->
+    <!--
+      One canvas behind #makers, #about and #contact: the orbs deflate to a
+      point, that point's light disperses into the aurora, and the aurora drains
+      into the crater the halftone wave blooms out of — one continuous shot.
+      Fixed to the viewport and clipped to those three sections per frame,
+      because a morph cannot be drawn by hosts that stop at a section boundary:
+      the change would land on the seam. See team-field.js.
+    -->
+    <div class="team-field" id="team-field" aria-hidden="true"></div>
+
     <section id="makers" aria-labelledby="makers-heading">
       <!--
-        Soft-focus orbs with THE TEAM lettered over them. The word is canvas
-        texture in WebGL, so it is decoration; the card below carries the real
-        heading, and the card is placed under the word rather than over it.
+        THE TEAM is lettered over the orbs by the shared .team-field. The word is
+        canvas texture in WebGL, so it is decoration; the card below carries the
+        real heading, and the card is placed under the word rather than over it.
       -->
-      <div class="makers-field" id="makers-field" aria-hidden="true"></div>
-
       <div class="makers-inner">
         <article class="makers-card liquid-glass">
           <h2 id="makers-heading">Built by Makers</h2>
@@ -603,20 +605,18 @@
     <!-- About Section -->
     <section id="about" aria-labelledby="about-heading">
       <!--
-        The aurora: peach, magenta, violet and blue lights orbiting behind the
-        glass, with dark pockets drifting among them and film grain over the
-        lot. The planet that used to letter ENGINEERING STUDIO / FOR SCALABLE
-        PRODUCTS in WebGL is gone, and the pair of headings it stood in for with
-        it — the panel's own h2 is the section's heading now.
+        The aurora behind the glass — violet and blue lights with dark pockets
+        drifting among them and film grain over the lot — is the middle beat of
+        the shared .team-field, born out of the orbs above and draining into the
+        wave below. The panel's own h2 is the section's heading.
       -->
-      <div class="about-field" id="about-field" aria-hidden="true"></div>
-      <div class="systems-floor" id="systems-floor" aria-hidden="true"></div>
 
       <div class="about-inner">
-        <!-- Drawn as glyph planes in .about-field beside the panel. Kept here as
-             real text so the section is not one canvas deep: below the split
-             breakpoint, and with reduced motion on, this is what is shown. -->
-        <p class="about-tagline drawn-in-webgl">Engineering studio for scalable products</p>
+        <!-- Real copy at every width. This line used to be glyph planes in the
+             old about field; the shared field's middle beat is the aurora behind
+             the panel and is wordless by design, so nothing letters it in WebGL
+             any more and it is simply read. -->
+        <p class="about-tagline">Engineering studio for scalable products</p>
 
         <article class="systems-panel" id="systems-panel">
           <div class="systems-shade" aria-hidden="true"></div>
@@ -641,11 +641,11 @@
     <!-- Contact Section -->
     <section id="contact" aria-labelledby="contact-heading">
       <!--
-        The halftone sheet: a tilted grid of dots rippling around a crater, with
-        DELIVER TRACKS lettered inside it. That row is decoration drawn in
-        canvas texture, so the real heading is the visually-hidden h2 below.
+        The halftone sheet — a tilted grid of dots rippling around a crater, with
+        DELIVER TRACKS lettered inside it — blooms out of the shared .team-field.
+        That row is decoration drawn in canvas texture, so the real heading is
+        the visually-hidden h2 below.
       -->
-      <div class="contact-field" id="contact-field" aria-hidden="true"></div>
 
       <!--
         Two cards, parked either side of the crater so the lettering and the

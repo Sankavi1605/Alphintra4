@@ -445,6 +445,10 @@ a:hover {
    * Above .hero-title (z 1) so the model occludes the wordmark, but below the
    * hero copy (3), the scroll reveal (10) and the nav (20). Every section
    * after the hero is lifted to z 3 so the canvas never covers them.
+   *
+   * .story-field matches this 2 on purpose and wins the tie on tree order, so
+   * for the three sections it backs it hides this canvas the way their own
+   * black backgrounds used to. See the note there before changing either.
    */
   z-index: 2;
   pointer-events: none;
@@ -1491,9 +1495,8 @@ nav .nav-links {
 }
 
 /*
- * Scrim, banded by height for the same reason as .makers-field::after: it sits
- * over the canvas, so a flat wash heavy enough for the cards would also crush
- * the lettering. The word occupies roughly the top third and the cards the
+ * Scrim, banded by height because it sits over the canvas: a flat wash heavy
+ * enough for the cards would also crush the lettering. The word occupies roughly the top third and the cards the
  * bottom half, so the band is light through the heading and heavy under the
  * deck. 0.62 there puts a clipped-white blade at rgb(97) before .work-glass
  * adds its own 4.5% white, which keeps white copy past 8:1.
@@ -1748,24 +1751,6 @@ nav .nav-links {
   border: 0;
 }
 
-/*
- * Headings a WebGL layer draws instead. Same effect as .visually-hidden, but a
- * separate class so the reduced-motion block can put them back: that block
- * drops .about-field entirely, and a permanently hidden h2 would leave the
- * section with no visible heading at all.
- */
-.drawn-in-webgl {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* General Section Utilities */
 /*
  * `will-change` was previously pinned onto ~25 selectors permanently, which
@@ -1816,6 +1801,144 @@ nav .nav-links {
 }
 
 /* Concepts Section */
+/* =========================================================================
+ * The story field — one canvas behind #concepts, #about-us and #services
+ *
+ * Fixed to the viewport, because the scene it draws is one continuous shot
+ * across all three sections and a morph cannot be drawn by elements that stop
+ * at a section boundary — the change would land on the seam.
+ *
+ * BEHIND those sections, and there is no way around that: all three sit at
+ * z-index 3 (see the rule that keeps the page in front of the hero canvas),
+ * which makes each one a stacking context, so a single element outside them is
+ * either under the whole section or over all of its content — there is no
+ * height that slips between a section's own background and its cards.
+ *
+ * Being underneath means the sections must not paint anything opaque of their
+ * own. #about-us and #services used to lay down a black gradient to stop the
+ * hero's fixed canvas showing through them, and that black hid this canvas
+ * completely — the sections rendered as flat black while #concepts, which has
+ * no background, showed the scene. The field takes that job over instead: its
+ * context is alpha:false and it draws a full-screen quad, so it is opaque
+ * across the band, and the clip below matches the three sections' extent
+ * exactly — every on-screen pixel of them is covered.
+ *
+ * The handover is gated on the field being live, not merely stylesheet-present:
+ * story-field.js puts .story-field-live on <html> only after a frame has
+ * actually been drawn, and the black below is what a browser with no WebGL
+ * context (or a module that never mounts) is left with. Same fallback as
+ * before; it just is not in the way when it is not needed.
+ *
+ * z-index 2 is the one value that works, and the tie is deliberate. The other
+ * thing those black gradients were hiding is #webgl-container — the hero's
+ * chrome models, on a canvas that is fixed at z-index 2 for the entire scroll
+ * (the reason every section after the hero is lifted to 3). At z-index 1 this
+ * field would be under that canvas, so uncovering it would have swapped flat
+ * black for the hero showing through. Matching its 2 puts them on the same
+ * level, where tree order decides: #webgl-container is a direct child of body
+ * near the top of the document and this host is inside #main, so this one
+ * paints second. Above the hero, still below the sections' content at 3.
+ * Nothing between here and <html> establishes a stacking context, so this
+ * z-index really does compete in the root one — verified, not assumed.
+ *
+ * clip-path, set per frame by story-field.js, confines it to the three
+ * sections' real extent. Without it a viewport-sized fixed canvas would wash
+ * over the tail of #projects and the head of #disciplines on the way past —
+ * and, now that it is above #webgl-container, over the hero itself.
+ * ====================================================================== */
+.story-field {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* Shown by story-field.js once it has a context and a frame to draw. */
+  visibility: hidden;
+}
+
+.story-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Hand the backdrop over to the canvas once it is really drawing.
+ *
+ * These two sections' black gradients are declared further down as the no-WebGL
+ * fallback; the class only lands after story-field.js has rendered a frame, so
+ * dropping them here cannot leave a hole. #concepts is not listed because it
+ * never had a background to begin with.
+ */
+.story-field-live #about-us,
+.story-field-live #services {
+  background: none;
+}
+
+/* =========================================================================
+ * The team field - one canvas behind #makers, #about and #contact
+ *
+ * The second of the two joined scenes, and everything the note on .story-field
+ * says applies here for the same reasons: fixed rather than sticky, clipped per
+ * frame by script, and z-index 2 to win the tie against #webgl-container while
+ * staying under the sections' own content at 3.
+ *
+ * It replaced .makers-field, .about-field and .contact-field, which were three
+ * absolutely-positioned hosts each ending at their own section's edge - the one
+ * place a morph between two of them could never be drawn.
+ * ====================================================================== */
+.team-field {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* Shown by team-field.js once it has a context and a frame to draw. */
+  visibility: hidden;
+}
+
+.team-field canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/*
+ * Hand the backdrop over to the canvas once it is really drawing. Same
+ * arrangement as .story-field-live: the gradients on the three sections are the
+ * no-WebGL fallback, and this class only lands after a frame has been rendered.
+ */
+.team-field-live #makers,
+.team-field-live #about,
+.team-field-live #contact {
+  background: none;
+}
+
+/*
+ * A vignette, and nothing else.
+ *
+ * The three hosts this replaced each carried their own scrim, tuned to their own
+ * artwork: a height-banded wash under the makers card, a heavier one behind the
+ * systems panel, a side-banded one for the contact pair. None of those can be
+ * expressed by one viewport-fixed layer that all three scroll through, and the
+ * common term in all three was the vignette, which is what survives. Every card
+ * over this field is .liquid-glass, so the copy already sits on a blurred,
+ * dimmed surface rather than straight on the artwork.
+ */
+.team-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    125% 90% at 50% 50%,
+    rgba(0, 0, 0, 0) 42%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
 #concepts {
   position: relative;
   overflow: hidden;
@@ -1831,68 +1954,6 @@ nav .nav-links {
    */
   align-items: stretch;
   padding: 5rem 1.75rem;
-}
-
-/*
- * Full-bleed grain-sphere field behind the cards. Same vertical fade as the
- * other scene sections, or the scene's black backdrop ends in a hard line
- * against the page gradient above and below. Pointer-events stay off so the
- * cards keep their hover and the button stays clickable — initCapabilityField()
- * reads the cursor from the section instead.
- */
-.capability-field {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-}
-
-.capability-field canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/*
- * Black scrim over the scene. The rings' core term peaks white-hot and the
- * cards are only 5% white, so an orbiting hot segment passing behind a card
- * washes its copy out. Darkening the field is the lever here because the
- * .liquid-glass recipe itself has to stay exactly as it is.
- *
- * Banded by height, like .makers-field and .projects-field, because the scrim is
- * over the canvas and so dims the lettering along with the rings. The word and
- * the card occupy different rows — the lettering lands in roughly 14%..24% of
- * the height and the card in 28%..63% — so the wash is lighter across the word
- * and keeps its full weight under the card, where the copy needs the contrast.
- *
- * Inside .capability-field, so it inherits the same top/bottom mask and can
- * never show as a hard-edged rectangle against the neighbouring sections.
- */
-.capability-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    /* vignette: sinks the corners into the section's black */
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.45) 100%),
-    /* the scrim proper, heaviest through the band the cards occupy */
-    linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.38) 0%,
-      rgba(0, 0, 0, 0.42) 12%,
-      rgba(0, 0, 0, 0.42) 26%,
-      rgba(0, 0, 0, 0.7) 32%,
-      rgba(0, 0, 0, 0.7) 66%,
-      rgba(0, 0, 0, 0.66) 88%,
-      rgba(0, 0, 0, 0.38) 100%
-    );
 }
 
 /*
@@ -2125,19 +2186,19 @@ nav .nav-links {
 /* =========================================================================
  * About Us
  *
- * The card surfaces come from .liquid-glass; the geometry is here, and the silk
- * dune sits behind it all in .about-us-field.
+ * The card surfaces come from .liquid-glass; the geometry is here, and the
+ * scene behind it all is drawn by the shared .story-field.
  * ====================================================================== */
 #about-us {
   position: relative;
   overflow: hidden;
   /*
-   * Same backdrop as #about and #contact. The hero canvas is fixed to the
-   * viewport for the whole scroll, so a section with no background of its own
-   * lets the chrome models through wherever its field's mask has faded out —
-   * and with #concepts fading out directly above, that seam would be a 200px
-   * window onto the hero. Black through the middle, feathered at the extremes
-   * so the page gradient carries the joins instead of a flat #000 band.
+   * Fallback backdrop, dropped by .story-field-live once the canvas behind is
+   * drawing. It has to be here rather than nowhere because the hero canvas is
+   * fixed to the viewport for the whole scroll, so with no field and no
+   * background this section is a window onto the chrome models. Black through
+   * the middle, feathered at the extremes so the page gradient carries the
+   * joins instead of a flat #000 band.
    */
   background: linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
   padding: 9rem 1.75rem 5rem;
@@ -2149,80 +2210,6 @@ nav .nav-links {
   display: flex;
   /* the card hangs off the bottom padding; the word sits across the fold above */
   align-items: flex-end;
-}
-
-/*
- * Full-bleed field. initAboutUsField() draws the whole thing — the silk dune and
- * ABOUT US over it — so there is no CSS backdrop here any more; the black-hole
- * image this used to carry is gone with it, and with it the cover/contain pair
- * that framed a fixed-aspect bitmap. The shader spans its ridge across whatever
- * box it is given instead.
- *
- * Same short vertical ramp as every other internal join — see the note on the
- * scrollytelling block: 4%, so the dune reaches the section's edges and meets
- * the scenes above and below instead of dissolving into black between them.
- * Pointer-events stay off so the card keeps its hover — initAboutUsField() reads
- * the cursor from the section instead.
- */
-.about-us-field {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-}
-
-.about-us-field canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/*
- * Black scrim, banded by height — same idea as .makers-field::after and
- * .projects-field::after: the scrim sits over the canvas, so a flat wash would
- * dim ABOUT US along with the artwork. The word and the card occupy different
- * rows — the glyphs fall around 40%..48% of the height, the card in 66%..91% —
- * so the top stays light and the weight goes under the card.
- *
- * Much lighter under the card than the ribbon this replaced needed, and the
- * shader is why. That ribbon summed three additive passes to roughly 5x white
- * and its core lines clamped to flat #fff, so it took 0.83 to bring them down.
- * The dune's crest is the only comparably bright thing here, and on a landscape
- * box it never reaches the card: the ridge is still up around uv y +0.02..+0.45
- * across the card's own span, well above its top edge, so everything behind the
- * copy is the violet field. Sampled off the shader at 1425x860, the brightest
- * pixel in the card's box comes out rgb(36,22,102) once this 0.55 is applied,
- * which holds the secondary copy at 7.2:1 — bare, and through a .liquid-glass
- * card, which lifts the surface it sits on by only 5% of white.
- *
- * Which matters, because 0.83 would have taken the pool of light with it: that
- * glow sits around 73% of the height, squarely inside the heavy band, and it is
- * the payoff the whole entrance builds to. The mobile override further down
- * moves this weight, because there the card does too.
- */
-.about-us-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    /* vignette: sinks the corners into the section's black */
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
-    linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.42) 0%,
-      rgba(0, 0, 0, 0.3) 20%,
-      rgba(0, 0, 0, 0.3) 48%,
-      rgba(0, 0, 0, 0.55) 57%,
-      rgba(0, 0, 0, 0.55) 90%,
-      rgba(0, 0, 0, 0.42) 100%
-    );
 }
 
 .about-us-inner {
@@ -2265,76 +2252,24 @@ nav .nav-links {
 }
 
 /* ======================================================================
- * Services — the capability cards over the eclipse
+ * Services — the capability cards over the story field's last scene
  *
- * The field draws two orbs kissing at the centre of the frame and letters
- * AI AND AUTOMATION across the dark band beneath them. So the card takes the
- * middle — the kiss glows through the glass, which is the point — and the
- * word follows the bottom of the copy rather than a fixed world y. That
- * measurement is initServicesField's rowFraction(); the bottom padding here
- * is what leaves it somewhere to land.
+ * The shared .story-field arrives here at the end of its run, with the vortex
+ * drawn around the centre of the frame and AI AND AUTOMATION lettered across
+ * it. The card takes the middle, so the core glows through the glass, and the
+ * bottom padding is the room the word needs below the copy.
  * ====================================================================== */
 #services {
   position: relative;
   overflow: hidden;
-  /* Same backdrop as the other scene sections: the hero canvas is fixed for
-     the whole scroll, so a transparent section lets it through wherever the
-     field's mask has faded out. */
+  /* Fallback backdrop, dropped by .story-field-live once the canvas behind is
+     drawing — same arrangement as #about-us. The hero canvas is fixed for the
+     whole scroll, so with neither a field nor a background this section is a
+     window onto it. */
   background: linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
   padding: 6rem 1.75rem 9rem;
   display: flex;
   align-items: center;
-}
-
-/* Full-bleed: the comets radiate from a single point out past every edge, and
-   cropping the stream to the content box would read as a framed picture of it
-   rather than as the section flying through it. */
-.services-field {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-}
-
-.services-field canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/*
- * Scrim over the stream. The eclipse this replaced needed none — it was two
- * barely-lit orbs on black — but a comet is a hard bright edge, and the heroes
- * carry a near-white head halo the size of the card's heading. Unscrimmed, one
- * of them parked on "AI & Intelligent Systems" and took the contrast with it.
- *
- * Banded by *width* rather than height, unlike the other fields: what has to
- * stay dark here is a column, not a row. .services-inner gives the copy the
- * left column and the artwork the right, so the wash is heaviest across the
- * card and clears completely before the vanishing point — the vortex, the
- * halos and the brightest stretch of every trail all keep their full value.
- *
- * Inside .services-field, so it inherits the same top/bottom mask and can
- * never show as a hard-edged rectangle against the neighbouring sections.
- */
-.services-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.76) 0%,
-    rgba(0, 0, 0, 0.72) 38%,
-    rgba(0, 0, 0, 0.24) 66%,
-    rgba(0, 0, 0, 0) 84%
-  );
 }
 
 /*
@@ -2726,9 +2661,9 @@ nav .nav-links {
 #makers {
   position: relative;
   overflow: hidden;
-  /* Same backdrop as the other scene sections: the hero canvas is fixed for
-     the whole scroll, so a transparent section lets it through wherever the
-     field's mask has faded out. */
+  /* Fallback backdrop, dropped by .team-field-live once the canvas behind is
+     drawing. The hero canvas is fixed for the whole scroll, so with neither a
+     field nor a background this section is a window onto it. */
   background: linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
   padding: 6rem 1.75rem 4rem;
   /* One screen, like every other scene. It used to run 118vh to give the orb
@@ -2737,76 +2672,6 @@ nav .nav-links {
   display: flex;
   /* the card hangs off the bottom; the word keeps the middle */
   align-items: flex-end;
-}
-
-/*
- * The orb field, plus the THE TEAM lettering drawn over it. Full-bleed so the
- * disc reads as a sphere rather than a cropped gradient, and so the word is
- * centred on the section rather than on the card.
- */
-.makers-field {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-}
-
-.makers-field canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/*
- * Black scrim — deliberately lighter than .about-field and .about-us-field.
- *
- * The disc body alone tops out around rgb(139,110,217), but the rim is
- * additive on top of it: body + 1.25x the rim colour + 0.55x its cubed core
- * sums to roughly (1.66, 1.22, 2.63) before the framebuffer clamps. So the
- * lower arc is flat #fff, not a tint, and it sweeps through the lower-left of
- * the disc — which is exactly where the copy card lands.
- *
- * The trail field answers that with a 0.83 scrim, and that is wrong here: at
- * 0.83 this disc stops reading as a lit sphere and becomes a flat gradient,
- * which is the entire subject of the artwork. So the scrim stays at 0.62 and
- * every line in the card is --text-primary instead. Against that clamped
- * white the surface is rgb(97), which .liquid-glass lifts to rgb(105), and
- * white copy still holds 5.5:1 — comfortably past AA, with the disc intact.
- *
- * The scrim sits over the canvas, so it dims THE TEAM as well as the disc —
- * a flat wash heavy enough for the card crushes the word to mid-grey. Since
- * the word and the card occupy different rows (48-58% and 66-92%), the scrim
- * is banded by height instead: light through the word, heavy under the card.
- */
-.makers-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    /* vignette: sinks the corners into the section's black. Only ~0.09 deep at
-       the word's outermost glyph, so it costs the lettering nothing. */
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.5) 100%),
-    /*
-     * Banded scrim. 0.26 through the word keeps the glyphs near rgb(178) on a
-     * rgb(31) disc; 0.74 under the card puts its surface at rgb(76) once
-     * .liquid-glass has added its 5% white, so white copy holds 8.6:1.
-     */
-    linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.34) 0%,
-      rgba(0, 0, 0, 0.26) 40%,
-      rgba(0, 0, 0, 0.3) 58%,
-      rgba(0, 0, 0, 0.74) 66%,
-      rgba(0, 0, 0, 0.74) 92%,
-      rgba(0, 0, 0, 0.42) 100%
-    );
 }
 
 .makers-inner {
@@ -2854,9 +2719,9 @@ nav .nav-links {
 
 /*
  * Three short sentences that read as a statement of practice. The step down
- * from .makers-lead is carried by tracking and line-height, not colour — see
- * the note on .makers-field::after for why nothing here drops to
- * --text-secondary.
+ * from .makers-lead is carried by tracking and line-height, not colour. The
+ * orbs behind clamp to white through the lower-left of the disc, which is where
+ * this card lands, so nothing here drops to --text-secondary.
  */
 .makers-creed {
   position: relative;
@@ -2871,12 +2736,12 @@ nav .nav-links {
 #about {
   position: relative;
   overflow: hidden;
-  /* Black behind the film, but transparent at the very edges so the page
-     gradient carries through instead of butting against a flat #000 band. */
+  /* Fallback backdrop, dropped by .team-field-live once the canvas behind is
+     drawing - same arrangement as #makers and #contact. */
   background: linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
   /*
    * One panel, centred, with the aurora behind it. The perspective is what
-   * gives the panel its tilt — initAboutField's frame loop writes rotateX and
+   * gives the panel its tilt — team-field.js's frame loop writes rotateX and
    * rotateY on it, and without a perspective on the containing block those
    * rotations are flat and nothing appears to move.
    *
@@ -2890,28 +2755,6 @@ nav .nav-links {
   perspective: 1500px;
 }
 
-/*
- * Full-bleed aurora, behind the panel. Same vertical fade as the spotlight
- * sections, or the scene ends in a hard line against the next one.
- */
-.about-field {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-}
-
-.about-field canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
 .about-inner {
   position: relative;
   z-index: 2;
@@ -2921,52 +2764,24 @@ nav .nav-links {
 }
 
 /*
- * The panel takes the left column and the right one is left empty on purpose:
- * initAboutField letters "ENGINEERING STUDIO / FOR SCALABLE / PRODUCTS" into
- * that space in the field canvas behind, measuring the panel's right edge to
- * find it. The empty column is what reserves the room.
+ * The tagline, as real copy at every width.
  *
- * 1100px is the same threshold the field uses to decide whether to draw the
- * rows at all; below it the panel re-centres and the tagline becomes real copy.
+ * It used to carry .drawn-in-webgl and be lettered into the old about field's
+ * canvas, with a reserved second column beside the panel to hold the rows. The
+ * shared .team-field's middle beat is the aurora behind the panel and is
+ * wordless by design, so that column is gone and the line runs above the panel
+ * — which is what it already did under the 1099px split and in reduced motion.
  */
-@media (min-width: 1100px) {
-  .about-inner {
-    max-width: 1380px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    justify-items: start;
-    align-items: center;
-  }
-
-}
-
-/*
- * The tagline carries .drawn-in-webgl, so it is hidden while the field letters
- * it and comes back as copy wherever the field does not — under the split
- * below, and in the reduced-motion block, which un-hides that class already.
- *
- * Under the split there is no second column for the rows to occupy, so the line
- * runs above the panel instead. It is worth reading, not just decoration.
- */
-@media (max-width: 1099px) {
-  .about-tagline {
-    position: static;
-    width: auto;
-    height: auto;
-    margin: 0 0 2rem;
-    padding: 0;
-    overflow: visible;
-    clip-path: none;
-    white-space: normal;
-    border: 0;
-    max-width: 22ch;
-    text-align: center;
-    font-size: clamp(1.5rem, 4.6vw, 2.4rem);
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    text-transform: uppercase;
-    color: rgba(240, 236, 250, 0.92);
-    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
-  }
+.about-tagline {
+  margin: 0 0 2rem;
+  max-width: 22ch;
+  text-align: center;
+  font-size: clamp(1.5rem, 4.6vw, 2.4rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 250, 0.92);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
 }
 
 /*
@@ -2982,8 +2797,11 @@ nav .nav-links {
  * tracks and the call to action, so the height follows the copy and the section
  * stays one screen tall.
  *
- * Parked at opacity 0 with a lift and a slight shrink — initAboutField's
- * entrance brings it up, and its frame loop then owns `transform` for the tilt.
+ * Parked at opacity 0 with a lift and a slight shrink — team-field.js brings
+ * it up as #about arrives, and its frame loop then owns `transform` for the
+ * tilt. Nothing else drives this, so a panel with no script is an invisible
+ * panel: that module raises it even when it cannot get a WebGL context, and the
+ * reduced-motion block places it lit and level.
  */
 .systems-panel {
   --mx: 50%;
@@ -3006,15 +2824,6 @@ nav .nav-links {
   opacity: 0;
   transform: translateY(56px) scale(0.97);
   will-change: transform;
-}
-
-/* Narrower in the split layout so the tagline's column is worth having. Placed
-   after the base rule rather than up with .about-inner: same specificity, so
-   source order is what decides it, and up there the 640px cap simply won. */
-@media (min-width: 1100px) {
-  .systems-panel {
-    width: min(600px, 100%);
-  }
 }
 
 /* Without backdrop-filter the 38% fill is a window onto the aurora, and the
@@ -3129,30 +2938,6 @@ nav .nav-links {
     0 1px 3px rgba(0, 0, 0, 0.95),
     0 2px 12px rgba(0, 0, 0, 0.9),
     0 0 32px rgba(0, 0, 0, 0.75);
-}
-
-/*
- * The glow pooling on the floor beneath the panel. Behind .about-inner and
- * outside the panel's own overflow, so it reads as light thrown onto the
- * section rather than as part of the glass.
- */
-.systems-floor {
-  position: absolute;
-  left: 50%;
-  bottom: 6%;
-  z-index: 1;
-  width: min(70vw, 620px);
-  height: 110px;
-  transform: translateX(-50%);
-  background: radial-gradient(
-    50% 100% at 50% 50%,
-    rgba(70, 45, 190, 0.3),
-    rgba(25, 35, 150, 0.13) 55%,
-    transparent 75%
-  );
-  filter: blur(26px);
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* Careers Page Styling */
@@ -3310,71 +3095,9 @@ body > footer {
   position: relative;
   overflow: hidden;
   padding: 8rem 1.75rem;
-  /* Black behind the liquid, transparent at the edges so the page gradient
-     carries through instead of butting against a flat band. */
+  /* Fallback backdrop, dropped by .team-field-live once the canvas behind is
+     drawing - same arrangement as #makers and #about. */
   background: linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
-}
-
-/*
- * The halftone dot sheet, with DELIVER TRACKS lettered inside its crater.
- * .contact-inner already carries z-index 1, so this sits behind it.
- */
-.contact-field {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  /* The scene reads the pointer, so it must receive the events. */
-  cursor: grab;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-}
-
-.contact-field:active { cursor: grabbing; }
-
-.contact-field canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/*
- * Scrim, so the cards stay the subject.
- *
- * Much lighter than the one the liquid had. That shader filled every pixel
- * with colour and needed 0.8 across the middle to sit down behind the copy;
- * this one is sparse lavender points on near-black, and the same wash simply
- * erased it. The band is heaviest down the sides, where the cards are, and
- * clears through the centre so the crater and the lettering read.
- */
-.contact-field::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    /* vignette: sinks the blob's outer edge into the section's own black
-       rather than ending it on a hard silhouette */
-    radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 42%, rgba(0, 0, 0, 0.62) 100%),
-    linear-gradient(
-      90deg,
-      rgba(0, 0, 0, 0.5) 0%,
-      rgba(0, 0, 0, 0.34) 22%,
-      rgba(0, 0, 0, 0) 42%,
-      rgba(0, 0, 0, 0) 58%,
-      rgba(0, 0, 0, 0.34) 78%,
-      rgba(0, 0, 0, 0.5) 100%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.4) 0%,
-      rgba(0, 0, 0, 0.16) 22%,
-      rgba(0, 0, 0, 0.16) 78%,
-      rgba(0, 0, 0, 0.4) 100%
-    );
 }
 
 /*
@@ -3833,27 +3556,7 @@ footer {
      hint up with the card is now just a dent in it. */
   .services-hint { padding-left: 0; margin-top: 1.1rem; font-size: 0.66rem; }
 
-  /*
-   * The scrim turns through 90 degrees here, because the thing it is protecting
-   * has: the card is full width at this breakpoint, so there is no clear column
-   * left to aim the stream at and a left-heavy wash would leave two thirds of
-   * the copy exposed. Banded by height instead, like .capability-field and
-   * .makers-field — heavy through the card, easing off over the bottom band so
-   * AI AND AUTOMATION and the crater it sits in are not crushed with it.
-   */
-  .services-field::after {
-    background: linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.3) 0%,
-      rgba(0, 0, 0, 0.34) 15%,
-      rgba(0, 0, 0, 0.72) 23%,
-      rgba(0, 0, 0, 0.72) 77%,
-      rgba(0, 0, 0, 0.38) 87%,
-      rgba(0, 0, 0, 0.32) 100%
-    );
-  }
-
-  /*
+    /*
    * The block layout makes #about-us's align-items inert, so the card sits at
    * the top of the section while the trail's ABOUT US lettering stays centred in
    * the field — and lands underneath the card. The top margin is the room the
@@ -3881,59 +3584,7 @@ footer {
      align-items has nothing useful to do once the deck is the only child. */
   #concepts { display: block; }
 
-  /*
-   * Scene fields: one screen tall, parked at the top of the section.
-   *
-   * Every field is inset:0 over a section that is taller than the screen on a
-   * phone — #concepts stacks four cards and runs to about 1.6 viewports — so
-   * the WebGL host measured 375x1332 and each scene was composed for a 0.28
-   * aspect box when only 812px of it is ever on screen. The halo came out
-   * sized for a frame nobody sees: its centre a third of a screen below the
-   * fold, buried behind cards 02 and 03, with its left and right arcs cut off.
-   *
-   * Sizing the host to the viewport puts the scene back inside the frame the
-   * reader is looking at, and hands the lettering a portrait box that
-   * fitScale() can actually solve. `bottom: auto` releases the inset's stretch
-   * so the height takes effect.
-   */
-  .capability-field,
-  .about-us-field,
-  .contact-field {
-    height: 100svh;
-    bottom: auto;
-  }
-
-  /*
-   * The About Us scrim's weight follows the card, and the card has moved.
-   *
-   * #about-us goes to block flow here, so the copy leaves the bottom of the
-   * frame for 25%..53% of it — and the dune's crest sweeps through exactly that
-   * band. Measured against the shader at 375x812: under the desktop banding the
-   * brightest pixel behind the paragraph is the crest's clamped white at
-   * rgb(179), which is 1.01:1 against the secondary copy. Illegible, and the
-   * artwork's own subject is what does it.
-   *
-   * Moving the 0.8 up to cover 18%..58% puts that same pixel at rgb(51) and the
-   * copy back to 6:1. The word and the pool of light both sit lower — the row
-   * lands around 72%..82%, where the worst case is rgb(55,34,150) at 5.5:1 —
-   * so the bottom of the frame keeps the light band and the artwork still
-   * arrives at its payoff.
-   */
-  .about-us-field::after {
-    background:
-      radial-gradient(125% 90% at 50% 50%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.55) 100%),
-      linear-gradient(
-        180deg,
-        rgba(0, 0, 0, 0.45) 0%,
-        rgba(0, 0, 0, 0.8) 18%,
-        rgba(0, 0, 0, 0.8) 58%,
-        rgba(0, 0, 0, 0.3) 66%,
-        rgba(0, 0, 0, 0.3) 90%,
-        rgba(0, 0, 0, 0.45) 100%
-      );
-  }
-
-  /*
+      /*
    * The discipline cards, tightened for a phone.
    *
    * Polish rather than a fix — card-stack.js's narrow band already gives the
@@ -3971,19 +3622,11 @@ footer {
    * Room above the stacked pair for DELIVER TRACKS, the same trade
    * .about-us-card makes for its own word. Stacked full-width cards leave no
    * clear band anywhere else in the frame, so the row had nowhere to go but
-   * through the copy — initContactField() lifts it up here to match.
-   *
-   * The mask is pulled back from 14% to 5% for the same reason: the row now
-   * sits at about 12% of the height, and the old fade drew it at a fraction of
-   * its alpha, which is most of why it could not be read.
+   * through the copy — team-field.js lifts it up here to match, on the same
+   * portrait test.
    */
   #contact { padding: 3.5rem 1.25rem 3rem; }
   .contact-inner { margin-top: 6.5rem; }
-  .contact-field {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, #000 4%, #000 96%, transparent 100%);
-  }
-
   .cta-card { max-width: none; padding: 1.9rem 1.5rem; border-radius: 20px; gap: 1.1rem; }
 
   .footer-top { gap: 2.5rem; margin-bottom: 3rem; }
@@ -4024,7 +3667,55 @@ footer {
   .concepts-deck {
     grid-template-columns: 1fr;
   }
-}
+
+  /* =======================================================================
+   * The halo becomes a crown ABOVE the deck, rather than a backdrop behind it.
+   *
+   * Scoped to this breakpoint on purpose: it is the line above that creates the
+   * problem. Once the deck is a single column, every card is full width and so
+   * every card crosses the section's centre — and the halo is drawn centred in
+   * its host. Measured at 375x812, that put the ring's centre at y=406 with
+   * card 01 spanning 212..442, so the ring ran straight through the first two
+   * cards and the fixed echo glyphs sat on top of them. Two columns have a
+   * corridor down the middle to thread it through; one column has nowhere.
+   *
+   * The two-column range does NOT have this problem and is left alone. Checked
+   * at 700x900 before scoping: the ring crosses zero cards there either way,
+   * so bringing the crown up that far would have been redesigning a layout that
+   * already worked.
+   *
+   * Everything below the host size follows from code that was already there.
+   * The halo centres itself in its host; rowY() finds no corridor, computes a
+   * lift that would put the word above a deck now far below the band, and
+   * clamps it to 0 — which centres the word in the ring. The intended
+   * composition, at phone scale, with no JS changes.
+   * ==================================================================== */
+  #concepts {
+    /*
+     * Capped against the WIDTH as well as in rems. The halo's radius is 0.62 of
+     * min(host width, host height), so on a landscape band its diameter is
+     * about 1.24x the band's height: at 70vw the ring comes to ~87% of the
+     * screen and keeps its side arcs, where a flat 16rem would have overflowed
+     * a 320px phone.
+     */
+    --halo-band: min(16rem, 70vw);
+    /* Clears the band, plus a gap, so the first card starts below the ring. */
+    padding-top: calc(var(--nav-height) + var(--halo-band) + 2.5rem);
+  }
+
+  /*
+   * The deck's own 6rem top margin goes with it.
+   *
+   * That margin was how the deck used to be pushed clear of a halo that filled
+   * the whole screen behind it. The padding above now does that job from the
+   * band's real height, and leaving both in place counted the clearance twice —
+   * 117px of empty black between the ring and the first card.
+   */
+  .concepts-deck {
+    margin-top: 0;
+  }
+
+    }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -4095,43 +3786,12 @@ footer {
   }
 
   /*
-   * .contact-field is NOT hidden here, unlike the About planet: the contact
-   * heading is drawn in that canvas, so dropping it would leave the section
-   * headless. It renders one settled frame and never animates, which is what
-   * this query actually asks for.
+   * .team-field is NOT hidden here. THE TEAM and DELIVER TRACKS are drawn in
+   * that canvas, so dropping it would leave two sections headless; it renders
+   * one settled frame and never animates, which is what this query asks for.
+   * The tagline between them is real copy at every width now, so it needs
+   * nothing from this block.
    */
-  .about-field { display: none; }
-
-  /* Un-hidden by the .drawn-in-webgl rule below; this only dresses it. */
-  .about-tagline {
-    margin: 0 0 2rem;
-    max-width: 22ch;
-    text-align: center;
-    font-size: 2rem;
-    line-height: 1.15;
-    text-transform: uppercase;
-    color: rgba(240, 236, 250, 0.92);
-  }
-
-  /* The panel re-centres: with no canvas there is nothing in the right column. */
-  .about-inner {
-    grid-template-columns: none;
-    justify-items: center;
-  }
-
-  /*
-   * The planet is not drawn here, so the heading it would have lettered has to
-   * come back as real text — otherwise #about loses its heading entirely.
-   */
-  .drawn-in-webgl {
-    position: static;
-    width: auto;
-    height: auto;
-    margin: 0;
-    overflow: visible;
-    clip-path: none;
-    white-space: normal;
-  }
 
   /* No entrance runs in this mode, so the panel is placed lit and level. */
   .systems-panel {
