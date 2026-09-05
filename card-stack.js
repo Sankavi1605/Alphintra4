@@ -31,6 +31,8 @@
  * ====================================================================== */
 import gsap from 'gsap';
 
+import { initSwipe } from './swipe.js';
+
 /* --- the reference's geometry -------------------------------------------- */
 const MAX_VISIBLE = 7; /* cards in the fan, active included; odd reads best  */
 const OVERLAP = 0.48; /* 0..0.8 — higher stacks them tighter                */
@@ -442,49 +444,32 @@ export function initCardStack(rootSelector, introSelectors = []) {
 
   cards.forEach((card, i) => {
     card.addEventListener('click', () => {
-      /* A click on the active card is the end of a drag, not a selection. */
-      if (i !== active) go(i, true);
+      /* A click on the active card is the end of a drag, not a selection. And
+         every swipe ends with a click on whatever the finger lifted from, which
+         would otherwise step the deck and then immediately jump back. */
+      if (i !== active && !justSwiped()) go(i, true);
     });
   });
 
-  /* --- drag on the active card -------------------------------------------
-   * Pointer events, not GSAP Draggable: Draggable is a paid plugin and this
-   * needs one axis, a threshold and a velocity — about twenty lines.
+  /* --- swipe --------------------------------------------------------------
+   * The card is not moved by the gesture. The reference lets framer drag it
+   * with dragConstraints pinned to 0 so it springs back; here the travel only
+   * decides which way to step, which keeps the fan's transform in one place
+   * instead of having the drag and the layout both writing it.
    *
-   * The card is not moved by the drag. The reference lets framer drag it with
-   * dragConstraints pinned to 0 so it springs back; here the travel only decides
-   * which way to step, which keeps the fan's transform in one place instead of
-   * having the drag and the layout both writing it.
+   * On the whole stage rather than only the active card, which is what it used
+   * to be. On a phone the neighbours are a thumb's width from the middle and
+   * starting a swipe on one of them is not a mistake, it is just where the
+   * thumb landed — refusing it there was most of why the deck felt like it did
+   * not respond to touch at all.
    */
-  let dragId = null;
-  let dragStartX = 0;
-  let dragStartT = 0;
-
-  stage.addEventListener('pointerdown', (e) => {
-    const card = e.target.closest('.stack-card');
-    if (!card || !card.classList.contains('is-active')) return;
-    dragId = e.pointerId;
-    dragStartX = e.clientX;
-    dragStartT = performance.now();
-    card.setPointerCapture?.(e.pointerId);
-  });
-
-  stage.addEventListener('pointerup', (e) => {
-    if (dragId !== e.pointerId) return;
-    dragId = null;
-
-    const travel = e.clientX - dragStartX;
-    const seconds = Math.max(0.001, (performance.now() - dragStartT) / 1000);
-    const velocity = travel / seconds; /* px per second */
-    /* The reference's threshold, and its 650px/s flick. */
-    const threshold = Math.min(160, cardWidth * 0.22);
-
-    if (travel > threshold || velocity > 650) prev(true);
-    else if (travel < -threshold || velocity < -650) next(true);
-  });
-
-  stage.addEventListener('pointercancel', () => {
-    dragId = null;
+  const justSwiped = initSwipe(stage, {
+    onPrev: () => prev(true),
+    onNext: () => next(true),
+    /* The reference's threshold, off the card's measured width — as a function,
+       because measure() has not run when this is called and changes it again on
+       every resize. */
+    threshold: () => Math.min(160, cardWidth * 0.22),
   });
 
   /* --- autoplay ----------------------------------------------------------

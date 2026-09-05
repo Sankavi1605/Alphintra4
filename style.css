@@ -853,41 +853,86 @@ nav .nav-links {
 }
 
 /* Buttons */
+/*
+ * The call to action, responsive in both senses of the word.
+ *
+ * It answers a tap, and it scales with the viewport instead of at one
+ * breakpoint. Both were missing: the only state this had was :hover, and a
+ * touchscreen never enters :hover, so on a phone pressing it produced no
+ * response whatsoever until the new tab opened. The size was fixed too — one
+ * font-size for every screen, with a single padding step at 768px.
+ */
 .btn {
-  display: inline-block;
+  /* inline-flex, so min-height can centre the label rather than just pad the
+     box out underneath it. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* A thumb-sized target. 44px is the WCAG 2.5.8 minimum and this sat a hair
+     under it once the phone padding applied. */
+  min-height: 44px;
   background-color: var(--accent);
   color: var(--accent-text);
-  padding: 1rem 2.5rem;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 0.9rem;
+  /* Fluid: 0.8rem on a 320px phone, 0.9rem from about 640px up. */
+  font-size: clamp(0.8rem, 0.75rem + 0.25vw, 0.9rem);
   letter-spacing: 0.05em;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  padding: clamp(0.75rem, 0.55rem + 0.9vw, 1rem) clamp(1.4rem, 0.6rem + 3.4vw, 2.5rem);
+  text-align: center;
+  transition: transform 0.18s ease, box-shadow 0.3s ease;
   cursor: pointer;
   border: none;
+  /* The browser's default tap flash is a grey rectangle drawn through the
+     pill's rounded corners. The :active rule below replaces it. */
+  -webkit-tap-highlight-color: transparent;
+  /* Opts out of the 300ms wait for a possible double-tap-to-zoom, which is the
+     other half of a button feeling slow to the touch. */
+  touch-action: manipulation;
 }
 
-.btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 10px 20px rgba(255, 255, 255, 0.1);
-  opacity: 1;
+/*
+ * Only where a pointer can actually hover.
+ *
+ * Ungated, this lands on touch too: a tap latches :hover, and the button is
+ * left sitting at scale(1.05) until something else is touched — so the one
+ * visible state it had was both unavailable when wanted and stuck when not.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 20px rgba(255, 255, 255, 0.1);
+    opacity: 1;
+  }
+}
+
+/* The press. This is what a phone gets instead of hover, and it is deliberately
+   the opposite direction — a button that gives under the finger. */
+.btn:active {
+  transform: scale(0.97);
 }
 
 /* Frosted variant — surface comes from .liquid-glass. */
 .btn-glass {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.6rem;
   background: none;
   background-color: transparent;
   color: var(--text-primary);
   border-radius: 9999px;
-  padding: 0.85rem 1.9rem;
+  /* The pill's own, slightly tighter than the base button's. Fluid for the
+     same reason, and declared here so it is not fighting a breakpoint override
+     of .btn — same specificity, so that was decided by source order alone. */
+  padding: clamp(0.7rem, 0.5rem + 0.85vw, 0.85rem) clamp(1.25rem, 0.5rem + 3.2vw, 1.9rem);
 }
 
-.btn-glass:hover {
-  color: var(--text-primary);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 12px 36px rgba(0, 0, 0, 0.25);
+@media (hover: hover) and (pointer: fine) {
+  .btn-glass:hover {
+    color: var(--text-primary);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 12px 36px rgba(0, 0, 0, 0.25);
+  }
 }
 
 .btn-glass > * {
@@ -1308,9 +1353,17 @@ nav .nav-links {
   will-change: transform;
 }
 
+/*
+ * No shadow change on hover.
+ *
+ * This used to swap the card's own dark drop shadow for a 60px violet one,
+ * which bloomed out around all four edges the moment the pointer arrived and
+ * read as a halo stuck behind the card rather than as the card lifting. The
+ * sheen and the glow inside the card are the response to the cursor; the
+ * shadow underneath it stays put. Only the border brightens.
+ */
 .testimonial-card:hover {
   border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 25px 60px rgba(138, 43, 226, 0.3);
 }
 
 /*
@@ -3402,6 +3455,68 @@ footer {
   .contact-inner { gap: 2rem; }
 }
 
+/* =========================================================================
+ * Swipeable decks
+ *
+ * The other half of swipe.js, and it has to be here: touch-action is read by
+ * the compositor before the first event, so it is not something script can
+ * decide once a gesture is already under way.
+ *
+ * Without it the browser owns every gesture on these elements. A finger moving
+ * horizontally on a card was claimed for scrolling, the pointer sequence was
+ * revoked with pointercancel, and the drag the discipline stack already had
+ * simply never reached pointerup — which is why that deck could be stepped by
+ * arrow key on a laptop and not at all by thumb.
+ *
+ * pan-y, not none. The reader still has to be able to scroll the page with a
+ * finger that happens to be resting on a card, and these decks sit in the
+ * middle of full-screen sections, so `none` would strand them on a phone.
+ * Vertical goes to the browser, horizontal comes to us.
+ * ====================================================================== */
+.projects-deck,
+.services-deck,
+.card-stack-stage {
+  touch-action: pan-y;
+}
+
+/* =========================================================================
+ * Phones: no backdrop blur, anywhere
+ *
+ * backdrop-filter is the most expensive thing this page asks of a phone. It
+ * makes the browser snapshot whatever sits behind the element and re-filter it
+ * every frame that backdrop changes — and behind these cards are two
+ * full-viewport WebGL canvases redrawing thirty times a second, so the blur is
+ * recomputed continuously the whole time the reader is scrolling. There are
+ * nineteen .liquid-glass cards on the home page, plus the testimonial card at
+ * 20px, .work-glass at 22px and the systems panel at 30px: twenty-odd backdrop
+ * roots, each one re-filtering against moving pixels.
+ *
+ * The substitute fills are the ones the @supports blocks already use for
+ * browsers that have no backdrop-filter at all, so this is a look the design
+ * already accounts for rather than a new one.
+ *
+ * .liquid-glass is the cheap surprise in the list: its blur is 1px, which is
+ * visually nothing, but a 1px blur still creates a backdrop root and still
+ * costs a re-filter per frame. Dropping it changes nothing anyone can see and
+ * removes nineteen of them.
+ * ====================================================================== */
+@media (max-width: 767.98px) {
+  .liquid-glass,
+  .testimonial-card,
+  .work-glass,
+  .systems-panel,
+  .careers-standalone-card {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* The near-opaque ones barely used the blur; a couple of points of alpha
+     stands in for it. The transparent ones take their @supports fallback. */
+  .testimonial-card { background: rgba(12, 6, 18, 0.97); }
+  .work-glass { background: rgba(24, 26, 42, 0.72); }
+  .systems-panel { background: rgba(10, 9, 18, 0.9); }
+}
+
 /* Phones */
 @media (max-width: 768px) {
   #projects, #concepts, #contact, #faq {
@@ -3426,7 +3541,6 @@ footer {
   .section-header h2 { font-size: 2rem; }
 
   .hero-content { padding: 0 1.25rem; }
-  .btn { padding: 0.9rem 1.75rem; }
 
   .hole-text h2 { font-size: 2rem; }
   .hole-text p { font-size: 1rem; }
@@ -3439,7 +3553,23 @@ footer {
        past the pinned viewport, and let the card scroll if it still would. */
     max-height: calc(100dvh - 5.5rem);
   }
-  .cards-container { overflow-y: auto; overscroll-behavior: contain; }
+  /*
+   * overflow-y stays; overscroll-behavior does not.
+   *
+   * `contain` stops the scroll chaining out of this element, and that is what
+   * made the page unscrollable from the testimonial card. The container is a
+   * scroll container because of the overflow-y — the quote only just fits at
+   * this width and has to be able to scroll if it ever does not — but measured
+   * at 651px with the reveal open it has nothing to scroll at all: scrollHeight
+   * and clientHeight are both 313. So a finger landing on the card was handed
+   * to a scroll container that could not move and, because of `contain`, would
+   * not pass the gesture on either. The page simply refused to scroll, from the
+   * one element a reader is most likely to put their thumb on.
+   *
+   * Without it the default `auto` applies: the quote scrolls if it overflows,
+   * and the page takes over the moment it cannot.
+   */
+  .cards-container { overflow-y: auto; }
   .testimonial-card { padding: 1.5rem 1.25rem; border-radius: 16px; gap: 0.9rem; }
   .testimonial-text { font-size: 0.9rem; line-height: 1.55; }
   .quote-icon { width: 26px; height: 26px; }

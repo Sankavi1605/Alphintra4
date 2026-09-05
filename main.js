@@ -20,6 +20,8 @@ import { initTeamField } from './team-field.js';
 import { initSectionScroll } from './section-scroll.js';
 // The fanned discipline deck in #disciplines. GSAP only — no WebGL.
 import { initCardStack } from './card-stack.js';
+// Left/right swipe for the three decks. Needs touch-action: pan-y in CSS.
+import { initSwipe } from './swipe.js';
 // The cursor-tracked tilt and sheen on the hero's testimonial card. Also
 // GSAP-free: pointer events and CSS custom properties, nothing else.
 import { initHolographicCard } from './holographic-card.js';
@@ -1122,6 +1124,10 @@ function setupProjectsCarousel() {
   if (prev) prev.addEventListener('click', () => go(-1, true));
   if (next) next.addEventListener('click', () => go(1, true));
 
+  /* The same step, by thumb. Until this the deck could only be moved by the two
+     flanking buttons or the arrow keys, and a phone has neither. */
+  initSwipe(stage, { onPrev: () => go(-1, true), onNext: () => go(1, true) });
+
   /*
    * Left/right on the track itself, so the cards can be stepped without hunting
    * for the arrows once focus is already inside them.
@@ -1679,6 +1685,9 @@ function setupServiceDeck() {
 
   if (prev) prev.addEventListener('click', () => go(-1));
   if (next) next.addEventListener('click', () => go(1));
+
+  /* The same step, by thumb — see the note in swipe.js. */
+  initSwipe(deck, { onPrev: () => go(-1), onNext: () => go(1) });
 
   /*
    * Left/right on the deck itself, so the cards can be stepped without hunting

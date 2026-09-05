@@ -23,6 +23,9 @@
  *   inner scrollers  the FAQ's .cards-container and anything else that
  *                    overflows takes the gesture first, while it still has
  *                    somewhere to go.
+ *
+ *   touch            a finger scrolls the page natively. See the note above
+ *                    the listener at the bottom of this file.
  * ====================================================================== */
 
 /* In document order. These are the one-screen scenes; the hero above them and
@@ -42,11 +45,11 @@ const SECTION_IDS = [
 /*
  * 700ms, having been 620 and then briefly 1000.
  *
- * The duration is also the lockout: every wheel notch and every swipe that
- * arrives while a step is running is swallowed by the handlers below, so this
- * plus SETTLE_MS is how long the page ignores the reader. At 1000 + 90 that was
- * a tenth over a second of dropped input per gesture, and it read as the page
- * being stuck rather than as being calm.
+ * The duration is also the lockout: every wheel notch that arrives while a step
+ * is running is swallowed, so this plus SETTLE_MS is how long the page ignores
+ * the reader. At 1000 + 90 that was a tenth over a second of dropped input per
+ * gesture, and it read as the page being stuck rather than as being calm.
+ * (Touch is no longer in that sentence — see the listener at the bottom.)
  *
  * The good news is that the duration was never the thing making it feel fast.
  * The curve was. Measured on a 698px viewport, easeInOutCubic peaked at
@@ -58,7 +61,6 @@ const SECTION_IDS = [
  */
 const DURATION = 700; // ms for one step
 const WHEEL_MIN = 4; // deltaY below this is noise, not intent
-const TOUCH_MIN = 44; // px of finger travel that counts as a swipe
 const SETTLE_MS = 90; // quiet time after a step before the next is accepted
 const EDGE = 6; // px tolerance when deciding which stop we are already on
 
@@ -240,48 +242,23 @@ export function initSectionScroll() {
     animateTo(target);
   }
 
-  let touchY = null;
-  let touchDone = false;
-
-  function onTouchStart(event) {
-    touchY = event.touches.length === 1 ? event.touches[0].clientY : null;
-    touchDone = false;
-  }
-
-  function onTouchMove(event) {
-    if (touchY === null || locked()) return;
-    if (animating) {
-      event.preventDefault();
-      return;
-    }
-    if (touchDone) return;
-
-    const dy = touchY - event.touches[0].clientY;
-    if (Math.abs(dy) < TOUCH_MIN) return;
-
-    const dir = Math.sign(dy);
-    if (scrollableUnder(event.target, dir)) return;
-
-    const target = nextStop(dir);
-    if (target === null) return;
-
-    /*
-     * Only now. Claiming the gesture any earlier would also swallow the swipes
-     * the browser has to keep — through the hero's zoom, and inside the FAQ
-     * cards — and leave them dead to the touch.
-     */
-    event.preventDefault();
-    touchDone = true;
-    animateTo(target);
-  }
-
-  function onTouchEnd() {
-    touchY = null;
-  }
-
+  /*
+   * Wheel only. Touch scrolls natively.
+   *
+   * This used to claim the swipe too, and that is what "it feels stuck on
+   * mobile" was. A step preventDefaults every touchmove for its whole duration,
+   * so the page stops following the finger that is dragging it — and a phone
+   * reader reads that as the page having frozen, not as it having snapped. It
+   * also throws away the two things touch scrolling gets for free and cannot be
+   * reproduced from script: momentum, and a 1:1 relationship between how far
+   * the finger moves and how far the page does.
+   *
+   * The problem this file exists to solve was a wheel problem. CSS
+   * scroll-snap re-snapped to the nearest point when a gesture ended, so a
+   * notch-sized scroll was simply undone; that snap is long gone, and with it
+   * gone a phone left alone just scrolls, smoothly, the way it always did. The
+   * sections are still a screen tall each, so the page still reads a scene at a
+   * time — it is only no longer forced.
+   */
   window.addEventListener('wheel', onWheel, { passive: false });
-  window.addEventListener('touchstart', onTouchStart, { passive: true });
-  window.addEventListener('touchmove', onTouchMove, { passive: false });
-  window.addEventListener('touchend', onTouchEnd, { passive: true });
-  window.addEventListener('touchcancel', onTouchEnd, { passive: true });
 }
