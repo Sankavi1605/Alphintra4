@@ -40,23 +40,23 @@ const SECTION_IDS = [
 ];
 
 /*
- * 1000ms, not the 620 this shipped with.
+ * 700ms, having been 620 and then briefly 1000.
  *
- * A step is a whole viewport, so the duration is the only thing setting how
- * fast the page moves. Measured on a 698px viewport, 620ms with the cubic that
- * used to be below peaked at 3377px/s — an easeInOutCubic has to reach three
- * times the average speed, not the two it is easy to assume, because its
- * derivative at the midpoint is 12 * 0.25. That is fast enough that the scenes
- * behind it read as snapping past rather than travelling.
+ * The duration is also the lockout: every wheel notch and every swipe that
+ * arrives while a step is running is swallowed by the handlers below, so this
+ * plus SETTLE_MS is how long the page ignores the reader. At 1000 + 90 that was
+ * a tenth over a second of dropped input per gesture, and it read as the page
+ * being stuck rather than as being calm.
  *
- * With 1000ms and the sine curve the peak is 1096px/s: a third of what it was,
- * and only 1.57x the average rather than 3x.
- *
- * It is a ceiling on how fast the page can be read, so it is not free: nine
- * stops at 1000ms is nine seconds to cross the page against six and a half. The
- * scenes are the content here, and none of them can be taken in at 3377px/s.
+ * The good news is that the duration was never the thing making it feel fast.
+ * The curve was. Measured on a 698px viewport, easeInOutCubic peaked at
+ * 3377px/s — it has to reach three times the average speed, not the two it is
+ * easy to assume, because its derivative at the midpoint is 12 * 0.25 — where
+ * the easeInOutSine below only reaches 1.57x. So at 700ms the peak is 1566px/s,
+ * still less than half the original, with the lockout back to 790ms: about
+ * where it was before any of this, and a rate nobody described as stuck.
  */
-const DURATION = 1000; // ms for one step
+const DURATION = 700; // ms for one step
 const WHEEL_MIN = 4; // deltaY below this is noise, not intent
 const TOUCH_MIN = 44; // px of finger travel that counts as a swipe
 const SETTLE_MS = 90; // quiet time after a step before the next is accepted

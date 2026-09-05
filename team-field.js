@@ -542,6 +542,7 @@ export function initTeamField() {
    * One rect pair per frame, and the same read decides whether to draw at all.
    */
   let shown = false;
+  let lastClip = null;
   function clipToField() {
     const vh = window.innerHeight || 1;
     const top = sections[0].getBoundingClientRect().top;
@@ -556,7 +557,13 @@ export function initTeamField() {
 
     const t = Math.max(0, Math.round(top));
     const b = Math.max(0, Math.round(vh - bottom));
-    host.style.clipPath = t || b ? `inset(${t}px 0px ${b}px 0px)` : 'none';
+    /* Only on change. Rounded to whole pixels above, so a page that is not
+       moving settles on one string instead of writing a style every frame. */
+    const clip = t || b ? `inset(${t}px 0px ${b}px 0px)` : 'none';
+    if (clip !== lastClip) {
+      lastClip = clip;
+      host.style.clipPath = clip;
+    }
     return true;
   }
 
@@ -588,6 +595,24 @@ export function initTeamField() {
       }
     }
   }, { passive: true });
+
+  /*
+   * Half rate, like every other field on this page.
+   *
+   * Dropping this was a real regression. The loops in main.js and
+   * horizon-field.js all cap at 30fps, and the comment there says why: these
+   * are ambient drifts redrawn as a full-viewport fragment shader, so on a
+   * 120Hz panel an uncapped loop is four times the shading the artwork needs,
+   * and it "is what had the fans running". Running on gsap.ticker instead of a
+   * private rAF made it easy to forget, and these two fields now cover six
+   * sections between them - one with a 9,216-point pass on top of its quad.
+   *
+   * 30 divides evenly into both 60 and 120, so the cadence stays regular rather
+   * than juddering. The hero stays deliberately uncapped: it carries the
+   * scroll-scrubbed motion, where a dropped frame reads as a stutter.
+   */
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let lastFrameAt = 0;
 
   const clock = new THREE.Clock();
   let smoothP = teamProgress();
@@ -653,19 +678,39 @@ export function initTeamField() {
     });
   }
 
+  /*
+   * `visible`, not just opacity.
+   *
+   * three draws a transparent mesh whatever its alpha, so an opacity of 0 still
+   * costs a full draw call per glyph. Every heading is built up front and only
+   * one of them is on screen at a time, which measured at about 52 draw calls a
+   * frame with two thirds of them painting nothing. Turning the off-screen rows
+   * off leaves only the row being read, and skips its per-glyph position maths
+   * with it.
+   */
   function drive(list, o) {
     const t = uni.uTime.value;
     list.forEach((m, i) => {
+      const opacity = m.userData.base * o * m.userData.intro;
+      m.material.opacity = opacity;
+      m.visible = opacity > 0.001;
+      if (!m.visible) return;
       const bob = reduced.matches ? 0 : Math.sin(t * 0.5 + i * 0.5) * 0.008;
       m.position.y = m.userData.baseY + bob - (1 - o) * 0.16;
-      m.material.opacity = m.userData.base * o * m.userData.intro;
     });
   }
 
   const ptr = { x: 0, y: 0 };
 
   function frame() {
+    /* The clip is not throttled: two rect reads and, on change, one style
+       write. It has to track the scroll every frame, or the canvas overhangs
+       its sections between draws. */
     if (!clipToField()) return;
+
+    const now = performance.now();
+    if (now - lastFrameAt < FRAME_INTERVAL_MS) return;
+    lastFrameAt = now;
 
     entrance();
 

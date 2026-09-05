@@ -47,8 +47,6 @@
   --accent-text: #000000;
   --brand: #8a2be2;
   --brand-soft: #d8b4fe;
-  --danger: #ff8b8b;
-  --success: #7ee0b8;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.05);
   --nav-height: 64px;
@@ -606,12 +604,6 @@ body > nav.nav-hidden {
   gap: 0.6rem;
   color: #ffffff;
   text-decoration: none;
-}
-
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
 }
 
 .brand-logo-img {
@@ -1793,11 +1785,6 @@ nav .nav-links {
 .btn-outline:hover {
   background: var(--glass-bg);
   border-color: rgba(255,255,255,0.2);
-}
-
-.btn-wide {
-  width: 100%;
-  text-align: center;
 }
 
 /* Concepts Section */
@@ -3362,11 +3349,6 @@ footer {
 
 .separator {
   opacity: 0.3;
-}
-
-.footer-bottom-right {
-  display: flex;
-  gap: 2rem;
 }
 
 .scroll-to-top {
