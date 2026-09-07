@@ -563,6 +563,22 @@ function initHeroScene() {
         model3.position.set(0, 0, -5);
         model3.rotation.set(0.15, 0, 0);
 
+        /*
+         * Not drawn until the scroll asks for it.
+         *
+         * opacity: 0 above hides this model; it does not stop three submitting
+         * it. A transparent mesh is drawn whatever its alpha, so from the moment
+         * the page loaded, the first thing anyone sees was costing 489,158
+         * triangles of world nobody could see on top of the 493,094 of the
+         * chrome A they came for — the hero was doing 982,252 a frame to show
+         * half of one model. The timeline turns this on at the beat its fade-in
+         * starts and off again after its fade-out ends.
+         *
+         * Same fix as `tl.set(model, { visible: false }, 6)` further down, which
+         * already stops the A being drawn once it has flown past the camera.
+         */
+        model3.visible = false;
+
         scene.add(model3);
       }
 
@@ -793,6 +809,14 @@ function setupScrollAnimations(model, model3) {
 
   // --- Background world model ---
   if (model3) {
+    /*
+     * The load leaves this invisible; here is where it earns its draw call.
+     *
+     * A zero-duration set on a scrubbed timeline reverts when the playhead
+     * moves back before it, so scrolling up puts the world away again rather
+     * than leaving it drawn for the rest of the visit.
+     */
+    tl.set(model3, { visible: true }, 2);
     model3.traverse((child) => {
       if (child.isMesh && child.material) {
         /*
@@ -844,6 +868,9 @@ function setupScrollAnimations(model, model3) {
         tl.to(child.material, { opacity: 0, duration: 2, ease: 'power2.in' }, 9.3);
       }
     });
+    /* 11.3: where that fade-out lands. Once it is transparent again there is
+       nothing left to draw, and the tail of the pin should not pay for it. */
+    tl.set(model3, { visible: false }, 11.3);
   }
 
   tl.to({}, { duration: 0.6 }); // hold before unpinning

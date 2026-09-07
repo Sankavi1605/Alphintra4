@@ -282,7 +282,22 @@ export function initStoryField() {
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  /*
+   * No multisampling, and no stencil buffer.
+   *
+   * This was the only context on the page still asking for antialias, and it
+   * was getting it: 4 samples on a 468x1015 buffer on a phone. MSAA only
+   * smooths GEOMETRY edges, and there is not one here worth smoothing — the
+   * background is a single full-screen quad, and the glyphs are axis-aligned
+   * planes whose edges come from a texture's alpha, which MSAA does not touch.
+   * So it was paying for four samples a pixel, plus a resolve every frame, to
+   * antialias nothing. Mobile GPUs are tiled and keep those samples in tile
+   * memory, which is exactly where the cost hurts most.
+   *
+   * The team field, which draws the same shape of scene, has always run with
+   * both off. This just stops the two from disagreeing.
+   */
+  const renderer = new THREE.WebGLRenderer({ antialias: false, stencil: false, alpha: false });
   renderer.setPixelRatio(pixelRatioFor(1.5, 1.25));
   renderer.autoClear = false;
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
