@@ -405,7 +405,52 @@ html {
  * section-scroll.js drives it instead, off the gesture's direction. See the
  * header there. The scenes keep min-height:100svh below, since being a screen
  * tall is a layout fact rather than a snapping one.
+ *
+ * TOUCH IS THE EXCEPTION, AND THE BLOCK BELOW IS WHY
+ *
+ * Read the two failures above again: both are measured in wheel notches — 100px
+ * against a 700px pitch. That is a mouse problem, and neither mode fails that
+ * way under a thumb, where a swipe carries 200-600px with momentum and crosses
+ * any threshold either mode cares about. So snap comes back for coarse
+ * pointers only, and script keeps the wheel.
+ *
+ * It has to be CSS there rather than script. section-scroll.js used to claim
+ * the swipe as well, and preventDefaulting every touchmove for the length of a
+ * step is what made the page feel frozen under the finger: no momentum, and no
+ * 1:1 with the hand. Native snap is run by the compositor, so it keeps both and
+ * still rests on one scene.
+ *
+ * proximity, not mandatory. #concepts is 1.86 screens on a phone and #contact
+ * 1.27, and mandatory has to rest on a snap point — so it would pull a reader
+ * out of the middle of those two and they could never reach the bottom of
+ * either. proximity snaps a gesture that lands near a boundary and leaves one
+ * that deliberately stopped halfway alone, which is the only mode that can hold
+ * both a screen-tall scene and a taller one.
  */
+@media (pointer: coarse) {
+  html {
+    scroll-snap-type: y proximity;
+  }
+
+  /*
+   * The hero is deliberately absent: it is pinned and scrubbed across 1500px,
+   * so it has no single resting place and a snap point inside it would fight
+   * the scrub. scroll-padding-top is already set above, so `start` lands each
+   * scene under the nav rather than behind it.
+   */
+  #projects,
+  #concepts,
+  #about-us,
+  #services,
+  #disciplines,
+  #makers,
+  #about,
+  #contact,
+  #faq,
+  body > footer {
+    scroll-snap-align: start;
+  }
+}
 
 body {
   font-family: 'Inter', sans-serif;
