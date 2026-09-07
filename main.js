@@ -5,7 +5,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-import { pixelRatioFor } from './render-quality.js';
+import { pixelRatioFor, SMALL_SCREEN } from './render-quality.js';
 // Canvas-texture glyph rows. Featured Work is the only lettered field left in
 // this file; the rest are in story-field.js and team-field.js.
 import { makeLetter, fitScale } from './webgl-letters.js';
@@ -154,16 +154,25 @@ const FIELD_PIXEL_CAP = 1.5;
 
 /*
  * The hero shades a 493k-triangle MeshPhysicalMaterial with clearcoat over the
- * whole viewport, with 4x multisampling on top, and it runs for the entire
- * pinned opening sequence. Same square-law cost: the old cap of 2 was doing
- * 1.8x the shading of this one on any HiDPI laptop, which is where the fans
- * were coming from. At 1.5 with MSAA still on, the chrome silhouette holds up.
+ * whole viewport, and it runs for the entire pinned opening sequence. Same
+ * square-law cost: the old cap of 2 was doing 1.8x the shading of this one on
+ * any HiDPI laptop, which is where the fans were coming from.
+ *
+ * A phone gets 1.25, the same as every other surface on the page. It was on 1.5
+ * because this cap was passed for both arms — so the most expensive scene here
+ * was the one thing NOT taking the mobile discount, at 562x1218 against a
+ * field's 468x1015. 1.25 is 31% less shading of a clearcoat material, on the
+ * scene that is running at the moment a reader first puts a thumb on the page.
+ *
+ * (The note that used to be here said "with 4x multisampling on top". That has
+ * not been true since antialias was turned off in the renderer below.)
  *
  * Declared up here with the field cap, not down beside initHeroScene: the boot
  * branch calls that function above this point in the file, so a const declared
  * there is still in its temporal dead zone when it runs.
  */
 const HERO_PIXEL_CAP = 1.5;
+const HERO_PIXEL_CAP_MOBILE = 1.25;
 
 /* -------------------------------------------------------------------------
  * The shared playhead
@@ -418,7 +427,7 @@ function initHeroScene() {
   }
   frameCamera();
 
-  renderer.setPixelRatio(pixelRatioFor(HERO_PIXEL_CAP, HERO_PIXEL_CAP));
+  renderer.setPixelRatio(pixelRatioFor(HERO_PIXEL_CAP, HERO_PIXEL_CAP_MOBILE));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -582,9 +591,26 @@ function initHeroScene() {
   let frameId = null;
   const start = performance.now();
 
+  /*
+   * Uncapped on a laptop, 30fps on a phone.
+   *
+   * Every other loop on this page is capped and the hero was deliberately left
+   * out, because it carries the scroll-scrubbed zoom where a dropped frame
+   * reads as a stutter. That argument holds on a machine that can afford 60 —
+   * and inverts on one that cannot. A phone shading half a million triangles of
+   * clearcoat over a full viewport is not hitting 60 anyway; it is hitting
+   * whatever it can, unevenly, which is exactly the judder the cap exists to
+   * prevent. Asking for 30 it can actually hold gives regular pacing instead.
+   */
+  const HERO_FRAME_MS = SMALL_SCREEN.matches ? 1000 / 30 : 0;
+  let lastHeroFrame = 0;
+
   function tick() {
     frameId = window.requestAnimationFrame(tick);
-    const elapsed = (performance.now() - start) / 1000;
+    const now = performance.now();
+    if (HERO_FRAME_MS && now - lastHeroFrame < HERO_FRAME_MS) return;
+    lastHeroFrame = now;
+    const elapsed = (now - start) / 1000;
 
     mouse.x += (targetMouse.x - mouse.x) * 0.05;
     mouse.y += (targetMouse.y - mouse.y) * 0.05;
@@ -611,7 +637,7 @@ function initHeroScene() {
    * gives back.
    */
   function sizeToViewport() {
-    renderer.setPixelRatio(pixelRatioFor(HERO_PIXEL_CAP, HERO_PIXEL_CAP));
+    renderer.setPixelRatio(pixelRatioFor(HERO_PIXEL_CAP, HERO_PIXEL_CAP_MOBILE));
     renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
@@ -732,7 +758,18 @@ function setupScrollAnimations(model, model3) {
       start: 'top top',
       // A shorter pin on phones: 2500px of scroll is a long time to be stuck.
       end: () => `+=${window.innerWidth < 768 ? 1500 : 2500}`,
-      scrub: 1.5,
+      /*
+       * The lag between finger and picture, and on a phone 1.5s of it is most
+       * of what "the page feels stuck" was. scrub is the number of seconds the
+       * playhead takes to catch up to the scroll position, so at 1.5 a swipe
+       * moves the scrollbar now and the hero a second and a half later — which
+       * on a pinned section, where the scrollbar is the only other evidence
+       * anything happened, is indistinguishable from nothing happening.
+       *
+       * A laptop keeps it: there the pin is 2500px, the pointer parallax gives
+       * continuous feedback, and the long ease is the effect.
+       */
+      scrub: SMALL_SCREEN.matches ? 0.5 : 1.5,
       pin: true,
       anticipatePin: 1,
       // No invalidateOnRefresh here: on a pinned + scrubbed timeline it
