@@ -151,6 +151,80 @@ export function fitScale(camera, aspect, wordHalfAtScaleOne, margin = fitMargin(
 }
 
 /**
+ * Lay a lettered row out over one or more lines, and report its half-width.
+ *
+ * A row's size on a narrow frame is decided entirely by its length. Seventeen
+ * glyphs on a 375px phone can only be drawn 16 CSS pixels tall before the row
+ * runs off both sides — smaller than the body copy in front of it, which is why
+ * the longer words could not be read there. Broken over two lines the longest
+ * line is ten glyphs, and the same frame allows 28.
+ *
+ * "ENGINEERING CAPABILITIES" was authored as two rows for exactly this reason
+ * from the start. This lets a field make that same choice in `resize`, where it
+ * knows the shape of the frame, rather than at build time where it does not.
+ *
+ * `meshes` are the row's glyphs in reading order. A field pushes its accent
+ * letters after them and keeps those in a list of their own, so they are not
+ * reached from here. Spaces have no plane, matching the layout each field's own
+ * `row` helper writes.
+ */
+export function flowRow(meshes, lines, size, gap) {
+  /* 1.5em. ENGINEERING and CAPABILITIES were authored 0.31 apart at 0.205 tall,
+     so a row that wraps here is led like the one that always wrapped. */
+  const leading = size * 1.5;
+  const top = ((lines.length - 1) / 2) * leading;
+  let half = 0;
+  let n = 0;
+  lines.forEach((line, li) => {
+    const width = (line.length - 1) * gap;
+    half = Math.max(half, width / 2 + size / 2);
+    [...line].forEach((ch, i) => {
+      if (ch === ' ') return;
+      const m = meshes[n];
+      n += 1;
+      if (!m) return;
+      m.position.x = -width / 2 + i * gap;
+      m.userData.baseY = top - li * leading;
+      m.position.y = m.userData.baseY;
+    });
+  });
+  return half;
+}
+
+/**
+ * Pull a group's free-floating accent glyphs back inside the frame.
+ *
+ * The accents are the single oversized coloured letters each field scatters
+ * behind its row, authored at fixed group-local coordinates chosen to sit just
+ * inside the frame at the scale the group used to be drawn at. Once a group is
+ * sized by its own row it can be drawn much larger — story's ENGINEERING went
+ * from 0.38 to 0.61 on a phone — and at that scale its accents are outside the
+ * frustum altogether, so the composition simply loses them.
+ *
+ * They are decoration with no fixed relationship to the row, so the answer is
+ * to read their coordinates as a shape rather than as positions, and shrink that
+ * shape by whatever it takes to bring the outermost one in. Nothing is ever
+ * pushed outwards, so a group with room to spare is left exactly as authored —
+ * which is every landscape box, and is why wide layouts do not move at all.
+ *
+ * Requires `userData.ax` / `ay`: the authored position, since `position` is what
+ * this overwrites.
+ */
+export function holdInside(meshes, scale, halfFrameW, margin = 0.92) {
+  let widest = 0;
+  meshes.forEach((m) => {
+    widest = Math.max(widest, Math.abs(m.userData.ax));
+  });
+  if (!widest || !scale) return;
+  const pull = Math.min(1, (halfFrameW * margin) / scale / widest);
+  meshes.forEach((m) => {
+    m.position.x = m.userData.ax * pull;
+    m.userData.baseY = m.userData.ay * pull;
+    m.position.y = m.userData.baseY;
+  });
+}
+
+/**
  * How much of the frame's width a glyph row may span, by box shape.
  *
  * 0.92 leaves 4% of air either side, which is plenty on a wide box. On a phone

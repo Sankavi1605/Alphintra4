@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 
 import { pixelRatioFor } from './render-quality.js';
-import { makeLetter, fitScale } from './webgl-letters.js';
+import { makeLetter, fitScale, flowRow, holdInside } from './webgl-letters.js';
 
 /* =========================================================================
  * The story field — one scene for three sections
@@ -332,36 +332,53 @@ export function initStoryField() {
     const m = makeLetter(group, ch, color, glow, size, x, y, z, additive);
     m.userData.base = base;
     m.userData.intro = 1;
+    /* The authored position, kept because resize() rewrites `position`. */
+    m.userData.ax = x;
+    m.userData.ay = y;
     list.push(m);
     return m;
   }
 
-  function row(group, list, word, y, size, gap) {
-    const width = (word.length - 1) * gap;
-    [...word].forEach((ch, i) => {
+  /* Builds the row's planes; flowRow lays them out once the frame is known. */
+  function row(group, list, word, size, gap) {
+    [...word].forEach((ch) => {
       if (ch === ' ') return;
       add(group, list, ch, 'rgba(242,238,248,0.95)', null, size,
-          -width / 2 + i * gap, y, Math.sin(list.length * 1.7) * 0.05, 0.95, false);
+          0, 0, Math.sin(list.length * 1.7) * 0.05, 0.95, false);
     });
   }
 
-  row(gA, lA, 'ENGINEERING', 0.155, 0.205, 0.215);
-  row(gA, lA, 'CAPABILITIES', -0.155, 0.205, 0.215);
-  add(gA, lA, 'E', '#8a4bff', 'rgba(138,75,255,0.9)', 0.34, -1.8, 1.35, -0.4, 0.5, true);
-  add(gA, lA, 'C', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 1.95, -1.3, -0.5, 0.5, true);
+  const SIZE_A = 0.205;
+  const GAP_A = 0.215;
+  const SIZE_B = 0.3;
+  const GAP_B = 0.315;
+  const SIZE_C = 0.235;
+  const GAP_C = 0.245;
 
-  row(gB, lB, 'ABOUT US', 0, 0.3, 0.315);
-  add(gB, lB, 'A', '#7a4bff', 'rgba(122,75,255,0.9)', 0.36, -1.55, 0.72, -0.4, 0.5, true);
-  add(gB, lB, 'U', '#b9a4ff', 'rgba(185,164,255,0.9)', 0.34, 1.55, -0.72, -0.5, 0.5, true);
+  row(gA, lA, 'ENGINEERING', SIZE_A, GAP_A);
+  row(gA, lA, 'CAPABILITIES', SIZE_A, GAP_A);
+  row(gB, lB, 'ABOUT US', SIZE_B, GAP_B);
+  row(gC, lC, 'AI AND AUTOMATION', SIZE_C, GAP_C);
 
-  row(gC, lC, 'AI AND AUTOMATION', -1.58, 0.235, 0.245);
-  add(gC, lC, 'A', '#4a6aff', 'rgba(74,106,255,0.9)', 0.34, -2.55, -1.1, -0.4, 0.5, true);
-  add(gC, lC, 'N', '#9a5bff', 'rgba(154,91,255,0.9)', 0.32, 2.6, -2.02, -0.5, 0.5, true);
-
-  /* Half-widths of the longest row in each group, for the fit cap below. */
-  const HALF_A = (11 * 0.215) / 2 + 0.205 / 2;
-  const HALF_B = (7 * 0.315) / 2 + 0.3 / 2;
-  const HALF_C = (16 * 0.245) / 2 + 0.235 / 2;
+  /*
+   * The accents, in a list of their own as well as their row's.
+   *
+   * drive() walks the row lists, so these still fade and bob with their group;
+   * holdInside needs them apart from the row, because the row is sized to the
+   * frame and these are only positioned within it.
+   */
+  const xA = [
+    add(gA, lA, 'E', '#8a4bff', 'rgba(138,75,255,0.9)', 0.34, -1.8, 1.35, -0.4, 0.5, true),
+    add(gA, lA, 'C', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 1.95, -1.3, -0.5, 0.5, true),
+  ];
+  const xB = [
+    add(gB, lB, 'A', '#7a4bff', 'rgba(122,75,255,0.9)', 0.36, -1.55, 0.72, -0.4, 0.5, true),
+    add(gB, lB, 'U', '#b9a4ff', 'rgba(185,164,255,0.9)', 0.34, 1.55, -0.72, -0.5, 0.5, true),
+  ];
+  const xC = [
+    add(gC, lC, 'A', '#4a6aff', 'rgba(74,106,255,0.9)', 0.34, -2.55, -1.1, -0.4, 0.5, true),
+    add(gC, lC, 'N', '#9a5bff', 'rgba(154,91,255,0.9)', 0.32, 2.6, -2.02, -0.5, 0.5, true),
+  ];
 
   function resize() {
     const w = host.clientWidth;
@@ -376,28 +393,80 @@ export function initStoryField() {
     txCam.updateProjectionMatrix();
 
     /*
-     * The sketch's own term first, then the frame as a hard cap.
+     * Each heading sized by its OWN row, and on a portrait box as large as that
+     * row will allow.
      *
-     * The sketch scales the whole text scene by aspect, which is right on a
-     * landscape box and spills on a portrait one — AI AND AUTOMATION is
-     * seventeen glyphs and runs off both sides of a phone. fitScale returns the
-     * scale at which a row exactly spans the frame less a margin, so taking the
-     * smaller of the two keeps the sketch's proportions everywhere it fits and
-     * only pulls the narrow cases down.
+     * This used to put one scale on txScene, taken as min(sketch, the fit of
+     * every row) — so every heading came out as small as the LONGEST one
+     * needed. Measured on a 375px phone: AI AND AUTOMATION's 0.379 was applied
+     * to all three groups, though the frame would have allowed 0.61 for
+     * ENGINEERING CAPABILITIES and 0.63 for ABOUT US. A glyph came out 14 CSS
+     * pixels tall, smaller than the body copy in front of it, which is why the
+     * words could not be read. The three now measure 23, 35 and 28.
+     *
+     * The sketch's term is a proportion meant for a wide frame. On a portrait
+     * one it resolves to 0.36, below its own 0.52 floor, so all the floor can
+     * do there is hold a row below the size it would happily fit at. Portrait
+     * therefore takes the fit outright; landscape still takes the smaller of
+     * the two, which is what keeps the sketch's proportions where there is room
+     * for them.
      */
+    const narrow = a < 1;
+    const halfFrameH = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
+    const halfFrameW = halfFrameH * a;
+
+    /* On one line AI AND AUTOMATION spans seventeen glyph slots, which on a
+       phone is the difference between a 16px glyph and a 28px one. ENGINEERING
+       CAPABILITIES already wraps at every width; ABOUT US is short enough that
+       it never needs to. */
+    const halfA = flowRow(lA, ['ENGINEERING', 'CAPABILITIES'], SIZE_A, GAP_A);
+    const halfB = flowRow(lB, ['ABOUT US'], SIZE_B, GAP_B);
+    const halfC = flowRow(
+      lC,
+      narrow ? ['AI AND', 'AUTOMATION'] : ['AI AND AUTOMATION'],
+      SIZE_C,
+      GAP_C
+    );
+
     const sketch = Math.max(0.52, Math.min(1, a / 1.3));
-    txScene.scale.setScalar(Math.min(
-      sketch,
-      fitScale(txCam, a, HALF_A),
-      fitScale(txCam, a, HALF_B),
-      fitScale(txCam, a, HALF_C)
-    ));
+    const sizeFor = (half) => {
+      const fit = fitScale(txCam, a, half);
+      /* Never larger than the sketch authored it, in either branch. */
+      return Math.min(1, narrow ? fit : Math.min(sketch, fit));
+    };
+    /* The tuck is only for the wide case: it exists to keep ABOUT US clear of
+       the wave beside it, and a centred row on a phone has nothing to clear. */
+    const tuck = a > 1.15 ? Math.max(0.6, Math.min(0.92, a / 1.7)) : 1;
+    const scaleA = sizeFor(halfA);
+    const scaleB = sizeFor(halfB) * tuck;
+    const scaleC = sizeFor(halfC);
+
+    /* 1, because each group carries its own scale now. */
+    txScene.scale.setScalar(1);
+    gA.scale.setScalar(scaleA);
+    gB.scale.setScalar(scaleB);
+    gC.scale.setScalar(scaleC);
 
     /* ABOUT US sits off to the side of the wave's dark upper right on a wide
        box, and centres once there is no room to put it anywhere else. */
     gB.position.x = a > 1.15 ? Math.min((a - 0.45) * 0.85, 1.3) : 0;
     gB.position.y = a > 1.15 ? 0.95 : 1.3;
-    gB.scale.setScalar(Math.max(0.6, Math.min(0.92, a / 1.7)));
+
+    /*
+     * AI AND AUTOMATION sits low in the frame, below the service cards.
+     *
+     * On the group rather than in the row, because the row's y is now the line
+     * flowRow puts it on. The number is the offset the row was authored with,
+     * and this is the first time it is applied as written: as part of the row it
+     * was multiplied by the scene scale, so on a phone the -1.58 became -0.6 and
+     * the word rode up into the middle of the cards. At full value it lands in
+     * the band below them, which is where the authored figure was aiming.
+     */
+    gC.position.y = -1.58;
+
+    holdInside(xA, scaleA, halfFrameW);
+    holdInside(xB, scaleB, halfFrameW);
+    holdInside(xC, scaleC, halfFrameW);
   }
   resize();
   new ResizeObserver(resize).observe(host);

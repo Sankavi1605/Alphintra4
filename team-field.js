@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 
 import { pixelRatioFor } from './render-quality.js';
-import { makeLetter, fitScale } from './webgl-letters.js';
+import { makeLetter, fitScale, flowRow, holdInside } from './webgl-letters.js';
 
 /* =========================================================================
  * The team field — one scene for three sections
@@ -437,31 +437,45 @@ export function initTeamField() {
     const m = makeLetter(group, ch, color, glow, size, x, y, z, additive);
     m.userData.base = base;
     m.userData.intro = 1;
+    /* The authored position, kept because resize() rewrites `position`. */
+    m.userData.ax = x;
+    m.userData.ay = y;
     list.push(m);
     return m;
   }
 
-  function row(group, list, word, y, size, gap) {
-    const width = (word.length - 1) * gap;
-    [...word].forEach((ch, i) => {
+  /* Builds the row's planes; flowRow lays them out once the frame is known. */
+  function row(group, list, word, size, gap) {
+    [...word].forEach((ch) => {
       if (ch === ' ') return;
       add(group, list, ch, 'rgba(242,238,248,0.95)', null, size,
-          -width / 2 + i * gap, y, Math.sin(list.length * 1.7) * 0.05, 0.95, false);
+          0, 0, Math.sin(list.length * 1.7) * 0.05, 0.95, false);
     });
   }
 
-  row(gA, lA, 'THE TEAM', -0.12, 0.44, 0.46);
-  add(gA, lA, 'T', '#7a4bff', 'rgba(122,75,255,0.9)', 0.5, -2.15, -0.85, -0.4, 0.5, true);
-  add(gA, lA, 'M', '#4653f0', 'rgba(70,83,240,0.9)', 0.46, 2.3, 0.55, -0.5, 0.5, true);
+  const SIZE_A = 0.44;
+  const GAP_A = 0.46;
+  const SIZE_C = 0.235;
+  const GAP_C = 0.245;
 
-  row(gC, lC, 'DELIVER TRACKS', 0, 0.235, 0.245);
-  add(gC, lC, 'D', '#a35bff', 'rgba(163,91,255,0.9)', 0.34, -2.6, 1.55, -0.4, 0.5, true);
-  add(gC, lC, 'T', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 2.65, -1.6, -0.5, 0.5, true);
+  row(gA, lA, 'THE TEAM', SIZE_A, GAP_A);
+  row(gC, lC, 'DELIVER TRACKS', SIZE_C, GAP_C);
 
-  /* Half-widths of each group's row, for the fit cap below. One gap wider than
-     the row actually measures, which is the margin the glows need. */
-  const HALF_A = (8 * 0.46) / 2 + 0.44 / 2;
-  const HALF_C = (14 * 0.245) / 2 + 0.235 / 2;
+  /*
+   * The accents, in a list of their own as well as their row's.
+   *
+   * drive() walks the row lists, so these still fade and bob with their group;
+   * holdInside needs them apart from the row, because the row is sized to the
+   * frame and these are only positioned within it.
+   */
+  const xA = [
+    add(gA, lA, 'T', '#7a4bff', 'rgba(122,75,255,0.9)', 0.5, -2.15, -0.85, -0.4, 0.5, true),
+    add(gA, lA, 'M', '#4653f0', 'rgba(70,83,240,0.9)', 0.46, 2.3, 0.55, -0.5, 0.5, true),
+  ];
+  const xC = [
+    add(gC, lC, 'D', '#a35bff', 'rgba(163,91,255,0.9)', 0.34, -2.6, 1.55, -0.4, 0.5, true),
+    add(gC, lC, 'T', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 2.65, -1.6, -0.5, 0.5, true),
+  ];
 
   function resize() {
     const w = host.clientWidth;
@@ -478,15 +492,50 @@ export function initTeamField() {
     txCam.updateProjectionMatrix();
 
     /*
-     * The sketch's own term first, then the frame as a hard cap.
+     * Each heading sized by its OWN row, and on a portrait box as large as that
+     * row will allow.
      *
-     * The sketch scales the text scene by aspect, which is right on a landscape
-     * box and spills on a portrait one. fitScale returns the scale at which a
-     * row exactly spans the frame less a margin, so the smaller of the two keeps
-     * the sketch's proportions wherever they fit and only pulls narrow cases in.
+     * This used to put one scale on txScene, taken as min(sketch, the fit of
+     * every row) — so every heading came out as small as the LONGEST one
+     * needed. Measured on a 375px phone: DELIVER TRACKS' 0.379 was applied to
+     * THE TEAM as well, though the frame would have allowed 0.43 for it. The
+     * two now measure 35 and 40 CSS pixels a glyph, against 31 and 19.
+     *
+     * The sketch's term is a proportion meant for a wide frame. On a portrait
+     * one it resolves to 0.36, below its own 0.52 floor, so all the floor can
+     * do there is hold a row below the size it would happily fit at. Portrait
+     * therefore takes the fit outright; landscape still takes the smaller of
+     * the two, which is what keeps the sketch's proportions where there is room
+     * for them.
      */
+    const narrow = a < 1;
+    const halfFrameH = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
+    const halfFrameW = halfFrameH * a;
+
+    /* On one line DELIVER TRACKS spans fourteen glyph slots, which on a phone
+       is the difference between a 19px glyph and a 40px one. THE TEAM is short
+       enough that one line always fits. */
+    const halfA = flowRow(lA, ['THE TEAM'], SIZE_A, GAP_A);
+    const halfC = flowRow(
+      lC,
+      narrow ? ['DELIVER', 'TRACKS'] : ['DELIVER TRACKS'],
+      SIZE_C,
+      GAP_C
+    );
+
     const sketch = Math.max(0.52, Math.min(1, a / 1.3));
-    txScene.scale.setScalar(Math.min(sketch, fitScale(txCam, a, HALF_A), fitScale(txCam, a, HALF_C)));
+    const sizeFor = (half) => {
+      const fit = fitScale(txCam, a, half);
+      /* Never larger than the sketch authored it, in either branch. */
+      return Math.min(1, narrow ? fit : Math.min(sketch, fit));
+    };
+    const scaleA = sizeFor(halfA);
+    const scaleC = sizeFor(halfC);
+
+    /* 1, because each group carries its own scale now. */
+    txScene.scale.setScalar(1);
+    gA.scale.setScalar(scaleA);
+    gC.scale.setScalar(scaleC);
 
     /*
      * DELIVER TRACKS sits on the crater's axis on a landscape box, where the two
@@ -494,9 +543,17 @@ export function initTeamField() {
      * Below square the pair stacks full width and fills the screen, so the row
      * would print straight through the copy; the stylesheet opens a band above
      * the cards at that width and this lifts the row into it.
+     *
+     * The lift the 0.62 asked for was never the lift it got: the scene scale
+     * was multiplied into this offset too, so on a phone it landed at 0.23 of
+     * the half frame — in the middle of the copy rather than above it. The
+     * figure is unchanged; a group's own scale no longer touches its position,
+     * so it now does what it says.
      */
-    const halfFrameH = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
-    gC.position.y = a < 1 ? halfFrameH * 0.62 : 0;
+    gC.position.y = narrow ? halfFrameH * 0.62 : 0;
+
+    holdInside(xA, scaleA, halfFrameW);
+    holdInside(xC, scaleC, halfFrameW);
 
     dotCam.aspect = a;
     dotCam.updateProjectionMatrix();
