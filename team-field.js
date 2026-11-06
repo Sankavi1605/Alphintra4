@@ -477,6 +477,35 @@ export function initTeamField() {
     add(gC, lC, 'T', '#4653f0', 'rgba(70,83,240,0.9)', 0.32, 2.65, -1.6, -0.5, 0.5, true),
   ];
 
+  /*
+   * The clear space between #contact's two cards, in world units at the text
+   * plane, or null when they are not side by side (a portrait screen stacks
+   * them, and the row is lifted above them instead).
+   *
+   * offsetLeft rather than a client rect: the cards carry an entrance
+   * transform, and their layout box is where they come to rest. Offsets are
+   * measured from .contact-inner, not the viewport — it starts 252px in at
+   * 1920 wide — so its own screen position is added back, or the gap's centre
+   * comes out that far to the left. The wrapper is never transformed, so its
+   * rect is safe to read.
+   */
+  const contactCards = [...document.querySelectorAll('#contact .contact-card')];
+  function cardGap(w, halfFrameW) {
+    if (contactCards.length !== 2) return null;
+    const [a, b] = contactCards;
+    if (!a.offsetParent || a.offsetParent !== b.offsetParent) return null;
+    if (Math.abs(a.offsetTop - b.offsetTop) > a.offsetHeight / 2) return null;
+    const origin = a.offsetParent.getBoundingClientRect().left;
+    const left = origin + a.offsetLeft + a.offsetWidth;
+    const right = origin + b.offsetLeft;
+    if (right <= left) return null;
+    const worldPerPx = (2 * halfFrameW) / w;
+    return {
+      half: ((right - left) / 2) * worldPerPx,
+      centre: ((left + right) / 2 - w / 2) * worldPerPx,
+    };
+  }
+
   function resize() {
     const w = host.clientWidth;
     const h = host.clientHeight;
@@ -512,16 +541,21 @@ export function initTeamField() {
     const halfFrameH = Math.tan(((txCam.fov / 2) * Math.PI) / 180) * txCam.position.z;
     const halfFrameW = halfFrameH * a;
 
-    /* On one line DELIVER TRACKS spans fourteen glyph slots, which on a phone
-       is the difference between a 19px glyph and a 40px one. THE TEAM is short
-       enough that one line always fits. */
+    /*
+     * DELIVER over TRACKS, at every width now, not only on a phone.
+     *
+     * On a landscape screen the row sits between the two contact cards, and
+     * since those cards became solid enough to read over the dot sheet, any of
+     * the word that runs under them is simply gone — the D at one end and the
+     * S at the other. On one line the word is wider than the gap between the
+     * cards at every common size (677px against a 540px gap at 1536x864, 564
+     * against 435 at 1280x720, 846 against 540 at 1920x1080), so it could only
+     * have fitted by shrinking. On two lines it is about half that and clears
+     * the gap at full size everywhere. THE TEAM is short enough that one line
+     * always fits.
+     */
     const halfA = flowRow(lA, ['THE TEAM'], SIZE_A, GAP_A);
-    const halfC = flowRow(
-      lC,
-      narrow ? ['DELIVER', 'TRACKS'] : ['DELIVER TRACKS'],
-      SIZE_C,
-      GAP_C
-    );
+    const halfC = flowRow(lC, ['DELIVER', 'TRACKS'], SIZE_C, GAP_C);
 
     const sketch = Math.max(0.52, Math.min(1, a / 1.3));
     const sizeFor = (half) => {
@@ -530,7 +564,11 @@ export function initTeamField() {
       return Math.min(1, narrow ? fit : Math.min(sketch, fit));
     };
     const scaleA = sizeFor(halfA);
-    const scaleC = sizeFor(halfC);
+    const gap = cardGap(w, halfFrameW);
+    /* Never wider than the gap between the cards, less a margin for the glow:
+       the two lines already fit at the sizes measured above, so this only
+       bites on a screen shaped unlike any of them. */
+    const scaleC = gap ? Math.min(sizeFor(halfC), (gap.half * 0.88) / halfC) : sizeFor(halfC);
 
     /* 1, because each group carries its own scale now. */
     txScene.scale.setScalar(1);
@@ -551,6 +589,8 @@ export function initTeamField() {
      * so it now does what it says.
      */
     gC.position.y = narrow ? halfFrameH * 0.62 : 0;
+    /* Centred on the gap itself, should the two cards ever sit off-centre. */
+    gC.position.x = gap ? gap.centre : 0;
 
     holdInside(xA, scaleA, halfFrameW);
     holdInside(xC, scaleC, halfFrameW);
