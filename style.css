@@ -1555,10 +1555,9 @@ nav .nav-links {
 #projects {
   position: relative;
   overflow: hidden;
-  /* Same backdrop as the other scene sections: the hero canvas is fixed for
-     the whole scroll, so a transparent section lets it through wherever the
-     field's mask has faded out. */
-  background: linear-gradient(180deg, transparent 0%, #000000 8%, #000000 98%, transparent 100%);
+  /* No background here: #projects is a white scene, and its background is the
+     "Light scenes" block's at the end of this file. An id rule would out-rank
+     that block's attribute selector and pin the section black. */
 }
 
 /*
@@ -1995,8 +1994,9 @@ nav .nav-links {
  * arrangement as .story-field-live: the gradients on the three sections are the
  * no-WebGL fallback, and this class only lands after a frame has been rendered.
  */
+/* #about is not here: it is a white scene with a paper background of its own
+   (the "Light scenes" block), and this id rule would out-rank it. */
 .team-field-live #makers,
-.team-field-live #about,
 .team-field-live #contact {
   background: none;
 }
@@ -2411,8 +2411,7 @@ nav .nav-links {
 
 /* Above .liquid-glass::before, which is an absolutely positioned overlay. */
 .service-card h3,
-.service-card p,
-.service-card .service-points {
+.service-card p {
   position: relative;
   z-index: 1;
 }
@@ -2429,23 +2428,6 @@ nav .nav-links {
   font-size: 1rem;
   line-height: 1.65;
   margin-bottom: 1.1rem;
-}
-
-.service-points {
-  display: grid;
-  gap: 0.6rem;
-  margin: 0;
-  padding-left: 1.1rem;
-}
-
-.service-points li {
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.6;
-}
-
-.service-points li::marker {
-  color: var(--brand-soft);
 }
 
 /*
@@ -2508,12 +2490,7 @@ nav .nav-links {
 #disciplines {
   position: relative;
   overflow: hidden;
-  background:
-    /* the wash: a cool pool low-left, a warmer one high-right, so the fan is
-       lit from two sides and the cards' edges separate from the ground */
-    radial-gradient(78% 62% at 22% 88%, rgba(70, 44, 190, 0.34) 0%, rgba(0, 0, 0, 0) 62%),
-    radial-gradient(64% 54% at 82% 14%, rgba(138, 75, 255, 0.22) 0%, rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
+  /* Background lives in the "Light scenes" block; see the note on #projects. */
   padding: 6rem 1.75rem 4rem;
   display: flex;
   align-items: center;
@@ -2561,6 +2538,22 @@ nav .nav-links {
      single baseline and the arc drop reads as depth rather than as misalignment. */
   transform-style: preserve-3d;
   /*
+   * Out of hit-testing; the cards opt back in below.
+   *
+   * In a preserve-3d context the stage's own plane is hit-tested too, at depth
+   * 0 — and it paints nothing, so nobody can see it is there. The middle card
+   * sits at depth 0 as well and wins on document order, but every other card is
+   * pushed back DEPTH_PX per step, behind that invisible plane. So a tap on a
+   * neighbour landed on the stage and did nothing. Measured on a still deck at
+   * 1280px: the two cards beside the middle had no hittable area at all, and
+   * the outer ones were reachable only where they hang past the stage's edges —
+   * which is why the last card each side was the only one a tap could bring in.
+   *
+   * Swipes are bound to the deck's root, not here, so a drag that starts in a
+   * gap between cards still lands on something that is listening.
+   */
+  pointer-events: none;
+  /*
    * No content-visibility here, and no paint containment.
    *
    * It was `content-visibility: auto` to save painting seven 3D cards while the
@@ -2587,6 +2580,8 @@ nav .nav-links {
 }
 
 .stack-card {
+  /* Back in, against the stage's none. .is-outside still takes it away again. */
+  pointer-events: auto;
   position: absolute;
   bottom: 0;
   /* Half the card is taken back off in JS with xPercent, so this is the centre
@@ -2599,11 +2594,10 @@ nav .nav-links {
   padding: 1.6rem 1.5rem;
   border-radius: 20px;
   /*
-   * Cards are art, not photographs. The reference stacks image cards, which is
-   * where a fan gets its punch — but this page has no photography anywhere in
-   * it, and eight stock shots would be the only ones on the site. So each card
-   * is its own gradient panel instead, keyed off --card-tint below, which keeps
-   * the fan's layered look and needs no external asset.
+   * Each card is a gradient panel keyed off --card-tint below, and now carries
+   * a photograph too (.stack-card-media), which is where a fan of cards gets
+   * its punch. The panel stays underneath as the card's frame and as what shows
+   * while a photo is still on its way.
    */
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 42%),
@@ -2667,14 +2661,52 @@ nav .nav-links {
 .stack-card:nth-child(7) { --card-tint: rgba(150, 92, 235, 0.46); }
 .stack-card:nth-child(8) { --card-tint: rgba(70, 96, 250, 0.5); }
 
+/*
+ * The photograph. It takes all the room above the copy — the card is a column
+ * pushed to the bottom, so `flex: 1` makes the image whatever is left once the
+ * title and body are laid out, at every card size the deck measures. Pulled
+ * out towards the card's edge, so the glass reads as a thin frame around it.
+ *
+ * pointer-events: none so a tap lands on the card, whose click handler is what
+ * brings it to the middle. draggable="false" in the markup and user-drag here
+ * stop a desktop drag from picking the photo up instead of swiping the deck.
+ */
+.stack-card-media {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Leaves a 0.6rem frame inside the card's 1.6rem/1.5rem padding, and the
+     radius is the card's 20px less that frame, so the two curves are
+     concentric rather than the photo looking rounder than the glass. */
+  margin: -1rem -0.9rem 0.45rem;
+  border-radius: 11px;
+  overflow: hidden;
+  /* Shows for the moment before a photo arrives, in the card's own tint. */
+  background: var(--card-tint, rgba(120, 82, 255, 0.5));
+}
+
+.stack-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Sits on the photo's corner now, so it is white over it rather than a faint
+   watermark on the panel. */
 .stack-card-num {
   position: absolute;
-  top: 1.1rem;
-  right: 1.3rem;
+  z-index: 2;
+  top: 1.3rem;
+  right: 1.35rem;
   font-family: Moonwalk, Inter, sans-serif;
-  font-size: 2.6rem;
+  font-size: 1.5rem;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 14px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
 
@@ -2821,23 +2853,13 @@ nav .nav-links {
 #about {
   position: relative;
   overflow: hidden;
-  /* Fallback backdrop, dropped by .team-field-live once the canvas behind is
-     drawing - same arrangement as #makers and #contact. */
-  background: linear-gradient(180deg, transparent 0%, #000000 3%, #000000 97%, transparent 100%);
-  /*
-   * One panel, centred, with the aurora behind it. The perspective is what
-   * gives the panel its tilt — team-field.js's frame loop writes rotateX and
-   * rotateY on it, and without a perspective on the containing block those
-   * rotations are flat and nothing appears to move.
-   *
-   * This was top-weighted with a 7rem head, back when the planet owned the
-   * upper half and its lettering landed under the copy. Both are gone.
-   */
+  /* No background here: #about is a white scene, and its background is the
+     "Light scenes" block's. See the note on #projects. */
+  /* The copy, centred in the screen as one spread. */
   padding: 4rem 1.5rem;
   min-height: 100svh;
   display: grid;
   place-items: center;
-  perspective: 1500px;
 }
 
 .about-inner {
@@ -2849,159 +2871,92 @@ nav .nav-links {
 }
 
 /*
- * The glass poster.
+ * The copy, set straight on the page.
  *
- * The supplied sketch's recipe, kept intact: a 38%-black fill under a heavy
- * backdrop blur that also desaturates and dims what shows through, four inset
- * shadows for the edge highlight and two outer ones for the drop, and the
- * curved-glass sheen on ::after.
+ * This was a glass panel with the two delivery steps listed down a vertical
+ * rule: a card, small uppercase labels and a line beside them — the shape a
+ * template reaches for by default, and what made it read as generated. It is
+ * an editorial spread now. The heading takes the left of the screen at display
+ * size, the argument takes the right, and the two steps are run-in paragraphs
+ * side by side, the way a printed page sets them. No panel, no list, no rule.
  *
- * The one deviation is the box. The sketch pins it to aspect-ratio 3/4.35 with
- * nothing inside; this one carries a heading, two paragraphs, the two delivery
- * tracks and the call to action, so the height follows the copy and the section
- * stays one screen tall.
- *
- * Parked at opacity 0 with a lift and a slight shrink — team-field.js brings
- * it up as #about arrives, and its frame loop then owns `transform` for the
- * tilt. Nothing else drives this, so a panel with no script is an invisible
- * panel: that module raises it even when it cannot get a WebGL context, and the
- * reduced-motion block places it lit and level.
+ * Every colour comes from the text tokens, so the light scene's ink applies
+ * with no rule of its own here.
  */
-.systems-panel {
-  --mx: 50%;
-  --my: 32%;
-  position: relative;
-  z-index: 2;
-  width: min(640px, 90vw);
-  max-height: 88svh;
-  border-radius: 18px;
-  overflow: hidden;
-  background: rgba(10, 8, 20, 0.38);
-  -webkit-backdrop-filter: blur(30px) saturate(1.15) brightness(0.9);
-  backdrop-filter: blur(30px) saturate(1.15) brightness(0.9);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-    0 44px 120px rgba(0, 0, 0, 0.78),
-    0 12px 60px rgba(50, 32, 150, 0.12);
-  opacity: 0;
-  transform: translateY(56px) scale(0.97);
-  will-change: transform;
+.about-copy {
+  width: 100%;
+  max-width: 1120px;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: start;
 }
 
-/* Without backdrop-filter the 38% fill is a window onto the aurora, and the
-   copy has nothing to sit on. */
-@supports not (backdrop-filter: blur(1px)) {
-  .systems-panel {
-    background: rgba(10, 9, 18, 0.9);
-  }
-}
-
-/* the LIQUID: a specular pool following the pointer inside the glass */
-.systems-panel::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(
-    380px 300px at var(--mx) var(--my),
-    rgba(205, 195, 255, 0.12),
-    rgba(145, 125, 255, 0.04) 44%,
-    transparent 68%
-  );
-}
-
-/* curved-glass top sheen */
-.systems-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    164deg,
-    rgba(255, 255, 255, 0.1),
-    rgba(255, 255, 255, 0.025) 26%,
-    transparent 48%
-  );
-}
-
-/* the dark shade inside the glass: the panel sinks toward its base */
-.systems-shade {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    radial-gradient(130% 90% at 50% -12%, transparent 42%, rgba(0, 0, 0, 0.34) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.05) 46%, rgba(0, 0, 0, 0.46) 100%);
-}
-
-/* Above ::before and ::after, both of which are absolutely positioned overlays. */
-.systems-body {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(0.85rem, 1.9vh, 1.25rem);
-  padding: clamp(1.75rem, 3.4vh, 2.5rem) clamp(1.5rem, 3vw, 2.25rem);
-}
-
-.systems-body h2 {
-  font-size: clamp(1.5rem, 3vw, 2rem);
+.about-title {
+  font-size: clamp(2.3rem, 4.6vw, 3.7rem);
+  line-height: 1.04;
+  letter-spacing: 0.02em;
   color: var(--text-primary);
 }
 
-.systems-body > p {
-  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
-  line-height: 1.6;
+.about-words {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  padding-top: 0.35rem;
+}
+
+.about-words p {
+  font-size: 1.02rem;
+  line-height: 1.75;
   color: var(--text-secondary);
 }
 
-.about-process {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(0.7rem, 1.6vh, 1.1rem);
-  padding-left: 1rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.14);
+/* The opening line in the accent serif, a size up: the sentence the section
+   is really saying, so it reads first. */
+.about-words .about-lead {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+  line-height: 1.3;
+  color: var(--text-primary);
 }
 
-.about-process li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+.about-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+  margin-top: 0.6rem;
 }
 
-.about-process strong {
-  font-size: 0.78rem;
+.about-steps p {
+  font-size: 0.97rem;
+}
+
+/* Run in: the step's name is the start of its own sentence, not a label
+   parked above it. */
+.about-steps strong {
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--brand-soft);
+  color: var(--text-primary);
 }
 
-.about-process span {
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--text-secondary);
+.about-cta {
+  align-self: flex-start;
+  margin-top: 0.4rem;
 }
 
-/*
- * The aurora behind the glass is bright where its lights pass, so light text
- * alone can lose its edge. A tight black halo keeps every line readable
- * wherever the blobs drift to.
- */
-.systems-body h2,
-.systems-body > p,
-.about-process strong,
-.about-process span {
-  text-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.95),
-    0 2px 12px rgba(0, 0, 0, 0.9),
-    0 0 32px rgba(0, 0, 0, 0.75);
+/* Below this the two columns would squeeze the heading, so the spread stacks:
+   heading, then the argument under it. */
+@media (max-width: 899.98px) {
+  .about-copy {
+    grid-template-columns: 1fr;
+    gap: 1.6rem;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .about-steps {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Careers Page Styling */
@@ -3209,24 +3164,6 @@ body > footer {
   font-size: 0.98rem;
   line-height: 1.7;
   color: var(--text-secondary);
-}
-
-.contact-card-points {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  margin: 0;
-  padding-left: 1.15rem;
-  list-style: disc;
-  font-size: 0.94rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-.contact-card-points li::marker {
-  color: var(--brand-soft);
 }
 
 .btn:disabled {
@@ -3520,6 +3457,7 @@ footer {
  * ====================================================================== */
 .projects-deck,
 .services-deck,
+.card-stack,
 .card-stack-stage {
   touch-action: pan-y;
 }
@@ -3549,7 +3487,6 @@ footer {
   .liquid-glass,
   .testimonial-card,
   .work-glass,
-  .systems-panel,
   .careers-standalone-card {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -3559,7 +3496,6 @@ footer {
      stands in for it. The transparent ones take their @supports fallback. */
   .testimonial-card { background: rgba(12, 6, 18, 0.97); }
   .work-glass { background: rgba(24, 26, 42, 0.72); }
-  .systems-panel { background: rgba(10, 9, 18, 0.9); }
 }
 
 /* Phones */
@@ -3686,7 +3622,6 @@ footer {
   .services-deck .service-card { padding: 1.6rem 1.4rem; border-radius: 18px; }
   .service-card h3 { font-size: 1.25rem; margin-bottom: 0.8rem; }
   .service-card p { font-size: 0.95rem; margin-bottom: 0.9rem; }
-  .service-points li { font-size: 0.9rem; }
   .services-arrow { width: 38px; height: 38px; }
   /* The arrows are no longer beside the deck, so the indent that lined the
      hint up with the card is now just a dent in it. */
@@ -3737,16 +3672,16 @@ footer {
   }
   .stack-card-title { font-size: 1rem; }
   .stack-card-body { font-size: 0.82rem; line-height: 1.5; }
-  .stack-card-num { font-size: 1.9rem; top: 0.8rem; right: 0.95rem; }
+  /* Same frame rule as the desktop card: a 0.5rem inset, a 16 - 8 = 8px curve. */
+  .stack-card-media { margin: -0.65rem -0.6rem 0.35rem; border-radius: 8px; }
+  .stack-card-num { font-size: 1.15rem; top: 1.05rem; right: 1.05rem; }
 
   #disciplines { padding: 4.5rem 1.25rem 3rem; }
   .disciplines-lede { font-size: 0.88rem; }
   .card-stack { margin-top: 1.75rem; }
   .card-stack-dots { margin-top: 1.5rem; }
 
-  /* The panel is the only thing in this section, so it takes the width. */
-  .systems-panel { width: 94vw; }
-  .systems-body > p { font-size: 0.95rem; }
+  .about-words p { font-size: 0.95rem; }
 
   /* No room either side of the crater on a phone: the pair stacks and the
      dot sheet runs behind them, as every other field does here. */
@@ -3925,14 +3860,8 @@ footer {
    * .team-field is NOT hidden here. THE TEAM and DELIVER TRACKS are drawn in
    * that canvas, so dropping it would leave two sections headless; it renders
    * one settled frame and never animates, which is what this query asks for.
-   * #about between them carries its heading on the panel, so it needs nothing.
+   * #about between them carries its heading in its own copy, so it needs nothing.
    */
-
-  /* No entrance runs in this mode, so the panel is placed lit and level. */
-  .systems-panel {
-    opacity: 1;
-    transform: none;
-  }
 
   /*
    * The track sizes to the stacked cards instead of holding one card's height,
@@ -3988,4 +3917,363 @@ footer {
   #services {
     display: block;
   }
+}
+
+/* =========================================================================
+ * Light scenes
+ *
+ * The page alternates dark and white. #projects, #disciplines and #about are
+ * white; the hero, the capability story, #makers, #contact and the closing
+ * call to action stay dark. A section opts in with data-tone="light"; tone.js
+ * says which tone the screen is in by setting .tone-light on <html>.
+ *
+ * THE CHANGE
+ *
+ * A white section arrives dark — under a black veil, the same black as the
+ * scene it follows — and once it takes over the screen the veil fades away as
+ * the paper and its wash come up. That is the whole transition: one fade, on
+ * one curve. The content never moves or fades; it is there all along, under
+ * the veil.
+ *
+ * A veil over the content rather than fading the content itself, and that is
+ * not a style choice. An ancestor at opacity below 1 becomes a backdrop root,
+ * so every glass card inside a fading wrapper would stop seeing the wash behind
+ * it for the length of the fade and then snap to frosted at the very end. A
+ * sibling painted on top changes nothing about what the glass samples, so the
+ * glass is right on every frame of the fade.
+ *
+ * Without JS the veil never appears: the dark state is gated on .tone-ready,
+ * which only tone.js sets, so a page whose script never ran is simply white.
+ *
+ * GLASS ON WHITE
+ *
+ * Glass is only visible because of what is behind it. On flat white a blur has
+ * nothing to blur and a translucent white panel is just white, which is why the
+ * dark recipe vanishes here. So each light scene carries a wash — two soft
+ * pools of the brand violet and blue, under the middle of the scene where the
+ * cards sit — for the glass to frost, and the panels carry the cues that read
+ * as glass on a light ground: a bright lip along the top edge, a hairline where
+ * the edge meets the page, and a soft lift shadow.
+ *
+ * Blur is desktop only. Phones already drop backdrop-filter page-wide for cost
+ * (see the note above the small-screen block), and over this wash the tinted
+ * translucency alone still reads as glass — except on the disciplines fan,
+ * which overlaps, and is near-opaque on a phone for that reason.
+ * ====================================================================== */
+:root {
+  --paper: #f4f4f7;
+  --ink: #121218;
+  --ink-soft: #565663;
+  --tone-fade: 0.7s;
+  --tone-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- the scene ---------------------------------------------------------- */
+[data-tone="light"] {
+  background: var(--paper);
+  transition: background-color var(--tone-fade) var(--tone-ease);
+  color: var(--ink-soft);
+
+  /*
+   * The shared tokens, re-pointed for everything inside. Headings, body copy,
+   * the arrows and links all read these already, so they turn dark with no
+   * rule of their own.
+   */
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-soft);
+  --glass-border: rgba(18, 18, 24, 0.08);
+  --brand-soft: #6a3fe0;
+
+  /* The glass, once, for both kinds of panel below. */
+  --lg-fill: linear-gradient(155deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.5) 100%);
+  --lg-blur: blur(20px) saturate(1.7);
+  --lg-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 0 0 1px rgba(18, 18, 40, 0.06),
+    0 22px 44px -20px rgba(44, 30, 110, 0.28),
+    0 4px 12px -6px rgba(44, 30, 110, 0.1);
+}
+
+/* The wash the glass frosts. Under the content (z 2), over the paper. */
+[data-tone="light"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(34% 40% at 30% 64%, rgba(122, 75, 255, 0.2) 0%, transparent 70%),
+    radial-gradient(30% 36% at 72% 36%, rgba(70, 110, 255, 0.16) 0%, transparent 70%);
+  transition: opacity var(--tone-fade) var(--tone-ease);
+}
+
+/*
+ * The veil. Over everything in the section, never in the way of a click.
+ *
+ * Soft at both ends, as these sections' own black backgrounds used to be. The
+ * scene before each one reaches its edge still lit — the hero's horizon glow
+ * runs right to the bottom of the pin — and a veil that went solid at its first
+ * pixel cut that glow off in a hard line along the seam.
+ */
+[data-tone="light"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, #000 6%, #000 97%, transparent 100%);
+  opacity: 0;
+  transition: opacity var(--tone-fade) var(--tone-ease);
+}
+
+/*
+ * Lights off. The paper and the wash go too, not just the veil arriving: where
+ * the veil is soft at its edges, whatever is under it shows, and that has to
+ * be the scene next door rather than a strip of white.
+ */
+html.tone-ready:not(.tone-light) [data-tone="light"] {
+  background-color: transparent;
+}
+html.tone-ready:not(.tone-light) [data-tone="light"]::before {
+  opacity: 0;
+}
+html.tone-ready:not(.tone-light) [data-tone="light"]::after {
+  opacity: 1;
+}
+
+/* --- headings ------------------------------------------------------------ */
+/* #projects' heading used to be lettered in WebGL over the blades. */
+.tone-heading {
+  margin-bottom: clamp(1.5rem, 4vh, 2.75rem);
+  font-size: clamp(1.6rem, 3.4vw, 2.5rem);
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+/* --- glass panels -------------------------------------------------------- */
+[data-tone="light"] .work-glass {
+  background: var(--lg-fill);
+  background-blend-mode: normal;
+  box-shadow: var(--lg-shadow);
+}
+
+/* Hover keeps the resting edge: on white the dark theme's glow read as a
+   shadow appearing under the pointer, which is the effect this page already
+   dropped from the testimonial card. */
+[data-tone="light"] .work-glass:hover,
+[data-tone="light"] .work-glass:focus-within {
+  box-shadow: var(--lg-shadow);
+}
+
+/*
+ * The fan overlaps eight deep, so the card in front must hide the copy of the
+ * cards behind it. Translucency alone could not: at 0.74 the next card's title
+ * read straight through the active one. Real frosted glass hides what is behind
+ * it by blurring it, so on desktop these get the blur too — tested in place,
+ * because the stage is a perspective, preserve-3d context and that is not a
+ * given; it renders. Phones have no blur, so there the fill is opaque instead,
+ * and the edge, lip and shadow carry the glass. Opaque, not nearly: at 0.9 the
+ * dark copy of the card behind still showed as grey text through the front
+ * one, because ten percent of near-black on white is plainly visible.
+ *
+ * Each keeps a trace of its own tint, so the fan still reads as one gradient
+ * across the deck.
+ */
+[data-tone="light"] .stack-card {
+  background:
+    radial-gradient(120% 90% at 12% 8%, color-mix(in srgb, var(--card-tint) 26%, transparent) 0%, transparent 62%),
+    linear-gradient(160deg, #ffffff 0%, #f5f4fa 100%);
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: var(--lg-shadow);
+}
+
+@media (min-width: 768px) {
+  [data-tone="light"] .work-glass,
+  [data-tone="light"] .stack-card {
+    -webkit-backdrop-filter: var(--lg-blur);
+    backdrop-filter: var(--lg-blur);
+  }
+
+  [data-tone="light"] .stack-card {
+    background:
+      radial-gradient(120% 90% at 12% 8%, color-mix(in srgb, var(--card-tint) 26%, transparent) 0%, transparent 62%),
+      linear-gradient(160deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.5) 100%);
+  }
+}
+
+/* --- what sits on them --------------------------------------------------- */
+[data-tone="light"] .project-num { color: rgba(106, 63, 224, 0.55); }
+[data-tone="light"] .project-slide h3 { color: var(--ink); }
+[data-tone="light"] .project-slide p { color: var(--ink-soft); }
+
+[data-tone="light"] .tag {
+  background: rgba(122, 75, 255, 0.08);
+  border-color: rgba(122, 75, 255, 0.22);
+  color: #5a34d6;
+}
+
+[data-tone="light"] .stack-card-body { color: var(--ink-soft); }
+
+/* All three states, because a rule here outranks the base hover and is-on. */
+[data-tone="light"] .card-stack-dot { background: rgba(18, 18, 24, 0.16); }
+[data-tone="light"] .card-stack-dot:hover { background: rgba(18, 18, 24, 0.34); }
+[data-tone="light"] .card-stack-dot.is-on { background: var(--ink); }
+
+/* Small glass, for the carousel's arrows. Hover restated for the same reason
+   as the dots; the base rule's scale still applies. */
+[data-tone="light"] .projects-arrow {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(18, 18, 40, 0.07), 0 6px 16px -8px rgba(44, 30, 110, 0.25);
+}
+[data-tone="light"] .projects-arrow:hover,
+[data-tone="light"] .projects-arrow:focus-visible {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+/* --- the nav ------------------------------------------------------------- */
+/*
+ * The nav floats over every section, so it follows the one under it — a
+ * separate class from .tone-light, set off the top of the screen rather than
+ * the 65% line (see tone.js). Not while the menu is open: that overlay is dark
+ * whatever is behind it.
+ */
+body > nav .nav-links,
+body > nav .nav-toggle {
+  transition: background-color var(--tone-fade) var(--tone-ease), box-shadow var(--tone-fade) var(--tone-ease);
+}
+body > nav .logo img {
+  transition: filter var(--tone-fade) var(--tone-ease), opacity var(--tone-fade) var(--tone-ease);
+}
+body > nav .nav-toggle-line {
+  transition: background-color var(--tone-fade) var(--tone-ease);
+}
+
+html.nav-light body:not(.no-scroll) > nav .nav-links,
+html.nav-light body:not(.no-scroll) > nav .nav-toggle {
+  background-color: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 0 0 1px rgba(18, 18, 40, 0.07), 0 8px 24px -12px rgba(44, 30, 110, 0.22);
+}
+html.nav-light body:not(.no-scroll) > nav .nav-links a,
+html.nav-light body:not(.no-scroll) > nav .nav-icon-link {
+  color: rgba(18, 18, 24, 0.62);
+}
+html.nav-light body:not(.no-scroll) > nav .nav-links a:hover,
+html.nav-light body:not(.no-scroll) > nav .nav-links a:focus-visible,
+html.nav-light body:not(.no-scroll) > nav .nav-links a.active {
+  color: var(--ink);
+  background-color: rgba(18, 18, 24, 0.06);
+}
+html.nav-light body:not(.no-scroll) > nav .nav-icon-link:hover {
+  color: var(--ink);
+}
+html.nav-light body:not(.no-scroll) > nav .nav-toggle-line {
+  background: var(--ink);
+}
+/* The marks are white PNGs. brightness(0) keeps their shape and makes them ink. */
+html.nav-light body:not(.no-scroll) > nav .logo img {
+  filter: brightness(0);
+  opacity: 0.86;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tone="light"],
+  [data-tone="light"]::before,
+  [data-tone="light"]::after,
+  body > nav .nav-links,
+  body > nav .nav-toggle,
+  body > nav .logo img,
+  body > nav .nav-toggle-line {
+    transition: none;
+  }
+}
+
+/* =========================================================================
+ * Dark-scene cards — readable over the 3D, and in pure white
+ *
+ * Every card in the dark scenes sits over a live WebGL scene, and most of those
+ * scenes have a bright moment exactly where the cards are: the halo's neon ring
+ * under the capability cards, the silk wave's crest, the comets, the orb's rim,
+ * the halftone crater. The cards were .liquid-glass, whose fill is white at 5%
+ * — clear, in practice — and phones drop even its 1px blur, so at those moments
+ * nothing stood between the copy and the glare.
+ *
+ * So the glass is dark now: a deep violet-black tint, frosted on desktop. 0.62
+ * there and 0.74 on a phone, which has no blur to soften what is behind. Even
+ * with a pure-white highlight directly under a card, that leaves the composite
+ * no lighter than about rgb(103) on desktop and rgb(74) on a phone — white copy
+ * at 5.7:1 and 8.9:1 in the worst case, rather than at the mercy of wherever
+ * the scene happens to be bright. The frost lowers the desktop case further,
+ * since a highlight is spread across the blur rather than sitting under a word.
+ *
+ * And the copy is pure white. The secondary grey (#a0a0a0) and the 35-94%
+ * whites it replaces all read as off-white once a bright scene is behind them,
+ * which is the other half of why the details were hard to make out. Done by
+ * re-pointing the two text tokens on the cards, so everything already reading
+ * them follows; the few hard-coded colours are restated below.
+ * ====================================================================== */
+.concept-card,
+.about-us-card,
+.service-card,
+.makers-card,
+.contact-card,
+.cta-card,
+.testimonial-card {
+  --text-primary: #ffffff;
+  --text-secondary: #ffffff;
+}
+
+/* The liquid-glass cards. The testimonial has a fill of its own. */
+.concept-card,
+.about-us-card,
+.service-card,
+.makers-card,
+.contact-card,
+.cta-card {
+  background: rgba(10, 8, 20, 0.74);
+  background-blend-mode: normal;
+}
+
+@media (min-width: 768px) {
+  .concept-card,
+  .about-us-card,
+  .service-card,
+  .makers-card,
+  .contact-card,
+  .cta-card {
+    background: rgba(10, 8, 20, 0.62);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+  }
+}
+
+/* --- the hard-coded colours -------------------------------------------- */
+.concept-index,
+.author-company,
+.hole-text p {
+  color: #ffffff;
+}
+
+/* --- the line that replaced the bullet lists --------------------------- */
+/*
+ * Each services and contact card used to end in a bullet list of three or two
+ * long parallel sentences. The paragraph above now carries those points in
+ * plain language, and the card closes on one short line set in the site's
+ * accent serif — the face its numerals already use.
+ *
+ * Two classes deep, so it outranks `.service-card p` and `.contact-card p`,
+ * which would otherwise hand it body size and a bottom margin.
+ */
+.service-card .card-kicker,
+.contact-card .card-kicker {
+  margin: 0.35rem 0 0;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 1.25rem;
+  line-height: 1.35;
+  letter-spacing: 0.005em;
+  color: #ffffff;
 }

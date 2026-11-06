@@ -27,6 +27,8 @@ import { initSwipe } from './swipe.js';
 import { initHolographicCard } from './holographic-card.js';
 // The pointer-driven light on the loader's logo outline. No WebGL, no GSAP.
 import { initLoaderFlare } from './loader-flare.js';
+// Which tone the screen is in — dark scenes or the white ones between them.
+import { initTone } from './tone.js';
 
 // Nav, FAQ, contact form and the other shared page behaviour.
 import './ui.js';
@@ -269,6 +271,10 @@ function mountWhenNear(selector, init) {
  * Reduced motion: skip the WebGL work entirely.
  * The stylesheet lays the hero out as a normal stacked section in this mode.
  * ---------------------------------------------------------------------- */
+/* Outside the split below: reduced motion still alternates dark and white,
+   the stylesheet just drops the fade between them. */
+initTone();
+
 if (prefersReducedMotion) {
   /* Still paint one static frame so those sections are not empty — mounted on
      approach, same as the motion path, so an unvisited section costs nothing.

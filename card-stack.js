@@ -97,7 +97,6 @@ const INTERVAL_MS = 4200;
 
 /* --- sizing -------------------------------------------------------------- */
 const CARD_MAX_W = 520;
-const CARD_RATIO = 320 / 520; /* the reference's 520x320 */
 
 /*
  * Card size against the stage, in two bands.
@@ -115,15 +114,30 @@ const CARD_RATIO = 320 / 520; /* the reference's 520x320 */
  * width. Some of the fan is given up for it — the neighbours show less of their
  * edges — but a card whose copy does not fit is not a trade worth making.
  *
- * 0.98 gives that 288px card 282px of height against the 182px it needs once the
+ * 0.98 gave that 288px card 282px of height against the 182px it needs once the
  * phone type scale in the stylesheet applies. The headroom is deliberate twice
  * over: this copy comes from alphintra.com and will not stay this length
  * forever, and the requirement grows as the stage narrows — at a 267px stage the
  * card is 230 wide and needs 202, which 0.92 cleared by only 10px.
+ *
+ * THE PHOTOGRAPHS
+ *
+ * Each card now carries a photo above its copy, and the photo is sized by the
+ * stylesheet as whatever height is left once the copy is laid out. So the copy
+ * requirement above is unchanged and still sets the floor; the ratios below are
+ * that floor plus room for a picture worth looking at.
+ *
+ *   narrow  1.2   the 288px phone card is 346 tall: the copy's 182, and about
+ *                 155 of photo — at 0.98 the photo would have been ~90px, a
+ *                 strip rather than an image.
+ *   wide    0.7   the full 520px card is 364 tall, about 205 of it photo. Not
+ *                 taller: the section has to hold heading, lede, the fanned
+ *                 stage (card + 94px) and the dots inside an 800px laptop
+ *                 screen, and 0.7 is about where that runs out.
  */
 const NARROW_STAGE_PX = 560;
-const WIDE = { fraction: 0.74, ratio: CARD_RATIO };
-const NARROW = { fraction: 0.86, ratio: 0.98 };
+const WIDE = { fraction: 0.74, ratio: 0.7 };
+const NARROW = { fraction: 0.86, ratio: 1.2 };
 
 function wrapIndex(n, len) {
   if (len <= 0) return 0;
@@ -287,9 +301,18 @@ export function initCardStack(rootSelector, introSelectors = []) {
       card.classList.toggle('is-outside', !inFan);
       /* Only the active card is draggable, so only it advertises the grab. */
       card.setAttribute('aria-current', isActive ? 'true' : 'false');
-      /* Nothing behind the active card should be reachable by tab or by click
-         through its own body — the click handler on it still selects it. */
-      card.inert = !isActive;
+      /*
+       * No `inert` on the cards behind, which is what used to be here.
+       *
+       * inert takes an element out of hit-testing altogether, so the click
+       * handler below — the one whose whole job is to bring a tapped card to the
+       * middle — could never fire on any card except the one already there.
+       * Sampled on a phone: of 80 on-screen points across the visible
+       * neighbours, none reached the card under them. It also took seven of the
+       * eight cards out of the accessibility tree, against the note on culling
+       * at the top of this file. And it bought nothing: a card holds no link or
+       * control, so there was never anything in one to tab to.
+       */
     });
 
     dots.forEach((d, i) => {
@@ -368,7 +391,17 @@ export function initCardStack(rootSelector, introSelectors = []) {
   let touched = false;
 
   function go(index, byHand) {
-    if (byHand) touched = true;
+    if (byHand) {
+      touched = true;
+      /*
+       * And act on it now. Setting the flag alone did nothing until some other
+       * event happened to re-check autoplay — the pointer leaving, a focus
+       * change — so a tapped card was carried off again on the next 4.2s tick,
+       * which is the opposite of what tapping it asked for. Declared further
+       * down, but hoisted, and only ever reached after boot.
+       */
+      syncAutoplay();
+    }
     active = wrapIndex(index, len);
     /* Instant under reduced motion: a step still has to work there — the arrow
        keys and the dots are the only way through the deck once autoplay is off —
@@ -457,13 +490,18 @@ export function initCardStack(rootSelector, introSelectors = []) {
    * decides which way to step, which keeps the fan's transform in one place
    * instead of having the drag and the layout both writing it.
    *
-   * On the whole stage rather than only the active card, which is what it used
+   * On the whole deck rather than only the active card, which is what it used
    * to be. On a phone the neighbours are a thumb's width from the middle and
    * starting a swipe on one of them is not a mistake, it is just where the
    * thumb landed — refusing it there was most of why the deck felt like it did
    * not respond to touch at all.
+   *
+   * The root rather than the stage, now that the stage takes no pointer events
+   * of its own (see the stylesheet): a gesture starting on a card still bubbles
+   * up to here, and one starting in a gap between cards falls through to the
+   * root instead of to nothing.
    */
-  const justSwiped = initSwipe(stage, {
+  const justSwiped = initSwipe(root, {
     onPrev: () => prev(true),
     onNext: () => next(true),
     /* The reference's threshold, off the card's measured width — as a function,

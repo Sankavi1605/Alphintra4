@@ -266,16 +266,18 @@
       Projects: a single pinned page. The chrome figure stays locked in the
       middle while each project is swapped through in front of it.
     -->
-    <section id="projects" aria-labelledby="projects-heading">
-      <!--
-        Blades field, with OUR FEATURED WORK lettered over it in WebGL. The
-        word is canvas texture, so the real heading is the visually-hidden h2
-        below — it stays in the accessibility tree and the document outline.
-      -->
-      <div class="projects-field" id="projects-field" aria-hidden="true"></div>
+    <!--
+      data-tone="light": one of the two white scenes. tone.js lights it up
+      when it takes over the screen; the look is the "Light scenes" block at
+      the end of style.css.
 
+      The blades field that used to sit behind this is gone — a dark WebGL
+      scene cannot be a white one — so the heading it lettered is real text
+      again rather than a visually-hidden h2.
+    -->
+    <section id="projects" aria-labelledby="projects-heading" data-tone="light">
       <div class="projects-stage">
-        <h2 id="projects-heading" class="visually-hidden">Our Featured Work</h2>
+        <h2 id="projects-heading" class="tone-heading">Our Featured Work</h2>
 
         <!--
           Carousel: one card holds centre while the next waits off-stage right.
@@ -436,48 +438,32 @@
 
           <!--
             One card at a time, stacked. The deck is stepped by hand rather than
-            on a timer like #concepts: these cards carry three bullets each, and
-            a card that reads for eight seconds cannot also leave on its own.
+            on a timer like #concepts: each card is a full paragraph, and a card
+            that reads for eight seconds cannot also leave on its own.
           -->
           <div class="services-deck" id="services-deck" aria-live="polite">
             <article class="service-card liquid-glass">
               <h3>AI &amp; Intelligent Systems</h3>
-              <p>We design AI-powered systems that integrate directly into business workflows. From LLM integrations and RAG architectures to automation pipelines, we build intelligent systems that deliver measurable operational value.</p>
-              <ul class="service-points">
-                <li>Outcome-driven AI strategies based on measurable business priorities.</li>
-                <li>Rapid delivery cycles that validate value before full-scale rollout.</li>
-                <li>Built-in data quality checks for stable and trustworthy outputs.</li>
-              </ul>
+              <p>AI that earns its place in your workflow. We connect LLMs, retrieval and automation to the work your team already does, prove the value on a small, real slice first, and guard the data underneath so every answer can be trusted.</p>
+              <p class="card-kicker">Prove it small, then let it scale.</p>
             </article>
 
             <article class="service-card liquid-glass">
               <h3>Web &amp; Mobile Engineering</h3>
-              <p>We build high-performance full-stack web platforms and cross-platform mobile apps on one shared architecture, so a feature is specified once and ships to every surface your customers actually use.</p>
-              <ul class="service-points">
-                <li>One codebase across web, iOS and Android, with native behaviour where it counts.</li>
-                <li>Performance budgets set at design time, not measured after launch.</li>
-                <li>Accessibility and analytics built into the component layer.</li>
-              </ul>
+              <p>One product, every screen. We build your web platform and your iOS and Android apps on a single shared foundation, so a feature is designed once and lands everywhere together &mdash; fast from the first release, and easy for everyone to use.</p>
+              <p class="card-kicker">Designed once, at home on every screen.</p>
             </article>
 
             <article class="service-card liquid-glass">
               <h3>Interactive 3D &amp; WebGL</h3>
-              <p>We build immersive 3D web experiences, shader effects and interactive product reveals that run in the browser — no plugin, no install, no fallback screenshot.</p>
-              <ul class="service-points">
-                <li>Custom shaders written for the story, not lifted from a library.</li>
-                <li>Scenes that hold 60fps on a mid-range phone, not just a workstation.</li>
-                <li>Full reduced-motion and no-WebGL paths, so nothing is ever a blank frame.</li>
-              </ul>
+              <p>Experiences people remember. Custom shaders, 3D scenes and interactive product reveals that run right in the browser &mdash; no plugin, no install &mdash; and still feel smooth on the phone in your pocket.</p>
+              <p class="card-kicker">Made for your story, never pulled from a template.</p>
             </article>
 
             <article class="service-card liquid-glass">
               <h3>Cloud &amp; DevOps</h3>
-              <p>We deliver enterprise cloud architecture on AWS and GCP, provisioned and deployed as code, so every environment is reproducible and every change is reviewable.</p>
-              <ul class="service-points">
-                <li>Infrastructure as code from the first environment onward.</li>
-                <li>Pipelines that gate on tests, security scans and cost, not just a green build.</li>
-                <li>Observability wired in at deploy time, so incidents are diagnosed rather than guessed.</li>
-              </ul>
+              <p>Infrastructure you never have to guess about. Every environment on AWS or GCP is written as code, every release clears tests and security checks before it ships, and every system is watched from the moment it goes live.</p>
+              <p class="card-kicker">No mystery servers. No 2&nbsp;a.m. guesswork.</p>
             </article>
           </div>
 
@@ -503,10 +489,10 @@
       CSS-only wash so it still reads as part of the scene run (see the note on
       the joins in the stylesheet) without a tenth GL context.
     -->
-    <section id="disciplines" aria-labelledby="disciplines-heading">
+    <section id="disciplines" aria-labelledby="disciplines-heading" data-tone="light">
       <div class="disciplines-inner">
         <h2 id="disciplines-heading">Engineering Disciplines</h2>
-        <p class="disciplines-lede">Eight practices, one delivery model. Drag the deck, or use the arrow keys.</p>
+        <p class="disciplines-lede">Eight practices, one delivery model. Tap a card to bring it forward, swipe through the deck, or use the arrow keys.</p>
 
         <div class="card-stack" id="disciplines-stack">
           <!--
@@ -519,48 +505,96 @@
                aria-live="polite">
             <article class="stack-card" aria-roledescription="slide" aria-label="1 of 8">
               <span class="stack-card-num" aria-hidden="true">01</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1674027444485-cec3da58eef4?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1674027444485-cec3da58eef4?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1674027444485-cec3da58eef4?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1674027444485-cec3da58eef4?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">AI &amp; Intelligent Systems</h3>
               <p class="stack-card-body">We design AI-powered systems that integrate directly into business workflows — LLM integrations, RAG architectures and automation pipelines.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="2 of 8">
               <span class="stack-card-num" aria-hidden="true">02</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1683322499436-f4383dd59f5a?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1683322499436-f4383dd59f5a?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1683322499436-f4383dd59f5a?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1683322499436-f4383dd59f5a?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">AI Ops &amp; Integrations</h3>
               <p class="stack-card-body">Productionising AI with backend services, retrieval pipelines and monitoring across workflows.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="3 of 8">
               <span class="stack-card-num" aria-hidden="true">03</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1559028012-481c04fa702d?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1559028012-481c04fa702d?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1559028012-481c04fa702d?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1559028012-481c04fa702d?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">High-Performance Web &amp; Mobile</h3>
               <p class="stack-card-body">We build fast, SEO-optimised web platforms and cross-platform mobile applications, with product UX engineered for conversion and retention.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="4 of 8">
               <span class="stack-card-num" aria-hidden="true">04</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">Enterprise Backend Foundations</h3>
               <p class="stack-card-body">Microservices architectures and CI/CD pipelines built for performance and reliability.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="5 of 8">
               <span class="stack-card-num" aria-hidden="true">05</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1580106815433-a5b1d1d53d85?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1580106815433-a5b1d1d53d85?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1580106815433-a5b1d1d53d85?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1580106815433-a5b1d1d53d85?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">Cloud Infrastructure &amp; Data Operations</h3>
               <p class="stack-card-body">Secure cloud environments, data layers, ERP and CRM implementation, and tool integrations.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="6 of 8">
               <span class="stack-card-num" aria-hidden="true">06</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1555529902-5261145633bf?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1555529902-5261145633bf?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1555529902-5261145633bf?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1555529902-5261145633bf?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">Delivery, Security &amp; Scale</h3>
               <p class="stack-card-body">Stable releases with security baselines, observability and long-term maintainability — from MVP to growth-stage platform.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="7 of 8">
               <span class="stack-card-num" aria-hidden="true">07</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">Immersive UI/UX Systems</h3>
               <p class="stack-card-body">User-centred design with high design-to-code fidelity and consistent interface systems.</p>
             </article>
 
             <article class="stack-card" aria-roledescription="slide" aria-label="8 of 8">
               <span class="stack-card-num" aria-hidden="true">08</span>
+              <div class="stack-card-media" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1671519821564-ced7e41ee7ae?auto=format&fit=crop&q=70&w=480"
+                     srcset="https://images.unsplash.com/photo-1671519821564-ced7e41ee7ae?auto=format&fit=crop&q=70&w=480 480w, https://images.unsplash.com/photo-1671519821564-ced7e41ee7ae?auto=format&fit=crop&q=70&w=640 640w, https://images.unsplash.com/photo-1671519821564-ced7e41ee7ae?auto=format&fit=crop&q=70&w=960 960w"
+                     sizes="(max-width: 600px) 82vw, 480px"
+                     alt="" width="480" height="270" loading="lazy" decoding="async" draggable="false">
+              </div>
               <h3 class="stack-card-title">Interactive 3D Experience Engineering</h3>
               <p class="stack-card-body">Motion and interaction engineered for clarity, speed and engagement.</p>
             </article>
@@ -603,32 +637,35 @@
     </section>
 
     <!-- About Section -->
-    <section id="about" aria-labelledby="about-heading">
+    <section id="about" aria-labelledby="about-heading" data-tone="light">
       <!--
-        The aurora behind the glass — violet and blue lights with dark pockets
-        drifting among them and film grain over the lot — is the middle beat of
-        the shared .team-field, born out of the orbs above and draining into the
-        wave below. The panel's own h2 is the section's heading.
+        A white scene, like #projects and #disciplines, between the team
+        field's orbs above and its dot sheet below. Its paper covers that
+        field's middle beat — the aurora that used to sit behind the glass —
+        which still runs underneath for the hand-off between the other two.
       -->
 
       <div class="about-inner">
-        <article class="systems-panel" id="systems-panel">
-          <div class="systems-shade" aria-hidden="true"></div>
+        <!--
+          Set straight on the page: no panel, no list, no rule. The heading
+          carries the left of the spread and the argument the right, with the
+          two delivery steps as run-in paragraphs side by side.
+        -->
+        <div class="about-copy">
+          <h2 id="about-heading" class="about-title">We think in systems</h2>
 
-          <div class="systems-body">
-            <h2 id="about-heading">We think in systems</h2>
+          <div class="about-words">
+            <p class="about-lead">Code is only the start. We build whole systems &mdash; secure, well tested, and ready for the day your traffic doubles.</p>
+            <p>And we move fast, because we use what we build: our own development, testing and operations run on AI, which is how we keep the pace high and the quality steady.</p>
 
-            <p>We do not just write code. We build systems that scale. Security, quality, and scalability anchor everything we build.</p>
-            <p>Ultra-fast delivery powered by AI-driven engineering. We don&rsquo;t just build automation for clients &mdash; we run our own AI-powered development, QA, and operations, giving us exceptional speed, consistency, and precision.</p>
+            <div class="about-steps">
+              <p><strong>Discovery and design.</strong> We learn what matters most to you, then map the architecture before a line of code is written &mdash; so every decision serves the launch.</p>
+              <p><strong>Sprint and deploy.</strong> Short sprints you can see and steer, honest updates along the way, and a product that keeps getting better after it ships.</p>
+            </div>
 
-            <ul class="about-process">
-              <li><strong>Discovery &amp; Design</strong><span>Clear scope and priority mapping before implementation begins. Architecture decisions documented with delivery impact in mind.</span></li>
-              <li><strong>Sprint &amp; Deploy</strong><span>Transparent progress checkpoints with practical delivery updates. Measured improvements after launch through data and iteration.</span></li>
-            </ul>
-
-            <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="project-link">Schedule a Call <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
+            <a href="https://calendly.com/contact-alphintra/30min" target="_blank" rel="noopener" class="project-link about-cta">Schedule a Call <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></a>
           </div>
-        </article>
+        </div>
       </div>
     </section>
 
@@ -650,20 +687,14 @@
 
         <article class="contact-card liquid-glass">
           <h3>Engineering Partner for Ambitious Teams</h3>
-          <p>Whether you are launching a startup product or modernizing enterprise infrastructure, we operate as a long-term engineering partner embedded into your roadmap and delivery model.</p>
-          <ul class="contact-card-points">
-            <li>Role-matched experts across frontend, backend, cloud, and AI systems.</li>
-            <li>Domain ownership with consistent technical decision-making across sprints.</li>
-          </ul>
+          <p>Launching something new or rebuilding what you already run, we join your roadmap as part of the team &mdash; not a vendor at arm&rsquo;s length. The right specialist for every layer, from interface to cloud to AI, and the same people owning the decisions sprint after sprint.</p>
+          <p class="card-kicker">The same faces, every sprint.</p>
         </article>
 
         <article class="contact-card liquid-glass">
           <h3>Execution Model Built for Scale</h3>
-          <p>We combine scalable cloud architecture and product-focused execution with predictable governance to deliver measurable outcomes over long-term partnerships.</p>
-          <ul class="contact-card-points">
-            <li>Predictable sprint delivery with low-surprise quality controls.</li>
-            <li>Long-term partnership model with measurable delivery outcomes.</li>
-          </ul>
+          <p>Clear plans, steady releases and quality you can count on. We pair solid cloud architecture with real product thinking, so every sprint ships something that matters &mdash; and the results keep compounding the longer we work together.</p>
+          <p class="card-kicker">Fewer surprises. Better releases.</p>
         </article>
       </div>
     </section>
