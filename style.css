@@ -1620,8 +1620,15 @@ nav .nav-links {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding: calc(var(--nav-height) + 2.5rem) clamp(1.5rem, 5vw, 4rem) clamp(3rem, 7vh, 5.5rem);
+  /*
+   * Centred, with the same padding top and bottom so the heading and card sit
+   * in the middle of the screen rather than in the middle of what the nav
+   * leaves. This used to be flex-end with a light bottom pad: the blades field
+   * owned the upper half and the OUR FEATURED WORK lettering sat over it, so
+   * the card was parked low out of their way. Both are gone.
+   */
+  justify-content: center;
+  padding: calc(var(--nav-height) + 1.5rem) clamp(1.5rem, 5vw, 4rem);
 }
 
 /* The arrows sit outside the track, same arrangement as .services-stage. */
@@ -1655,6 +1662,12 @@ nav .nav-links {
   inset: 0;
   display: flex;
   flex-direction: column;
+  /* One centred stack — number, tags, title, copy, link — in the middle of the
+     card. It was split top-left and bottom-left, with the right half empty for
+     the blades to show through. */
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: clamp(1.75rem, 3.2vw, 3rem) clamp(1.75rem, 3.5vw, 3.5rem);
   /* The conveyor reveals these one at a time; without JS the first is shown. */
   opacity: 0;
@@ -1739,6 +1752,7 @@ nav .nav-links {
 }
 
 .project-num {
+  margin-bottom: 0.9rem;
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.18em;
@@ -1748,7 +1762,7 @@ nav .nav-links {
 /* Pushed to the bottom of the card, under the number. */
 .project-content {
   min-width: 0;
-  margin-top: auto;
+  max-width: 62ch;
 }
 
 .project-slide h3 {
@@ -1770,11 +1784,12 @@ nav .nav-links {
   font-size: clamp(0.95rem, 1.05vw, 1.05rem);
   line-height: 1.65;
   max-width: 62ch;
-  margin-bottom: 1.5rem;
+  margin: 0 auto 1.5rem;
 }
 
 .project-tags {
   display: flex;
+  justify-content: center;
   gap: 0.6rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
@@ -1864,24 +1879,6 @@ nav .nav-links {
 .section-subtext {
   font-size: 1.1rem;
   color: var(--text-secondary);
-}
-
-.btn-outline {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--glass-border);
-  padding: 1rem 2.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.btn-outline:hover {
-  background: var(--glass-bg);
-  border-color: rgba(255,255,255,0.2);
 }
 
 /* Concepts Section */
@@ -2207,34 +2204,11 @@ nav .nav-links {
  */
 .concept-index,
 .concept-card h4,
-.concept-card .concept-desc,
-.concepts-action-text {
+.concept-card .concept-desc {
   text-shadow:
     0 1px 3px rgba(0, 0, 0, 0.95),
     0 2px 12px rgba(0, 0, 0, 0.9),
     0 0 32px rgba(0, 0, 0, 0.75);
-}
-
-/*
- * Out of flow, so the deck above stays centred on the halo. Anchored to
- * .concepts-inner, which is stretched over the whole content box.
- */
-.concepts-action {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.concepts-action-text {
-  max-width: 46ch;
-  font-size: 1.02rem;
-  color: rgba(255, 255, 255, 0.75);
 }
 
 /* --- Liquid glass (supplied spec — do not restyle) --- */
@@ -3568,7 +3542,6 @@ footer {
    */
   #concepts { align-items: flex-start; padding: calc(var(--nav-height) + 1.5rem) 1.25rem 3rem; }
   .concepts-inner { display: block; }
-  .concepts-action { position: static; margin-top: 2rem; }
 
   .projects-stage { padding: calc(var(--nav-height) + 1.5rem) 1rem 2.5rem; }
 
@@ -3577,7 +3550,7 @@ footer {
    * the track takes a row of its own and they wrap underneath it — the same
    * rearrangement .services-stage makes at this breakpoint.
    */
-  .projects-row { flex-wrap: wrap; justify-content: flex-end; gap: 0.9rem; }
+  .projects-row { flex-wrap: wrap; justify-content: center; gap: 0.9rem; }
   .projects-deck { flex: 1 0 100%; order: -1; }
   .projects-arrow { width: 38px; height: 38px; }
 

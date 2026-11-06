@@ -913,15 +913,6 @@ function setupScrollAnimations(model, model3) {
     }
   );
 
-  const at = { trigger: '.concepts-action', start: 'top 90%' };
-  reveal('.concepts-action-text', at, { y: 20, blur: 4 }, { duration: 0.6 });
-  reveal(
-    '.concepts-action .btn-outline',
-    at,
-    { y: 25, scale: 0.9 },
-    { duration: 0.7, ease: 'back.out(1.4)', delay: 0.15 }
-  );
-
   /*
    * 2. ABOUT
    *
