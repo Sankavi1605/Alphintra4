@@ -1640,17 +1640,26 @@ nav .nav-links {
 }
 
 /*
- * The carousel track. Every card is absolutely stacked in the same box and
- * moved on x, so the entering and leaving cards pass each other without any
- * layout work per frame. The height is fixed because the cards are absolute
- * and would otherwise collapse the track to nothing.
+ * The carousel track. Every card is stacked in the same grid cell and moved on
+ * x, so the entering and leaving cards pass each other without any layout
+ * work per frame.
+ *
+ * A grid cell rather than absolute positioning, because the cards now have a
+ * height of their own — a photo of a fixed shape plus a caption that wraps to
+ * two lines on a narrow card — and the track should simply be as tall as the
+ * tallest of them. Absolute cards made the track a fixed box and the photo
+ * whatever the caption left, so a caption that wrapped squashed the photo:
+ * 2.64:1 on a portrait tablet, a sixth of each shot cropped away.
+ *
+ * The width cap keeps a whole card inside 60% of the screen's height: about
+ * 90px of frame and caption, and the photo at 2.05:1 for the rest.
  */
 .projects-deck {
   position: relative;
+  display: grid;
   width: 100%;
-  max-width: 1180px;
+  max-width: min(1180px, calc((60vh - 90px) * 2.05));
   margin-inline: auto;
-  height: clamp(300px, 42vh, 420px);
   perspective: 1100px;
   /* min-width: 0 so a flex row cannot be widened past the stage by the track. */
   flex: 1 1 auto;
@@ -1658,17 +1667,12 @@ nav .nav-links {
 }
 
 .project-slide {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
-  /* One centred stack — number, tags, title, copy, link — in the middle of the
-     card. It was split top-left and bottom-left, with the right half empty for
-     the blades to show through. */
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: clamp(1.75rem, 3.2vw, 3rem) clamp(1.75rem, 3.5vw, 3.5rem);
+  /* The screenshot, framed by the glass, with one caption row under it. */
+  padding: 0.75rem;
   /* The conveyor reveals these one at a time; without JS the first is shown. */
   opacity: 0;
   cursor: pointer;
@@ -1751,18 +1755,58 @@ nav .nav-links {
   z-index: 1;
 }
 
-.project-num {
-  margin-bottom: 0.9rem;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  color: #ab93d8;
+/*
+ * The screenshot, at a fixed 2.05:1 — between the three shots' 1.83 and 2.19,
+ * so the wide two lose about 3% off each side and CipherLux is shown whole
+ * (see --whole). A fixed shape rather than leftover space, so it is the same
+ * at every width whatever the caption does. Cropped from the centre: all
+ * three are hero shots with the headline across the middle.
+ */
+.project-shot {
+  display: block;
+  aspect-ratio: 2.05;
+  border-radius: 13px;
+  overflow: hidden;
+  background: rgba(122, 75, 255, 0.12);
 }
 
-/* Pushed to the bottom of the card, under the number. */
+.project-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  -webkit-user-drag: none;
+}
+
+/*
+ * Shown whole instead. CipherLux's shot is the squarer one (1.83:1 against a
+ * ~2:1 frame) and its headline runs to both edges, so the centre crop took the
+ * foot off TRADING. Its page is black, so the bars either side of a contained
+ * image are black too, and read as more of the same page rather than as bars.
+ */
+.project-shot--whole {
+  background: #000;
+}
+
+.project-shot--whole img {
+  object-fit: contain;
+}
+
+/*
+ * The caption: the project's name and the way in, and nothing else. The
+ * number, the three category pills and the paragraph of description that
+ * used to stack above the name read as filler, and the screenshot now says
+ * what the project is.
+ */
 .project-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  flex-wrap: wrap;
   min-width: 0;
-  max-width: 62ch;
+  padding: 1rem 0.75rem 0.35rem;
 }
 
 .project-slide h3 {
@@ -1770,41 +1814,7 @@ nav .nav-links {
   font-weight: 300;
   font-size: clamp(1.4rem, 2.4vw, 2.1rem);
   letter-spacing: 0.02em;
-  margin-bottom: 0.8rem;
-}
-
-/*
- * Capped in ch rather than left to fill the card: a single paragraph running
- * the full ~1100px is a ~150 character line, roughly twice what the eye
- * tracks comfortably.
- */
-.project-slide p {
-  color: var(--text-primary);
-  font-weight: 300;
-  font-size: clamp(0.95rem, 1.05vw, 1.05rem);
-  line-height: 1.65;
-  max-width: 62ch;
-  margin: 0 auto 1.5rem;
-}
-
-.project-tags {
-  display: flex;
-  justify-content: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-}
-
-.tag {
-  background: rgba(138, 43, 226, 0.15);
-  border: 1px solid rgba(138, 43, 226, 0.4);
-  color: #d8b4fe;
-  padding: 0.25rem 0.8rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  margin: 0;
 }
 
 .project-link {
@@ -3554,13 +3564,18 @@ footer {
   .projects-deck { flex: 1 0 100%; order: -1; }
   .projects-arrow { width: 38px; height: 38px; }
 
-  /* The word needs the upper third, so the track takes what is left. */
-  .projects-deck { height: clamp(340px, 46vh, 430px); }
-  .project-slide { padding: 1.35rem 1.4rem; border-radius: 18px; }
-  .project-slide h3 { margin-bottom: 0.6rem; }
-  .project-slide p { margin-bottom: 1.1rem; max-width: none; }
-  .project-tags { margin-bottom: 0.75rem; }
-  .tag { font-size: 0.68rem; padding: 0.2rem 0.6rem; }
+  /* On a phone the name wraps and needs the link under it, so the caption is
+     a centred stack. The photo keeps its 2.05:1 and the card grows to fit. */
+  .projects-deck { max-width: none; }
+  .project-slide { padding: 0.6rem; border-radius: 18px; }
+  .project-shot { border-radius: 12px; }
+  .project-content {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.9rem 0.5rem 0.5rem;
+    text-align: center;
+  }
 
   /* minmax(300px, …) still forces overflow on a 360px screen. */
   /* The panel is the only thing in this section, so it takes the width. */
@@ -3841,13 +3856,13 @@ footer {
    * and the cards leave the absolute stack so they can flow.
    */
   .projects-deck {
-    height: auto;
+    display: block;
     perspective: none;
   }
 
+  /* Out of the shared cell, so the three follow one another down the page. */
   .project-slide {
-    position: relative;
-    inset: auto;
+    grid-area: auto;
     opacity: 1;
     cursor: auto;
     margin-bottom: 2.5rem;
@@ -4077,15 +4092,7 @@ html.tone-ready:not(.tone-light) [data-tone="light"]::after {
 }
 
 /* --- what sits on them --------------------------------------------------- */
-[data-tone="light"] .project-num { color: rgba(106, 63, 224, 0.55); }
 [data-tone="light"] .project-slide h3 { color: var(--ink); }
-[data-tone="light"] .project-slide p { color: var(--ink-soft); }
-
-[data-tone="light"] .tag {
-  background: rgba(122, 75, 255, 0.08);
-  border-color: rgba(122, 75, 255, 0.22);
-  color: #5a34d6;
-}
 
 [data-tone="light"] .stack-card-body { color: var(--ink-soft); }
 

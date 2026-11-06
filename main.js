@@ -1061,9 +1061,9 @@ function setupProjectsCarousel() {
    * Just far enough to be fully clear of the track, plus a little for the blur.
    *
    * The sketch used `stage/2 + card * 0.9`, but its cards were min(560px, 88vw)
-   * inside a full-width stage. Ours fill the track — the copy is a tags row, a
-   * title, a 62ch paragraph and a link, which at 560px would be a very tall
-   * card — so that formula asked for ~40% more distance than the card needs.
+   * inside a full-width stage. Ours fill the track — a wide screenshot over a
+   * caption, which at 560px would be a small, cramped card — so that formula
+   * asked for ~40% more distance than the card needs.
    * With the duration fixed at 1.15s the surplus all came off the visible part
    * of the move, and the sweep read as a whip.
    */
